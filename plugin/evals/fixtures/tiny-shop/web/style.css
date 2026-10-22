@@ -1,0 +1,2 @@
+:root { --space: 16px; --text: #1b1b1f; --bg: #ffffff; }
+body { margin: 0; padding: var(--space); color: var(--text); background: var(--bg); font: 16px/1.5 system-ui, sans-serif; }

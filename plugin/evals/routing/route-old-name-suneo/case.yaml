@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-old-name-suneo
+description: 'A retired name (suneo) is mapped to its new role (shizuka) instead of failing. Source: plan section 2 merges, doraemon old-name map.'
+tags: [routing, shizuka]
+context:
+  scaffold_script: setup.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: shizuka-claims-match-code
+description: 'Shizuka checks every README claim against the code: the false PDF and encryption claims go, CSV stays. Source: harvest nobita/suneo/shizuka (never overclaim security, seen 3).'
+tags: [shizuka]
+context:
+  scaffold_script: setup.sh

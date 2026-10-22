@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: chip-path-line-read-only
+description: 'Chip ''n Dale answer ''where is X defined and used'' with path:line, using only Read/Grep/Glob (memory: project also grants Write/Edit, so the prompt is the only guard).'
+tags: [chip-and-dale, smoke]
+context:
+  scaffold_script: setup.sh

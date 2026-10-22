@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: cost-general-purpose-leak
+description: 'Measures the general-purpose leak: run once plain and once with CLAUDE_CODE_SUBAGENT_MODEL=sonnet exported, then compare modelUsage in the trace (see docs/cost-baseline.md). The owner asks for general-purpose by name.'
+tags: [cost]
+context:
+  scaffold_script: setup.sh

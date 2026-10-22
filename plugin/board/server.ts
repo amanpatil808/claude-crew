@@ -1,0 +1,51 @@
+// Local live board: serves page.html and one JSON endpoint, and runs the pollers in the same
+// process so a single stop command turns everything off. Bound to 127.0.0.1 only.
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { SERVER_FILE } from "./lib/paths.ts";
+import { writePrivate } from "./lib/private-fs.ts";
+import { startPolling } from "./lib/pollers.ts";
+import { buildState } from "./lib/state.ts";
+
+const DIR = import.meta.dirname;
+// The page is one file for the browser (strict CSP, no extra requests): the Crew Room css and js are inlined here.
+const readPage = () => readFileSync(join(DIR, "page.html"), "utf8")
+  .replace("/*ROOM_CSS*/", () => readFileSync(join(DIR, "room.css"), "utf8"))
+  .replace("/*ROOM_JS*/", () => readFileSync(join(DIR, "room.js"), "utf8"));
+const BASE = Number(process.env.BOARD_PORT) || 8811;
+const PORTS = Array.from({ length: 10 }, (_, i) => BASE + i);
+
+function handle(req: IncomingMessage, res: ServerResponse) {
+  // A Host check blocks DNS-rebinding: a web page elsewhere cannot read this through a lookalike name.
+  const host = (req.headers.host ?? "").replace(/:\d+$/, "");
+  if (host !== "127.0.0.1" && host !== "localhost") { res.writeHead(403).end(); return; }
+  const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" };
+  if (req.method !== "GET") { res.writeHead(405, headers).end(); return; }
+  if (req.url === "/api/state") {
+    res.writeHead(200, { ...headers, "content-type": "application/json" }).end(JSON.stringify(buildState()));
+  } else if (req.url === "/" || req.url?.startsWith("/?")) {
+    let page: string;
+    try { page = readPage(); } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("page.html is missing from the board folder"); return; }
+    res.writeHead(200, { ...headers, "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'" })
+      .end(page);
+  } else res.writeHead(404, headers).end();
+}
+
+// Takes the first free port from BOARD_PORT (default 8811) up to +9, so a second copy or another tool does not block it.
+function listen(i = 0) {
+  if (i >= PORTS.length) { console.error(`no free port in ${PORTS[0]}-${PORTS[PORTS.length - 1]}`); process.exit(1); }
+  const server = createServer(handle);
+  server.once("error", () => listen(i + 1));
+  server.listen(PORTS[i], "127.0.0.1", () => {
+    writePrivate(SERVER_FILE, JSON.stringify({ pid: process.pid, port: PORTS[i], startedAt: new Date().toISOString() }));
+    console.log(`crew board on http://127.0.0.1:${PORTS[i]}`);
+    const stopPolling = startPolling();
+    const shutdown = () => { stopPolling(); server.close(); rmSync(SERVER_FILE, { force: true }); process.exit(0); };
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+  });
+}
+
+listen();

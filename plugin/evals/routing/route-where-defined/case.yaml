@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-where-defined
+description: 'A "where is X defined" question goes to chip-and-dale (Haiku), never general-purpose or Explore (main model). Source: plan 3.1, harvest (26 of 57 runs were general-purpose).'
+tags: [routing, smoke]
+context:
+  scaffold_script: setup.sh
