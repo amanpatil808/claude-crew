@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: doraemon-verify-before-commit
+description: 'Verify a hand-back''s claims before committing: a false ''all green'' is caught by running the tests, and nothing is committed. Source: harvest doraemon ''verify hand-back claims'' (seen 4), ''skipped tests are not passing tests''.'
+tags: [doraemon, smoke]
+context:
+  scaffold_script: setup.sh

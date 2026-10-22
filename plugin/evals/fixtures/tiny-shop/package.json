@@ -1,0 +1,11 @@
+{
+  "name": "tiny-shop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

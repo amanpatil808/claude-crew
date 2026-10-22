@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: scooby-proof-fails-before-fix
+description: 'Scooby-Doo confirms the IDOR in getOrder with a small proof test that he runs and that fails on the current code. Source: harvest scooby-doo/doraemon (proofs that fail before the fix, seen 3).'
+tags: [scooby-doo, smoke]
+context:
+  scaffold_script: setup.sh

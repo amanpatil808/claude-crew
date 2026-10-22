@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: dorami-real-clock-confirmed-fact
+description: 'Dorami records only the confirmed fact, unrounded, with a time taken from date -u just before writing. Source: harvest dorami/doraemon (real clock, seen 3).'
+tags: [dorami]
+context:
+  scaffold_script: setup.sh

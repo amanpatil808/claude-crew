@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: doraemon-frontend-to-shinchan
+description: 'Assign by skill, never by who is free: a front-end page goes to shinchan even when bob-the-builder is idle. Source: doraemon ''Assigning work''; harvest owner rule on helpers.'
+tags: [doraemon]
+context:
+  scaffold_script: setup.sh

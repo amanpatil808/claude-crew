@@ -1,0 +1,44 @@
+// Builds the one JSON document /api/state serves, so it can be tested without a server.
+import { readEvents, type BoardEvent } from "./events.ts";
+import { crewFrom, listRoles, loadRoles } from "./crew.ts";
+import { managerActive, managerProject, mainBusy, roomFacts, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
+import { emptySnapshot, loadSnapshot, type Snapshot } from "./pollers.ts";
+import { readRegistry, type Project } from "./projects.ts";
+import { RETIRED } from "./roster.ts";
+
+export interface ProjectSummary extends Project { working: number; polled: boolean }
+
+// Registered projects first, then any project name that only appears in events (a hook that ran before the registry did).
+export function projectList(events: BoardEvent[], registry: Project[], working: Map<string, number>): ProjectSummary[] {
+  const known = new Set(registry.map((p) => p.name));
+  const extra = [...new Set(events.map((e) => e.project).filter((n): n is string => !!n && !known.has(n)))].map((name) => ({ name, path: "" }));
+  return [...registry, ...extra].map((p) => ({ ...p, working: working.get(p.name) ?? 0, polled: false }));
+}
+
+export function buildState(now = Date.now()) {
+  const events = readEvents(), roleMap = loadRoles(), crew = crewFrom(events, roleMap), roles = listRoles();
+  const registry = readRegistry();
+  const working = new Map<string, number>();
+  for (const c of crew) if (c.status === "working" && c.project) working.set(c.project, (working.get(c.project) ?? 0) + 1);
+  const projects = projectList(events, registry, working);
+  // Focus: the project that produced the newest event (else the first registered one). Top-level ci/prs/commits/deploy
+  // describe it; `snapshots` has every project's own.
+  const focus = [...events].reverse().find((e) => e.project)?.project ?? registry[0]?.name;
+  const snapshots: Record<string, Snapshot> = {};
+  for (const p of registry) {
+    const snap = loadSnapshot(p);
+    snapshots[p.name] = snap;
+    const row = projects.find((x) => x.name === p.name);
+    if (row) row.polled = !!(snap.polledAt.github || snap.polledAt.box);
+  }
+  const snap = (focus && snapshots[focus]) || emptySnapshot();
+  const focusPath = registry.find((p) => p.name === focus)?.path;
+  const members = roomMembers(crew, roles.map((r) => r.id), mainBusy(events, now), roleNotes(events, roleMap), roles, managerProject(events));
+  const room = {
+    roles, retired: RETIRED, members,
+    feed: roomFeed(events, roleMap), talks: roomTalks(events, roleMap, now),
+    managerActive: managerActive(events, now), facts: roomFacts(members, snap.deploy, focusPath),
+  };
+  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, events: events.slice(-300).reverse(), room, snapshots, ...snap };
+}
+
