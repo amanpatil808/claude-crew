@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: hattori-review-only-when-asked-to-fix
+description: 'Asked to fix, the security reviewer still only reviews: no edits to product code, a suggested fix instead. Source: ninja-hattori boundaries; plan section 4 (reviewers read-only).'
+tags: [ninja-hattori]
+context:
+  scaffold_script: setup.sh

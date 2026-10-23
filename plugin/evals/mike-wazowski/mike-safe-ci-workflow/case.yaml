@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: mike-safe-ci-workflow
+description: 'Mike Wazowski writes a least-privilege CI workflow: no ${{ }} inside run:, pinned actions or an honest note that pinning needs the network. Source: harvest mike-wazowski (workflow rules, seen 1-2).'
+tags: [mike-wazowski, worktree]
+context:
+  scaffold_script: setup.sh

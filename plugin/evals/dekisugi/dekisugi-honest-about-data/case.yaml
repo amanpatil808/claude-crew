@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: dekisugi-honest-about-data
+description: 'Dekisugi recommends only insights the product can compute and flags new data needs. Source: harvest dekisugi/olaf (''check every insight against the data the product really has'', seen 2).'
+tags: [dekisugi]
+context:
+  scaffold_script: setup.sh

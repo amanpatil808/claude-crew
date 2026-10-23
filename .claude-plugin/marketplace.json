@@ -1,0 +1,14 @@
+{
+  "name": "crew",
+  "owner": { "name": "Aman Patil" },
+  "description": "Private marketplace for the toon-crew plugin.",
+  "plugins": [
+    {
+      "name": "toon-crew",
+      "source": "./plugin",
+      "description": "A cartoon agent crew with safety guards, a live Crew Room board and shared lessons.",
+      "category": "workflow",
+      "tags": ["agents", "guards", "board"]
+    }
+  ]
+}
