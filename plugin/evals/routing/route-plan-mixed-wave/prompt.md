@@ -2,7 +2,7 @@
 max_turns: 14
 timeout_seconds: 300
 allowed_tools: [Read, Glob, Grep, Agent]
-expected_outcome: 'settings page -> shinchan, discount cap -> bob-the-builder, orders review -> scooby-doo, README -> shizuka; each with a priority; no Agent call.'
+expected_outcome: 'settings page -> shinchan, discount cap -> bob, orders review -> ninja-hattori, README -> shizuka; each with a priority; no Agent call.'
 ---
 
 Plan the next wave for this repo; don't dispatch anyone yet, I'll confirm first.

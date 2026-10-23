@@ -37,9 +37,9 @@ Use this while you plan, build or review. Every rule you apply needs a test that
 
 ## 5. Consent, export and delete
 - Consent is tied to a notice version; a new version asks again.
-- Kill switches and pauses block new connections and fetches, but never block the way out (disconnect, export, delete).
+- Kill switches and pauses block new work (new connections, imports, syncs), but never block the way out (disconnect, export, delete).
 - Export includes everything the user's account holds; delete removes everything, including derived rows, and the tests prove both.
-- Work already running re-checks account state and consent at commit time (see `guarded-integrations`).
+- Work already running re-checks account state and consent at commit time (see `integrations`).
 
 ## 6. Errors, logs and responses
 - Errors are fixed strings built from an error kind. Never echo provider text, tokens, cookies, codes or personal data.

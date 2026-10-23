@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: velma-fact-check-verdicts
-description: 'Velma gives each claim a verdict (confirmed, wrong, unverified) with a source; no source, no row. Source: velma standards; harvest velma (mark unverified).'
-tags: [velma]
-context:
-  scaffold_script: setup.sh

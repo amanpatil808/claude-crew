@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: scrooge-test-fails-without-fix
-description: 'Scrooge fixes the isolation bug with a rule test and proves the test fails without the fix. Source: harvest scrooge/shaktimaan (''prove a fix by running the new tests against the unfixed code'', seen 2).'
-tags: [scrooge, worktree]
-context:
-  scaffold_script: setup.sh

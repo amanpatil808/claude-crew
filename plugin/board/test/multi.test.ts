@@ -45,11 +45,11 @@ test("registry accepts an array or { projects }, and skips bad rows", () => {
 
 test("hook events carry the project: CLAUDE_PROJECT_DIR first, then cwd; the registry names it", () => {
   writeFileSync(REGISTRY_FILE, JSON.stringify(registry));
-  const start = { hook_event_name: "SubagentStart", session_id: "abcdef123456", agent_id: "a1", agent_type: "toon-crew:tom", cwd: "/somewhere/else" };
+  const start = { hook_event_name: "SubagentStart", session_id: "abcdef123456", agent_id: "a1", agent_type: "toon-crew:joe-gardner", cwd: "/somewhere/else" };
   assert.equal(toEvent(start, () => false, () => undefined, { CLAUDE_PROJECT_DIR: "/work/acme/src" })?.project, "Acme Shop");
   assert.equal(toEvent(start, () => false, () => undefined, {})?.project, "else");
   assert.equal(toEvent({ ...start, cwd: undefined }, () => false, () => undefined, {})?.project, undefined);
-  const assign = toEvent({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "toon-crew:tom", description: "run" } }, () => false, () => undefined, { CLAUDE_PROJECT_DIR: "/work/blog" });
+  const assign = toEvent({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_input: { subagent_type: "toon-crew:joe-gardner", description: "run" } }, () => false, () => undefined, { CLAUDE_PROJECT_DIR: "/work/blog" });
   assert.equal(assign?.project, "Blog");
 });
 
@@ -82,26 +82,26 @@ test("a project with no project.md has no poller: polling does nothing and write
 
 test("retired characters count for their new role; prefixed and numbered types too", () => {
   const roles = loadRoles();
-  for (const [old, now] of [["dekisugi", "chhota-bheem"], ["suneo", "shizuka"], ["ninja-hattori", "bob-the-builder"], ["shaktimaan", "scrooge"]] as const) {
+  for (const [old, now] of [["chhota-bheem", "mike-wazowski"], ["suneo", "shizuka"], ["scooby-doo", "ninja-hattori"], ["shaktimaan", "kevin"], ["dorami", "miguel-rivera"], ["scrooge", "kevin"], ["bob-the-builder", "bob"], ["dexter", "dekisugi"], ["velma", "olaf"], ["chip-and-dale", "stuart"], ["tom", "joe-gardner"]] as const) {
     assert.equal(roleFor(old, roles)?.id, now);
     assert.equal(roleFor(`toon-crew:${old}`, roles)?.id, now);
     assert.equal(ALIASES[old], now);
   }
-  assert.equal(roleFor("toon-crew:tom", roles)?.id, "tom");
-  assert.equal(roleFor("toon-crew:chip-and-dale-2", roles)?.id, "chip-and-dale");
+  assert.equal(roleFor("toon-crew:tom", roles)?.id, "joe-gardner");
+  assert.equal(roleFor("toon-crew:chip-and-dale-2", roles)?.id, "stuart");
   assert.equal(roleFor("general-purpose", roles), undefined);
   assert.equal(roleFor(undefined, roles)?.id, "doraemon");
   const crew = crewFrom([
     { id: "1", ts: "2026-10-22T10:00:00Z", kind: "agent-start", text: "", agentId: "n1", agentType: "ninja-hattori" },
-    { id: "2", ts: "2026-10-22T10:01:00Z", kind: "agent-start", text: "", agentId: "t1", agentType: "toon-crew:tom" },
+    { id: "2", ts: "2026-10-22T10:01:00Z", kind: "agent-start", text: "", agentId: "t1", agentType: "toon-crew:joe-gardner" },
   ], roles);
-  assert.deepEqual(crew.map((c) => [c.agentId, c.roleId]).sort(), [["n1", "bob-the-builder"], ["t1", "tom"]]);
+  assert.deepEqual(crew.map((c) => [c.agentId, c.roleId]).sort(), [["n1", "ninja-hattori"], ["t1", "joe-gardner"]]);
 });
 
-test("the roster has 13 roles and the retired list points at real roles", () => {
-  assert.equal(ROSTER.length, 13);
-  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 13);
-  assert.deepEqual(RETIRED.map((r) => [r.id, r.mergedInto]), [["dekisugi", "chhota-bheem"], ["suneo", "shizuka"], ["ninja-hattori", "bob-the-builder"], ["shaktimaan", "scrooge"]]);
+test("the roster has 15 roles and the retired list points at real roles", () => {
+  assert.equal(ROSTER.length, 15);
+  assert.equal(new Set(ROSTER.map((r) => r.id)).size, 15);
+  assert.deepEqual(RETIRED.map((r) => [r.id, r.mergedInto]), [["dorami", "miguel-rivera"], ["scrooge", "kevin"], ["bob-the-builder", "bob"], ["chhota-bheem", "mike-wazowski"], ["scooby-doo", "ninja-hattori"], ["tom", "joe-gardner"], ["dexter", "dekisugi"], ["velma", "olaf"], ["chip-and-dale", "stuart"], ["suneo", "shizuka"], ["shaktimaan", "kevin"]]);
   assert.ok(RETIRED.every((r) => r.name && r.show && ROSTER.some((x) => x.id === r.mergedInto)));
 });
 
@@ -119,11 +119,11 @@ test("/api/state: projects, per-member project, retired, snapshots", () => {
   const member = (id: string) => s.room.members.find((m) => m.id === id);
   assert.equal(member("shinchan")?.status, "working");
   assert.equal(member("shinchan")?.project, "Acme Shop");
-  assert.equal(member("chhota-bheem")?.status, "done");            // Dekisugi's stop counts for Chhota Bheem
-  assert.equal(member("chhota-bheem")?.project, undefined);        // only working members have a place
+  assert.equal(member("dekisugi")?.status, "done");
+  assert.equal(member("dekisugi")?.project, undefined);        // only working members have a place
   assert.equal(member("doraemon")?.project, "Ghost");              // his heartbeat came from there
-  assert.equal(s.room.roles.length, 13);
-  assert.deepEqual(s.room.retired.map((r) => r.id), ["dekisugi", "suneo", "ninja-hattori", "shaktimaan"]);
+  assert.equal(s.room.roles.length, 15);
+  assert.deepEqual(s.room.retired.map((r) => r.id), ["dorami", "scrooge", "bob-the-builder", "chhota-bheem", "scooby-doo", "tom", "dexter", "velma", "chip-and-dale", "suneo", "shaktimaan"]);
   assert.deepEqual(Object.keys(s.snapshots).sort(), ["Acme Shop", "Acme Tools", "Blog"]);
   assert.ok(Array.isArray(s.ci) && Array.isArray(s.prs) && s.deploy === null);
 });

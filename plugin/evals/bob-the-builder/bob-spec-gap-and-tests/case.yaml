@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: bob-spec-gap-and-tests
-description: 'Bob builds to the spec, runs the tests and reports the spec''s holes instead of guessing silently. Source: bob standards; harvest (brief vs spec mismatches are flagged).'
-tags: [bob-the-builder, worktree]
-context:
-  scaffold_script: setup.sh

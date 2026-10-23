@@ -315,7 +315,6 @@ h1 b { font-weight: 400; background: linear-gradient(100deg, var(--accent), var(
 .av-tomcat .eye { top: 17px; background: #ffe06a; box-shadow: inset 0 0 0 2.5px var(--dark); } .av-tomcat .eye.l { left: 13px; } .av-tomcat .eye.r { right: 13px; }
 .av-tomcat .blush { top: 30px; } .av-tomcat .blush.l { left: 7px; } .av-tomcat .blush.r { right: 7px; }
 
-/* Dorami: yellow cat-robot with a red bow */
 .av-dorami .head { inset: 6px 3px 8px; border-radius: 50%; background: var(--gold); box-shadow: inset -3px -4px 0 rgba(0,0,0,.08); }
 .av-dorami .face { left: 9px; right: 9px; top: 18px; height: 24px; border-radius: 50%; background: var(--white); }
 .av-dorami .bow { top: 0; width: 15px; height: 12px; background: var(--red); animation: wiggle 2.2s ease-in-out infinite; }
@@ -400,7 +399,6 @@ h1 b { font-weight: 400; background: linear-gradient(100deg, var(--accent), var(
   .feed-row .mini { grid-row: 1 / span 2; } .feed-row .kind { grid-row: 1 / span 2; }
 }
 
-/* Dexter: orange hair, big round glasses, white lab coat */
 .av-dexter .body { left: 10px; right: 10px; top: 38px; bottom: 0; border-radius: 8px 8px 4px 4px; background: #f4f6fb; box-shadow: inset 0 -4px 0 #7c4dce; }
 .av-dexter .collar { left: 19px; top: 38px; width: 10px; height: 8px; background: #7c4dce; clip-path: polygon(0 0, 100% 0, 50% 100%); }
 .av-dexter .head { left: 6px; right: 6px; top: 6px; height: 36px; border-radius: 48% 48% 46% 46%; background: var(--skin); }
@@ -409,7 +407,6 @@ h1 b { font-weight: 400; background: linear-gradient(100deg, var(--accent), var(
 .av-dexter .glass.l { left: 7px; } .av-dexter .glass.r { right: 7px; }
 .av-dexter .eye { top: 20px; width: 5px; height: 7px; } .av-dexter .eye.l { left: 12px; } .av-dexter .eye.r { right: 12px; }
 .av-dexter .smile { left: 19px; top: 34px; width: 10px; height: 4px; border-radius: 0 0 8px 8px; background: var(--dark); }
-/* Velma: brown bob with bangs, big square glasses, orange turtleneck */
 .av-velma .body { left: 11px; right: 11px; top: 38px; bottom: 0; border-radius: 8px 8px 4px 4px; background: #f28a1e; }
 .av-velma .neck { left: 17px; right: 17px; top: 35px; height: 6px; border-radius: 3px; background: #e07b10; }
 .av-velma .bob { left: 3px; right: 3px; top: 2px; height: 34px; border-radius: 16px 16px 8px 8px; background: #6b3d1f; }
@@ -696,10 +693,6 @@ html[data-tab="room"] {
 /* the six rooms: each has its own wall and floor */
 #view-room .team[data-room="closet"] { --wallbg: var(--p-fusuma); --floor: var(--f-wood); --team: #1f7fd6; --lamp: var(--gold); }
 #view-room .team[data-room="nobita"] { --wallbg: var(--p-shoji); --floor: var(--f-tatami); --team: #f5c518; --lamp: var(--gold); }
-#view-room .team[data-room="workshop"] { --wallbg: var(--p-metal); --floor: var(--f-concrete); --team: #ef7d1a; --lamp: var(--orange); }
-#view-room .team[data-room="mystery"] { --wallbg: var(--p-van); --floor: var(--f-van); --team: #a8642a; --lamp: var(--accent); }
-#view-room .team[data-room="lab"] { --wallbg: var(--p-tile); --floor: var(--f-lab); --team: #6b3fa0; --lamp: var(--accent2); }
-#view-room .team[data-room="tree"] { --wallbg: var(--p-leaf); --floor: var(--f-plank); --team: #c98a3b; --lamp: var(--gold); }
 #view-room .team[data-room="others"] { --wallbg: var(--p-paper); --floor: var(--f-carpet); --team: var(--idle); }
 #view-room .team[data-room="nobita"] .sign, #view-room .team[data-room="tree"] .sign { background: var(--plate); }
 
@@ -707,14 +700,10 @@ html[data-tab="room"] {
 #view-room .rooms { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 760px) {
   #view-room .rooms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #view-room .team[data-room="nobita"], #view-room .team[data-room="workshop"] { grid-column: span 2; }
 }
 @media (min-width: 1100px) {
   #view-room .rooms { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  #view-room .team { grid-column: span 3; }
-  #view-room .team[data-room="lab"] { grid-column: span 4; } #view-room .team[data-room="tree"] { grid-column: span 2; }
-  #view-room .team[data-room="closet"], #view-room .team[data-room="mystery"] { grid-column: span 2; }
-  #view-room .team[data-room="nobita"], #view-room .team[data-room="workshop"] { grid-column: span 4; }
+  #view-room .team { grid-column: span 2; }
 }
 #view-room .hall { padding-top: var(--s4); }
 #view-room .hall .gallery[hidden] + .rooms { margin-top: calc(var(--corr) - var(--s4)); }
@@ -771,12 +760,9 @@ html[data-tab="room"] {
 .av-pair .two, .av-pair .nose2 { animation: hop 2.4s ease-in-out infinite 1.2s; }
 .av-pair .fed { animation: hop 2.4s ease-in-out infinite; }
 .av-pair .shirt { animation: hop 2.4s ease-in-out infinite 1.2s; }
-/* nobita: pushes up his glasses now and then while working, and glances toward Shizuka (to his right) */
+/* nobita: pushes up his glasses now and then while working, and naps after ten idle minutes */
 .desk[data-s="working"] .av-nobita .glass { animation: pushUp 9s ease-in-out infinite; }
-.desk .av-nobita .eye { animation: blink 4.6s infinite, glanceR 13s ease-in-out infinite 3s; animation-delay: var(--blink, 0s), 3s; }
-.desk[data-s="queued"] .av-nobita .eye { animation: none; }
 @keyframes pushUp { 0%, 88%, 100% { translate: 0 0; } 92% { translate: 0 -3px; } 96% { translate: 0 -1px; } }
-@keyframes glanceR { 0%, 76%, 94%, 100% { translate: 0 0; } 80%, 90% { translate: 3px 0; } }
 /* tom straightens his whiskers before a run */
 .av-tomcat .muzzle::before, .av-tomcat .muzzle::after { content: ""; position: absolute; top: 4px; width: 9px; height: 1.5px; background: var(--dark); opacity: .55; }
 .av-tomcat .muzzle::before { left: -7px; transform-origin: right; } .av-tomcat .muzzle::after { right: -7px; transform-origin: left; }
@@ -789,16 +775,7 @@ html[data-tab="room"] {
 #view-room .tc { position: absolute; z-index: 3; display: block; pointer-events: none; }
 #view-room .tc.fl { z-index: 1; }
 #view-room .tc b { position: absolute; display: block; }
-/* Doraemon: a dorayaki on the desk */
 #view-room .t-dorayaki { left: 24px; bottom: 17px; width: 20px; height: 12px; border: var(--bw) solid var(--wall-ink); border-radius: 8px; background: linear-gradient(#b0743f 0 34%, #f1c98a 34% 66%, #b0743f 66%); }
-/* Dorami: melon bread, and lesson cards that she squares up when she is not busy */
-#view-room .t-melon { left: 24px; bottom: 17px; width: 18px; height: 13px; border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 30% 30%; background: repeating-linear-gradient(45deg, rgba(120, 80, 20, .4) 0 1.5px, transparent 1.5px 5px), repeating-linear-gradient(-45deg, rgba(120, 80, 20, .4) 0 1.5px, transparent 1.5px 5px), #e8c25a; }
-#view-room .t-cards { left: 78px; bottom: 17px; width: 18px; height: 20px; }
-#view-room .t-cards b { left: 0; width: 16px; height: 9px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: #fff; transition: transform .9s ease-in-out, left .9s ease-in-out; }
-#view-room .t-cards b:nth-child(1) { bottom: 0; transform: rotate(-7deg); left: -1px; }
-#view-room .t-cards b:nth-child(2) { bottom: 5px; transform: rotate(5deg); left: 2px; }
-#view-room .t-cards b:nth-child(3) { bottom: 10px; transform: rotate(-4deg); left: 0; background: #fff7c4; }
-#view-room .desk:not([data-s="working"]) .t-cards b { transform: none; left: 0; }
 /* Shizuka: violin case on the floor, a teacup with a little steam */
 #view-room .t-violin { left: -8px; bottom: 10px; width: 16px; height: 34px; border: var(--bw) solid var(--wall-ink); border-radius: 8px 8px 7px 7px; background: linear-gradient(90deg, rgba(255, 255, 255, .18) 0 3px, transparent 3px), #6b4426; }
 #view-room .t-violin::before { content: ""; position: absolute; left: 3px; top: -6px; width: 6px; height: 5px; border: var(--bw) solid var(--wall-ink); border-bottom: 0; border-radius: 3px 3px 0 0; }
@@ -816,56 +793,6 @@ html[data-tab="room"] {
 #view-room .t-shiro::before { content: ""; position: absolute; inset: 0; border: var(--bw) solid var(--wall-ink); border-radius: 10px 10px 4px 4px; background: #fff; }
 #view-room .t-shiro b:nth-child(1) { left: 2px; top: -2px; width: 7px; height: 7px; background: #cfd3de; border: 1.5px solid var(--wall-ink); border-radius: 50% 50% 0 50%; }
 #view-room .t-shiro b:nth-child(2) { right: -4px; top: 3px; width: 6px; height: 4px; background: #fff; border: 1.5px solid var(--wall-ink); border-radius: 3px; }
-/* Scrooge: the Number One Dime (polished while he is not busy) and a top hat on a stand */
-#view-room .t-dime { left: 24px; bottom: 17px; width: 14px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6b8 0 18%, var(--gold) 20%); box-shadow: inset 0 0 0 2px #e09a14; }
-#view-room .t-dime b { left: 14px; bottom: 0; width: 11px; height: 6px; background: #fff; border: 1.5px solid var(--wall-ink); border-radius: 2px; }
-#view-room .desk:not([data-s="working"]) .t-dime b { animation: polish 2.4s ease-in-out infinite; }
-#view-room .desk[data-s="working"] .t-dime b { display: none; }
-@keyframes polish { 0%, 100% { translate: 0 0; } 50% { translate: -9px -2px; } }
-#view-room .t-hatstand { right: -12px; bottom: 10px; width: 20px; height: 54px; }
-#view-room .t-hatstand::before { content: ""; position: absolute; left: 8px; top: 12px; width: 3px; bottom: 3px; background: var(--wall-ink); }
-#view-room .t-hatstand::after { content: ""; position: absolute; left: 1px; right: 1px; bottom: 0; height: 4px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: var(--brown); }
-#view-room .t-hatstand b:nth-child(1) { left: 3px; top: 0; width: 14px; height: 12px; border: var(--bw) solid var(--wall-ink); border-radius: 3px 3px 0 0; background: var(--dark); box-shadow: inset 0 -3px 0 var(--red); }
-#view-room .t-hatstand b:nth-child(2) { left: 0; top: 10px; width: 20px; height: 4px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: var(--dark); }
-/* Bob: a red toolbox with Pilchard the cat on top */
-#view-room .t-toolbox { left: -10px; bottom: 10px; width: 28px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: linear-gradient(rgba(0, 0, 0, .2) 0 2px, transparent 2px) 0 4px / 100% 100% no-repeat, #c8442f; }
-#view-room .t-toolbox b:nth-child(1) { left: 8px; top: -7px; width: 10px; height: 5px; border: var(--bw) solid var(--wall-ink); border-bottom: 0; border-radius: 3px 3px 0 0; }
-#view-room .t-toolbox b:nth-child(2) { left: 4px; top: -17px; width: 15px; height: 12px; border: var(--bw) solid var(--wall-ink); border-radius: 45% 45% 30% 30%; background: #e88a3a; box-shadow: inset 4px 3px 0 -2px #fff; z-index: 1; }
-#view-room .t-toolbox b:nth-child(2)::before, #view-room .t-toolbox b:nth-child(2)::after { content: ""; position: absolute; top: -5px; width: 5px; height: 5px; background: #e88a3a; border: 1.5px solid var(--wall-ink); border-bottom: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-#view-room .t-toolbox b:nth-child(2)::before { left: 0; } #view-room .t-toolbox b:nth-child(2)::after { right: 0; }
-#view-room .t-toolbox b:nth-child(3) { left: 19px; top: -9px; width: 10px; height: 3px; background: #e88a3a; border: 1.5px solid var(--wall-ink); border-radius: 2px; transform-origin: left; animation: wiggle 3s ease-in-out infinite; }
-/* Bheem: a plate of laddoos; he eats one after a green deploy */
-#view-room .t-laddoos { left: 22px; bottom: 17px; width: 28px; height: 14px; }
-#view-room .t-laddoos::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border: 1.5px solid var(--wall-ink); border-radius: 0 0 6px 6px; background: #fff; }
-#view-room .t-laddoos b { bottom: 2px; width: 9px; height: 9px; border: 1.5px solid var(--wall-ink); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd37a 0 20%, #e9a13b 22%); }
-#view-room .t-laddoos b:nth-child(1) { left: 2px; } #view-room .t-laddoos b:nth-child(2) { left: 10px; } #view-room .t-laddoos b:nth-child(3) { left: 18px; }
-#view-room .t-laddoos b:nth-child(4) { left: 9px; bottom: 7px; width: 9px; height: 9px; }
-#view-room .desk.fx-eat .t-laddoos b:nth-child(4) { animation: eatUp 3.4s ease-in forwards; }
-@keyframes eatUp { 0%, 20% { translate: 0 0; opacity: 1; } 60% { translate: 8px -26px; opacity: 1; } 75%, 100% { translate: 8px -26px; opacity: 0; } }
-/* Scooby: a box of Scooby Snacks */
-#view-room .t-snacks { left: 24px; bottom: 17px; width: 20px; height: 15px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: linear-gradient(#e8a23a 0 30%, #c4631c 30%); }
-#view-room .t-snacks::before { content: ""; position: absolute; left: 4px; top: 6px; width: 10px; height: 3px; background: #fff; border-radius: 1px; box-shadow: -2px -1px 0 -0.5px #fff, -2px 1px 0 -0.5px #fff, 12px -1px 0 -0.5px #fff, 12px 1px 0 -0.5px #fff; }
-/* Tom: a mouse hole in the wall; nobody ever comes out */
-#view-room .t-hole { left: -10px; bottom: 10px; width: 16px; height: 15px; border: var(--bw) solid var(--wall-ink); border-radius: 9px 9px 0 0; background: #1a1423; box-shadow: inset 0 3px 0 rgba(255, 255, 255, .06), 0 0 0 1.5px rgba(255, 240, 210, .55); }
-#view-room .t-hole b { left: 17px; bottom: -2px; width: 10px; height: 8px; background: #ffd04a; clip-path: polygon(0 100%, 100% 100%, 100% 20%); }
-/* Dexter: a bubbling beaker */
-#view-room .t-beaker { left: 80px; bottom: 17px; width: 16px; height: 20px; }
-#view-room .t-beaker::before { content: ""; position: absolute; left: 4px; top: 0; width: 8px; height: 6px; border: var(--bw) solid var(--wall-ink); border-bottom: 0; background: rgba(255, 255, 255, .6); }
-#view-room .t-beaker::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 15px; border: var(--bw) solid var(--wall-ink); border-radius: 2px 2px 6px 6px; background: linear-gradient(transparent 0 35%, #5bd16f 35%), rgba(255, 255, 255, .6); }
-#view-room .t-beaker b { z-index: 1; bottom: 5px; width: 3px; height: 3px; border-radius: 50%; background: #d9ffe0; opacity: 0; }
-#view-room .t-beaker b:nth-child(1) { left: 4px; } #view-room .t-beaker b:nth-child(2) { left: 8px; } #view-room .t-beaker b:nth-child(3) { left: 11px; }
-#view-room .desk[data-s="working"] .t-beaker b { animation: bubbleUp 1.8s ease-in infinite; }
-#view-room .desk[data-s="working"] .t-beaker b:nth-child(2) { animation-delay: .6s; } #view-room .desk[data-s="working"] .t-beaker b:nth-child(3) { animation-delay: 1.2s; }
-@keyframes bubbleUp { 0% { translate: 0 0; opacity: 0; } 20% { opacity: 1; } 100% { translate: 0 -16px; opacity: 0; } }
-/* Velma: a magnifying glass */
-#view-room .t-lens { left: 24px; bottom: 17px; width: 20px; height: 20px; }
-#view-room .t-lens::before { content: ""; position: absolute; left: 0; top: 0; width: 14px; height: 14px; border: 3px solid #8a5a38; border-radius: 50%; outline: 1.5px solid var(--wall-ink); background: rgba(190, 235, 255, .7); box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .7); }
-#view-room .t-lens::after { content: ""; position: absolute; left: 11px; top: 13px; width: 4px; height: 9px; background: #8a5a38; border: 1.5px solid var(--wall-ink); border-radius: 2px; transform: rotate(-45deg); transform-origin: top; }
-/* Chip and Dale: an acorn pile */
-#view-room .t-acorns { left: -16px; bottom: 10px; width: 36px; height: 20px; }
-#view-room .t-acorns b { width: 11px; height: 11px; border: 1.5px solid var(--wall-ink); border-radius: 40% 40% 55% 55%; background: linear-gradient(#7a4a22 0 35%, #d19a52 35%); }
-#view-room .t-acorns b:nth-child(1) { left: 0; bottom: 0; } #view-room .t-acorns b:nth-child(2) { left: 11px; bottom: 0; } #view-room .t-acorns b:nth-child(3) { left: 22px; bottom: 0; }
-#view-room .t-acorns b:nth-child(4) { left: 5px; bottom: 8px; } #view-room .t-acorns b:nth-child(5) { left: 16px; bottom: 8px; }
 
 /* catchphrases: a short bubble over the desk; neighbouring desks lean opposite ways so they never collide */
 #view-room .quip { position: absolute; left: 50%; top: -18px; z-index: 6; width: max-content; max-width: 140px; padding: 3px 8px; border: var(--bw) solid var(--edge); border-radius: var(--r-bubble); background: var(--panel); color: var(--ink); font: 700 var(--t-xs)/1.3 var(--font); box-shadow: var(--sh); pointer-events: none; animation: bubbleIn .25s ease-out; }
@@ -884,3 +811,168 @@ html[data-motion="off"] #view-room .quip { display: none; }
 /* long names wrap instead of being cut */
 #view-room .plate-name { flex-wrap: nowrap; }
 #view-room .plate-name b { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
+/* ---- Team structure: each room is a team; the sign says "Team · Lore name" ---- */
+#view-room .wall { height: auto; min-height: 32px; padding-block: 3px; }
+#view-room .sign { white-space: normal; text-transform: uppercase; }
+#view-room .team[data-room="library"] { --wallbg: var(--p-chalk); --floor: var(--f-plank); --team: #e85a9b; --lamp: var(--gold); }
+#view-room .pteam { align-self: center; max-width: 100%; margin-top: 2px; padding: 0 6px; border: 1px solid var(--plate-ink); border-radius: var(--r-chip); font: 700 var(--t-xs)/1.45 var(--font); color: var(--plate-ink); }
+#view-room .plate-role { -webkit-line-clamp: 2; }
+
+/* =====================================================================================================
+   Cast v2: new rooms, original pixel-art characters, desk touches.
+   ===================================================================================================== */
+html[data-tab="room"] {
+  --p-doors: repeating-linear-gradient(90deg, #6a4aa8 0 14px, #2b2150 14px 16px, #2f93ad 16px 30px, #2b2150 30px 32px, #c4573a 32px 46px, #2b2150 46px 48px);
+  --f-scare: repeating-conic-gradient(#a49ccf 0 25%, #988fc6 0 50%) 0 0 / 28px 28px;
+  --p-jazz: repeating-linear-gradient(90deg, rgba(255, 255, 255, .08) 0 3px, transparent 3px 18px), #4a3578;
+  --f-jazz: repeating-conic-gradient(#3b2f52 0 25%, #45385e 0 50%) 0 0 / 24px 24px;
+  --f-snow: radial-gradient(rgba(255, 255, 255, .85) 2px, transparent 3px) 0 0 / 16px 16px, linear-gradient(#e6f2fb, #d3e6f4);
+  --p-ice: repeating-linear-gradient(90deg, rgba(255, 255, 255, .4) 0 2px, transparent 2px 26px), linear-gradient(#a9d4f0, #cfe7f7);
+  --p-banana: repeating-linear-gradient(90deg, rgba(0, 0, 0, .08) 0 2px, transparent 2px 20px), #e6c542;
+}
+@media (prefers-color-scheme: dark) { html[data-tab="room"] {
+  --f-scare: repeating-conic-gradient(#3b3560 0 25%, #342e58 0 50%) 0 0 / 28px 28px;
+  --p-jazz: repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 3px, transparent 3px 18px), #2c2050;
+  --f-jazz: repeating-conic-gradient(#241b38 0 25%, #2c2244 0 50%) 0 0 / 24px 24px;
+  --f-snow: radial-gradient(rgba(255, 255, 255, .12) 2px, transparent 3px) 0 0 / 16px 16px, linear-gradient(#3c5f80, #345572);
+  --p-ice: repeating-linear-gradient(90deg, rgba(255, 255, 255, .1) 0 2px, transparent 2px 26px), linear-gradient(#27496f, #355f8a);
+  --p-banana: repeating-linear-gradient(90deg, rgba(0, 0, 0, .18) 0 2px, transparent 2px 20px), #8a7420;
+} }
+#view-room .team[data-room="backend"] { --wallbg: var(--p-metal); --floor: var(--f-concrete); --team: #f2c12e; --lamp: var(--orange); }
+#view-room .team[data-room="scare"] { --wallbg: var(--p-doors); --floor: var(--f-scare); --team: #1fa3b8; --lamp: var(--accent2); }
+#view-room .team[data-room="dojo"] { --wallbg: var(--p-fusuma); --floor: var(--f-plank); --team: #3b6fd1; --lamp: var(--gold); }
+#view-room .team[data-room="jazz"] { --wallbg: var(--p-jazz); --floor: var(--f-jazz); --team: #7a4db8; --lamp: var(--accent2); }
+#view-room .team[data-room="snow"] { --wallbg: var(--p-ice); --floor: var(--f-snow); --team: #3fb8d8; --lamp: var(--accent); }
+#view-room .team[data-room="helpers"] { --wallbg: var(--p-banana); --floor: var(--f-plank); --team: #e0b020; --lamp: var(--gold); }
+#view-room .team[data-room="library"] .sign, #view-room .team[data-room="dojo"] .sign, #view-room .team[data-room="helpers"] .sign, #view-room .team[data-room="snow"] .sign, #view-room .team[data-room="scare"] .sign { background: var(--plate); }
+#view-room .team[data-room="jazz"] .sign { background: var(--plate); }
+.d-door { width: 15px; height: 22px; background: #6a4aa8; }
+.d-door::after { content: ""; position: absolute; right: 2px; top: 10px; width: 3px; height: 3px; border-radius: 50%; background: var(--gold); }
+.d-door:nth-child(2) { background: #2f93ad; } .d-door:nth-child(3) { background: #c4573a; } .d-door:nth-child(4) { background: #5aa24a; }
+.team[data-room="scare"] .wall { overflow: visible; }
+
+/* ---- Characters (own pixel art: round shapes, big eyes, no copied artwork) ---- */
+/* Miguel: swept dark hair, tan skin, red hoodie, a bright smile */
+.av-miguel .body { left: 11px; right: 11px; top: 38px; bottom: 0; border-radius: 8px 8px 4px 4px; background: #d93a3a; }
+.av-miguel .hood { left: 14px; right: 14px; top: 35px; height: 8px; border-radius: 0 0 9px 9px; background: #b32a2a; }
+.av-miguel .head { left: 6px; right: 6px; top: 5px; height: 36px; border-radius: 48% 48% 46% 46%; background: #d99a64; }
+.av-miguel .hair { left: 5px; right: 4px; top: 1px; height: 15px; border-radius: 18px 20px 4px 10px; background: #2a1b14; }
+.av-miguel .eye { top: 21px; } .av-miguel .eye.l { left: 13px; } .av-miguel .eye.r { right: 13px; }
+.av-miguel .blush { top: 31px; } .av-miguel .blush.l { left: 8px; } .av-miguel .blush.r { right: 8px; }
+.av-miguel .smile { left: 16px; top: 33px; width: 16px; height: 6px; border-radius: 0 0 12px 12px; background: #fff; box-shadow: inset 0 -2px 0 #c0392b; }
+/* Minions: yellow capsules, goggles, blue overalls. Kevin is tall, Bob short with two different eyes, Stuart has one big eye. */
+.av-kevin .body, .av-bobm .body, .av-stuart .body { background: #f5cf2d; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .1); }
+.av-kevin .body { left: 10px; right: 10px; top: 0; bottom: 2px; border-radius: 14px 14px 8px 8px; }
+.av-kevin .over { left: 10px; right: 10px; top: 36px; bottom: 2px; border-radius: 0 0 8px 8px; background: #3f6fb5; }
+.av-kevin .strap { left: 10px; right: 10px; top: 16px; height: 5px; background: #2b2b33; }
+.av-kevin .hair { left: 20px; top: -3px; width: 2px; height: 6px; background: #3a2a14; box-shadow: 3px 1px 0 #3a2a14, -3px 1px 0 #3a2a14; }
+.av-kevin .eye { top: 12px; width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid #9aa3b0; background: radial-gradient(circle, #3b2a1a 0 2.5px, #fff 3px); animation: none; }
+.av-kevin .eye.l { left: 9px; } .av-kevin .eye.r { right: 9px; left: auto; }
+.av-kevin .mouth { left: 19px; top: 30px; width: 10px; height: 5px; border-radius: 0 0 10px 10px; background: #3a2a14; }
+.av-bobm .body { left: 7px; right: 7px; top: 16px; bottom: 2px; border-radius: 16px 16px 10px 10px; }
+.av-bobm .over { left: 7px; right: 7px; top: 38px; bottom: 2px; border-radius: 0 0 10px 10px; background: #3f6fb5; }
+.av-bobm .strap { left: 7px; right: 7px; top: 24px; height: 5px; background: #2b2b33; }
+.av-bobm .hair { left: 22px; top: 12px; width: 2px; height: 6px; background: #3a2a14; box-shadow: 3px 1px 0 #3a2a14, -3px 1px 0 #3a2a14; }
+.av-bobm .eye { top: 20px; border-radius: 50%; border: 2.5px solid #9aa3b0; animation: none; }
+.av-bobm .eye.l { left: 8px; width: 14px; height: 14px; background: radial-gradient(circle, #111 0 2px, #7a4a1c 2.5px 4.5px, #fff 5px); }
+.av-bobm .eye.r { right: 8px; left: auto; width: 12px; height: 12px; top: 21px; background: radial-gradient(circle, #111 0 2px, #3f9a4a 2.5px 4px, #fff 4.5px); }
+.av-bobm .mouth { left: 17px; top: 35px; width: 14px; height: 6px; border-radius: 0 0 12px 12px; background: #3a2a14; }
+.av-stuart .body { left: 9px; right: 9px; top: 8px; bottom: 2px; border-radius: 15px 15px 8px 8px; }
+.av-stuart .over { left: 9px; right: 9px; top: 37px; bottom: 2px; border-radius: 0 0 8px 8px; background: #3f6fb5; }
+.av-stuart .strap { left: 9px; right: 9px; top: 19px; height: 5px; background: #2b2b33; }
+.av-stuart .hair { left: 15px; top: 4px; width: 2px; height: 6px; background: #3a2a14; box-shadow: 5px -1px 0 #3a2a14, 10px 1px 0 #3a2a14, 14px 3px 0 #3a2a14; }
+.av-stuart .eye.c { left: 14px; top: 14px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid #9aa3b0; background: radial-gradient(circle, #3b2a1a 0 3.5px, #fff 4px); animation: none; }
+.av-stuart .mouth { left: 18px; top: 32px; width: 12px; height: 5px; border-radius: 0 0 10px 10px; background: #3a2a14; }
+.av-kevin .eye::after, .av-bobm .eye::after, .av-stuart .eye::after, .av-mike .eye::after { display: none; }
+.av[data-s="queued"].av-kevin .eye, .av[data-s="queued"].av-bobm .eye, .av[data-s="queued"].av-stuart .eye, .av[data-s="queued"].av-mike .eye { height: 3px; background: #3a2a14; border-width: 1.5px; }
+.av[data-s="done"].av-kevin .eye, .av[data-s="done"].av-bobm .eye, .av[data-s="done"].av-stuart .eye, .av[data-s="done"].av-mike .eye { border-bottom: 2.5px solid #9aa3b0; border-radius: 50%; }
+/* Mike: one big eye, two small horns */
+.av-mike .body { left: 2px; right: 2px; top: 5px; bottom: 5px; border-radius: 50%; background: #79c94a; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .1); }
+.av-mike .horn { top: 0; width: 7px; height: 10px; background: #f4ecc4; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.av-mike .horn.l { left: 12px; } .av-mike .horn.r { right: 12px; }
+.av-mike .eye.c { left: 12px; top: 13px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #2b4a1c; background: radial-gradient(circle, #111 0 3.5px, #3a8a2a 4px 7px, #fff 7.5px); animation: none; }
+.av-mike .mouth { left: 12px; top: 39px; width: 24px; height: 7px; border-radius: 0 0 14px 14px; background: #2b3a1f; box-shadow: inset 0 2px 0 #fff; }
+/* Sulley: big blue fur, purple spots, cream horns */
+.av-sulley .body { left: 0; right: 0; top: 4px; bottom: 0; border-radius: 42% 42% 18% 18%; background: #5fb4e8; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .12); }
+.av-sulley .spot { width: 9px; height: 9px; border-radius: 50%; background: #8a5fd0; }
+.av-sulley .spot.a { left: 3px; top: 24px; } .av-sulley .spot.b { right: 3px; top: 36px; }
+.av-sulley .horn { top: -1px; width: 9px; height: 12px; background: #f3e6b6; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.av-sulley .horn.l { left: 8px; } .av-sulley .horn.r { right: 8px; }
+.av-sulley .face { left: 9px; right: 9px; top: 15px; height: 30px; border-radius: 50%; background: #bfe4f7; }
+.av-sulley .eye { top: 20px; } .av-sulley .eye.l { left: 14px; } .av-sulley .eye.r { right: 14px; }
+.av-sulley .nose { left: 19px; top: 29px; width: 10px; height: 7px; border-radius: 50%; background: #3d3a7a; }
+.av-sulley .mouth { left: 15px; top: 38px; width: 18px; height: 6px; border-radius: 0 0 12px 12px; background: #2a2540; }
+/* Joe: pork-pie hat, plum jacket */
+.av-joe .body { left: 10px; right: 10px; top: 38px; bottom: 0; border-radius: 8px 8px 4px 4px; background: #6a4fa0; }
+.av-joe .head { left: 6px; right: 6px; top: 8px; height: 36px; border-radius: 48% 48% 46% 46%; background: #8a5a3a; }
+.av-joe .hat { left: 10px; right: 10px; top: 1px; height: 11px; border-radius: 5px 5px 0 0; background: #3a3340; box-shadow: inset 0 -3px 0 #8d86a0; }
+.av-joe .brim { left: 3px; right: 3px; top: 10px; height: 4px; border-radius: 3px; background: #2c2733; }
+.av-joe .eye { top: 22px; } .av-joe .eye.l { left: 13px; } .av-joe .eye.r { right: 13px; }
+.av-joe .smile { left: 17px; top: 34px; width: 14px; height: 6px; border-radius: 0 0 12px 12px; background: #fff; box-shadow: inset 0 -2px 0 #7a2f2f; }
+/* 22: a round lavender soul with a glow and a cheeky grin */
+.av-ttwo .aura { inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(170, 190, 255, .6), transparent 70%); }
+.av-ttwo .head { left: 5px; right: 5px; top: 7px; bottom: 5px; border-radius: 50% 50% 46% 46%; background: #a8b9ff; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .1); }
+.av-ttwo .eye { top: 20px; width: 10px; height: 12px; } .av-ttwo .eye.l { left: 12px; } .av-ttwo .eye.r { right: 12px; }
+.av-ttwo .blush { top: 31px; } .av-ttwo .blush.l { left: 8px; } .av-ttwo .blush.r { right: 8px; }
+.av-ttwo .smile { left: 15px; top: 33px; width: 18px; height: 8px; border-radius: 0 0 18px 18px; background: #fff; box-shadow: inset 0 -3px 0 #2d2a5a; }
+/* Olaf: two snowballs, twig hair and arms, a carrot nose, coal buttons */
+.av-olaf .low { left: 6px; right: 6px; bottom: 0; height: 24px; border-radius: 50%; background: #fff; box-shadow: inset -3px -3px 0 #dbe8f5, 0 0 0 1.5px #aebfd4; }
+.av-olaf .head { left: 9px; right: 9px; top: 6px; height: 28px; border-radius: 50%; background: #fff; box-shadow: inset -3px -3px 0 #dbe8f5, 0 0 0 1.5px #aebfd4; }
+.av-olaf .hair { left: 23px; top: 0; width: 2px; height: 7px; background: #5a3a22; box-shadow: 3px 1px 0 #5a3a22, -3px 1px 0 #5a3a22; }
+.av-olaf .arm { top: 38px; width: 12px; height: 2px; background: #5a3a22; }
+.av-olaf .arm.l { left: -4px; transform: rotate(-25deg); } .av-olaf .arm.r { right: -4px; transform: rotate(25deg); }
+.av-olaf .eye { top: 14px; width: 6px; height: 8px; } .av-olaf .eye.l { left: 15px; } .av-olaf .eye.r { right: 15px; }
+.av-olaf .nose { left: 22px; top: 21px; width: 13px; height: 5px; background: #f08a2a; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.av-olaf .smile { left: 15px; top: 26px; width: 18px; height: 7px; border-radius: 0 0 12px 12px; background: #3a2a22; }
+.av-olaf .smile::after { content: ""; position: absolute; left: 5px; top: 0; width: 8px; height: 3px; background: #fff; }
+.av-olaf .btn { left: 22px; top: 38px; width: 4px; height: 4px; border-radius: 50%; background: #2b2b2b; box-shadow: 0 8px 0 #2b2b2b; }
+
+/* ---- Desk touches for the new crew ---- */
+#view-room .t-guitar { left: -10px; bottom: 10px; width: 20px; height: 40px; }
+#view-room .t-guitar::before { content: ""; position: absolute; left: 8px; top: 0; width: 4px; height: 24px; background: #5a3a22; border: 1.5px solid var(--wall-ink); }
+#view-room .t-guitar::after { content: ""; position: absolute; left: 0; bottom: 0; width: 20px; height: 18px; border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 45% 45%; background: #d98a3d; }
+#view-room .t-guitar b { left: 7px; bottom: 6px; z-index: 1; width: 6px; height: 6px; border-radius: 50%; background: #2a1b14; }
+#view-room .t-marigolds { left: 24px; bottom: 17px; width: 24px; height: 18px; }
+#view-room .t-marigolds::before { content: ""; position: absolute; left: 7px; bottom: 0; width: 10px; height: 7px; border: 1.5px solid var(--wall-ink); border-radius: 0 0 4px 4px; background: #5b8bd6; }
+#view-room .t-marigolds b { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle, #ffd84a 0 1.5px, #f58a1f 2px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .25); }
+#view-room .t-marigolds b:nth-child(1) { left: 1px; bottom: 8px; } #view-room .t-marigolds b:nth-child(2) { left: 8px; bottom: 10px; } #view-room .t-marigolds b:nth-child(3) { left: 14px; bottom: 7px; }
+#view-room .t-banana { left: 22px; bottom: 17px; width: 20px; height: 10px; border: var(--bw) solid var(--wall-ink); border-top: 0; border-radius: 0 0 18px 18px; background: #f7d948; transform: rotate(-8deg); }
+#view-room .t-banana b { left: -3px; top: -1px; width: 4px; height: 4px; background: #6b4a1c; }
+#view-room .t-tim { left: -10px; bottom: 10px; width: 18px; height: 22px; }
+#view-room .t-tim::before { content: ""; position: absolute; left: 1px; bottom: 0; width: 16px; height: 13px; border: 1.5px solid var(--wall-ink); border-radius: 50%; background: #a9774b; }
+#view-room .t-tim b:nth-child(1) { left: 3px; top: 0; width: 12px; height: 11px; border: 1.5px solid var(--wall-ink); border-radius: 50%; background: #b98859; }
+#view-room .t-tim b:nth-child(2) { left: 6px; top: 5px; width: 6px; height: 4px; border-radius: 50%; background: #e8cfa8; }
+#view-room .t-goggles { left: 78px; bottom: 17px; width: 24px; height: 10px; }
+#view-room .t-goggles::before, #view-room .t-goggles::after { content: ""; position: absolute; bottom: 0; width: 10px; height: 10px; border: 2.5px solid #9aa3b0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px var(--wall-ink); }
+#view-room .t-goggles::before { left: 0; } #view-room .t-goggles::after { right: 0; }
+#view-room .t-goggles b { left: 9px; bottom: 4px; width: 6px; height: 3px; background: #2b2b33; }
+#view-room .t-clip { left: 78px; bottom: 17px; width: 16px; height: 20px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: #c8a06a; transform: rotate(6deg); }
+#view-room .t-clip::before { content: ""; position: absolute; left: 2px; right: 2px; top: 4px; bottom: 2px; background: linear-gradient(transparent 0 20%, #7d8fb3 20% 28%, transparent 28% 50%, #7d8fb3 50% 58%, transparent 58% 78%, #3fa05a 78% 86%, transparent 86%), #fff; }
+#view-room .t-clip b { left: 4px; top: -3px; width: 8px; height: 5px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: #8d96a8; }
+#view-room .t-can { right: -12px; bottom: 10px; width: 14px; height: 26px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(#3a3550 0 14%, #f2c53a 14% 40%, #c99a22 40% 52%, #f2c53a 52%); box-shadow: 0 0 8px rgba(255, 220, 90, .6); }
+#view-room .desk[data-s="working"] .t-can { animation: ledPulse 2.4s ease-in-out infinite; }
+#view-room .t-shuriken { left: 24px; bottom: 17px; width: 16px; height: 16px; background: #aab4c6; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+#view-room .t-shuriken b { left: 6px; top: 6px; width: 4px; height: 4px; border-radius: 50%; background: #2b3350; }
+#view-room .t-shishi { left: 44px; bottom: 0; width: 28px; height: 11px; transform-origin: 50% 100%; animation: breathe 3.4s ease-in-out infinite; }
+#view-room .t-shishi::before { content: ""; position: absolute; inset: 0; border: var(--bw) solid var(--wall-ink); border-radius: 10px 10px 4px 4px; background: #f3e3c2; }
+#view-room .t-shishi b:nth-child(1) { left: 2px; top: -2px; width: 7px; height: 7px; background: #a8743f; border: 1.5px solid var(--wall-ink); border-radius: 50% 50% 0 50%; }
+#view-room .t-shishi b:nth-child(2) { right: -4px; top: 3px; width: 6px; height: 4px; background: #f3e3c2; border: 1.5px solid var(--wall-ink); border-radius: 3px; }
+#view-room .t-shishi b:nth-child(3) { left: 10px; top: 0; width: 6px; height: 9px; background: #3b6fd1; border-radius: 2px; }
+#view-room .t-piano { right: -16px; bottom: 10px; width: 28px; height: 26px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: #2a2433; }
+#view-room .t-piano::before { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 8px; background: repeating-linear-gradient(90deg, #fff 0 3px, #2a2433 3px 4px); }
+#view-room .t-piano::after { content: ""; position: absolute; left: 4px; top: 3px; width: 16px; height: 8px; background: #fff7c4; border: 1px solid var(--wall-ink); }
+#view-room .t-badge { left: 26px; bottom: 17px; width: 14px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: radial-gradient(circle, #fff 0 2px, #8fa2ff 3px); }
+#view-room .t-badge b { left: 4px; top: 12px; width: 4px; height: 5px; background: #8fa2ff; border: 1px solid var(--wall-ink); }
+#view-room .t-books { left: 22px; bottom: 17px; width: 24px; height: 18px; }
+#view-room .t-books b { height: 6px; border: 1.5px solid var(--wall-ink); border-radius: 1px; }
+#view-room .t-books b:nth-child(1) { left: 0; bottom: 0; width: 24px; background: #3557a8; } #view-room .t-books b:nth-child(2) { left: 2px; bottom: 6px; width: 19px; background: #d4283a; } #view-room .t-books b:nth-child(3) { left: 4px; bottom: 12px; width: 15px; background: #f2c12e; }
+#view-room .t-flake { left: 78px; bottom: 17px; width: 18px; height: 10px; }
+#view-room .t-flake::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7px; border: 1.5px solid #8fb4d4; border-radius: 9px 9px 0 0; background: #fff; }
+#view-room .t-flake b { width: 4px; height: 4px; background: #bfe3ff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+#view-room .t-flake b:nth-child(1) { left: 3px; top: -4px; } #view-room .t-flake b:nth-child(2) { left: 11px; top: -2px; }
+#view-room .desk[data-s="working"] .t-flake b { animation: sparkle 2.6s ease-in-out infinite; }
+#view-room .t-uke { right: -8px; bottom: 10px; width: 16px; height: 30px; }
+#view-room .t-uke::before { content: ""; position: absolute; left: 6px; top: 0; width: 3px; height: 16px; background: #5a3a22; border: 1px solid var(--wall-ink); }
+#view-room .t-uke::after { content: ""; position: absolute; left: 1px; bottom: 0; width: 14px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: #e0a050; }
+#view-room .t-uke b { left: 5px; bottom: 5px; z-index: 1; width: 5px; height: 5px; border-radius: 50%; background: #2a1b14; }

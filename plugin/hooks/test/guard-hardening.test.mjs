@@ -1,4 +1,4 @@
-// Hardening tests added after the security review: Dorami limits, MCP asks, git config aliases, @{push} lookups,
+// Hardening tests added after the security review: Miguel Rivera limits, MCP asks, git config aliases, @{push} lookups,
 // protected plugin/hook/agent files, shell writes to memory, and the lazy-git ordering.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -76,8 +76,8 @@ test('shell writes into agent-memory are denied; the file tools remain the way i
     assert.ok(run(c)?.deny, c);
   assert.equal(run('cat .claude/agent-memory/tom/MEMORY.md'), null);
 });
-test('Dorami: only lesson pushes to origin and PRs against the crew repo', () => {
-  const d = { agent_type: 'toon-crew:dorami' };
+test('Miguel Rivera (knowledge manager): only lesson pushes to origin and PRs against the crew repo', () => {
+  const d = { agent_type: 'toon-crew:miguel-rivera' };
   const crew = path.join(root, 'crew-clone');
   fs.mkdirSync(crew); execFileSync('git', ['init', '-q', '-b', 'main', crew]); sh(crew, 'remote', 'add', 'origin', 'git@github.com:amanpatil808/claude-crew.git');
   assert.equal(run('git push origin crew-lessons/x', crew, d), null, 'origin is the crew repo');
@@ -89,8 +89,8 @@ test('Dorami: only lesson pushes to origin and PRs against the crew repo', () =>
   for (const c of ['git push origin feat/x', 'git push origin main', 'git push', 'git push upstream crew-lessons/x', 'git push origin crew-lessons/x other', 'git push -f origin crew-lessons/x', 'gh pr merge 3', 'gh pr create --fill', 'gh pr create -R someone/else', 'gh api -X POST repos/o/r/issues'])
     assert.ok(run(c, repo, d)?.deny, c);
   assert.equal(run('gh pr create -R amanpatil808/claude-crew --title x', repo, d), null);
-  assert.equal(run('gh pr create --repo=amanpatil808/claude-crew', repo, { agent_type: 'dorami' }), null);
-  assert.ok(run('git push origin crew-lessons/x', repo, { agent_type: 'doraemon' }) === null, 'other agents are not limited by the Dorami rule');
+  assert.equal(run('gh pr create --repo=amanpatil808/claude-crew', repo, { agent_type: 'miguel-rivera' }), null);
+  assert.ok(run('git push origin crew-lessons/x', repo, { agent_type: 'doraemon' }) === null, 'other agents are not limited by the Miguel Rivera rule');
 });
 test('MCP tools that merge, push or delete ask', () => {
   const mcp = (tool_name) => evaluate({ tool_name, cwd: repo, tool_input: {} }, { CLAUDE_PROJECT_DIR: repo });
@@ -169,7 +169,7 @@ test('interpreter here-docs and scripts written then run', () => {
   assert.equal(run('echo x > /tmp/a.txt && cat /tmp/a.txt'), null);
 });
 test('read-only roles via Bash: tree-changing git, patch and interpreter writes', () => {
-  for (const agent of ['toon-crew:tom', 'scooby-doo', 'toon-crew:nobita', 'velma', 'chip-and-dale', 'dexter']) {
+  for (const agent of ['toon-crew:twenty-two', 'joe-gardner', 'toon-crew:nobita', 'dekisugi', 'olaf', 'ninja-hattori', 'stuart']) {
     const as = (c) => run(c, repo, { agent_type: agent });
     for (const c of ['git reset --hard HEAD~3', 'git checkout -- .', 'git restore src/a.ts', 'git apply x.patch', 'git am x.mbox', 'git stash', 'git clean -fd', 'git commit -m x', 'git merge feat', 'git rebase main', 'git cherry-pick abc', 'git revert abc', 'patch -p1 < x.patch', `python3 -c "open('src/app.ts','w').write('x')"`, `node -e "require('fs').writeFileSync('src/a.ts','x')"`])
       assert.ok(as(c)?.deny, `${agent}: ${c}`);

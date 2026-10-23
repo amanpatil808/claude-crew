@@ -8,28 +8,45 @@ const rPut = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 // The crew by role id (the agent file name): lore room, pixel-art kind and board colour. Colours come from the data when it has a hex.
 const CREW = {
-  doraemon: { room: "closet", kind: "cat", hex: "#1F7FD6" }, dorami: { room: "closet", kind: "dorami", hex: "#F2C12E" },
-  nobita: { room: "nobita", kind: "nobita", hex: "#F5C518" }, shizuka: { room: "nobita", kind: "girl", hex: "#E85A9B" }, shinchan: { room: "nobita", kind: "kid", hex: "#D7263D" },
-  scrooge: { room: "workshop", kind: "duck", hex: "#C62828" }, "bob-the-builder": { room: "workshop", kind: "builder", hex: "#3B5BA9" }, "chhota-bheem": { room: "workshop", kind: "strong", hex: "#EF7D1A" },
-  "scooby-doo": { room: "mystery", kind: "dog", hex: "#A8642A" }, tom: { room: "mystery", kind: "tomcat", hex: "#6B7FA3" },
-  dexter: { room: "lab", kind: "dexter", hex: "#6B3FA0" }, velma: { room: "lab", kind: "velma", hex: "#E8731C" },
-  "chip-and-dale": { room: "tree", kind: "pair", hex: "#C98A3B" },
+  doraemon: { kind: "cat", hex: "#1F7FD6" }, "miguel-rivera": { kind: "miguel", hex: "#E8731C" },
+  nobita: { kind: "nobita", hex: "#F5C518" }, shinchan: { kind: "kid", hex: "#D7263D" },
+  kevin: { kind: "kevin", hex: "#F2C12E" }, bob: { kind: "bobm", hex: "#3B5BA9" },
+  "mike-wazowski": { kind: "mike", hex: "#1FA3B8" }, sulley: { kind: "sulley", hex: "#6B3FA0" },
+  "ninja-hattori": { kind: "ninja", hex: "#3B6FD1" },
+  "joe-gardner": { kind: "joe", hex: "#7A4DB8" }, "twenty-two": { kind: "ttwo", hex: "#22A6C4" },
+  dekisugi: { kind: "dekisugi", hex: "#EF7D1A" }, olaf: { kind: "olaf", hex: "#3FB8D8" },
+  shizuka: { kind: "girl", hex: "#E85A9B" }, stuart: { kind: "stuart", hex: "#E0B020" },
 };
-const MGR = "doraemon", BHEEM = "chhota-bheem";
+const MGR = "doraemon", SRE = "sulley";
 // Rooms from the shows, in display order. Roles not listed land in "Others".
 const R_ROOMS = [
-  ["closet", "THE CLOSET", ["doraemon", "dorami"], ["sconce", "clock"], ["shelf", "plant"]],
-  ["nobita", "NOBITA'S ROOM", ["nobita", "shizuka", "shinchan"], ["sconce", "window", "poster"], ["plant", "sofa"]],
-  ["workshop", "THE WORKSHOP", ["scrooge", "bob-the-builder", "chhota-bheem"], ["sconce", "board", "vent"], ["shelf", "rack"]],
-  ["mystery", "MYSTERY MACHINE", ["scooby-doo", "tom"], ["window", "poster", "window"], ["sofa", "plant"]],
-  ["lab", "DEXTER'S LAB", ["dexter", "velma"], ["vent", "board", "clock"], ["rack", "shelf"]],
-  ["tree", "TREE HOUSE", ["chip-and-dale"], ["window", "sconce"], ["plant"]],
+  // [key, team name, lore name, members, wall decor, furniture]. Team names come from the data when it has them.
+  ["closet", "Management", "The Closet", ["doraemon", "miguel-rivera"], ["sconce", "clock"], ["shelf", "plant"]],
+  ["nobita", "Frontend Team", "Nobita's Room", ["nobita", "shinchan"], ["sconce", "window", "poster"], ["plant", "sofa"]],
+  ["backend", "Backend Team", "Gru's Lab", ["kevin", "bob"], ["sconce", "board", "vent"], ["shelf", "rack"]],
+  ["scare", "DevOps Team", "The Scare Floor", ["mike-wazowski", "sulley"], ["door", "door", "door", "door"], ["rack", "plant"]],
+  ["dojo", "Security Team", "The Dojo", ["ninja-hattori"], ["sconce", "window"], ["plant", "shelf"]],
+  ["jazz", "QA Team", "The Jazz Club", ["joe-gardner", "twenty-two"], ["poster", "sconce", "poster"], ["sofa", "plant"]],
+  ["snow", "Research Team", "The Snow Study", ["dekisugi", "olaf"], ["window", "clock", "window"], ["shelf"]],
+  ["library", "Documentation Team", "The Library", ["shizuka"], ["books", "sconce", "window"], ["bookcase", "typewriter", "plant"]],
+  ["helpers", "Helpers", "Banana Corner", ["stuart"], ["window", "sconce"], ["shelf", "plant"]],
 ];
+// Professional title and team per person: the data wins, this table covers a server that does not send them yet.
+const R_PRO = {
+  doraemon: ["Engineering Manager", "Management"], "miguel-rivera": ["Knowledge Manager", "Management"], nobita: ["UX & Design Lead", "Frontend Team"], shinchan: ["Frontend Developer", "Frontend Team"],
+  kevin: ["Backend Lead", "Backend Team"], bob: ["Backend Developer", "Backend Team"], "mike-wazowski": ["DevOps Engineer", "DevOps Team"], sulley: ["SRE", "DevOps Team"],
+  "ninja-hattori": ["Security Engineer", "Security Team"], "joe-gardner": ["QA Engineer", "QA Team"], "twenty-two": ["Exploratory Tester", "QA Team"],
+  dekisugi: ["Research Lead", "Research Team"], olaf: ["Research Analyst", "Research Team"], shizuka: ["Technical Writer", "Documentation Team"], stuart: ["Code Search Assistant", "Helpers"],
+};
+const rTitleFull = (x) => x.title || R_PRO[x.id]?.[0] || x.role || "";
+// The plate keeps the short form: "SRE (deploys, rollouts...)" shows as "SRE"; the card shows it all.
+const rTitle = (x) => rTitleFull(x).replace(/\s*\(.*$/, "");
+const rTeam = (x) => x.team || R_PRO[x.id]?.[1] || "";
 // Working people carry a gadget: time machine for deploys, 4D pocket for tools, bamboo-copter for everyone else.
-const R_GADGET = { "chhota-bheem": "timem", scrooge: "pocket", "bob-the-builder": "pocket", "chip-and-dale": "pocket" };
+const R_GADGET = { "mike-wazowski": "timem", sulley: "timem", kevin: "pocket", bob: "pocket", stuart: "pocket" };
 const R_ICON = { working: "⌨", done: "✓", queued: "z" };
 // Retired characters hang as framed pictures; their art is kept here, keyed by id.
-const R_RETIRED_KIND = { dekisugi: "dekisugi", suneo: "smug", "ninja-hattori": "ninja", shaktimaan: "hero" };
+const R_RETIRED_KIND = { dorami: "dorami", scrooge: "duck", shaktimaan: "hero", "bob-the-builder": "builder", "chhota-bheem": "strong", "scooby-doo": "dog", tom: "tomcat", dexter: "dexter", velma: "velma", "chip-and-dale": "pair", suneo: "smug" };
 // Claude's eight colour names, for a role that has a name but no board hex.
 const R_CLAUDE_HEX = { red: "#D7263D", blue: "#1F7FD6", yellow: "#F2C12E", purple: "#6B3FA0", orange: "#EF7D1A", pink: "#E85A9B", cyan: "#1FA3B8", green: "#2E8B57" };
 
@@ -50,6 +67,15 @@ const KINDS = {
   tomcat: ["ear l", "ear r", "head", "muzzle", "nose", "eye l", "eye r", "blush l", "blush r"],
   girl: ["body", "pig l", "pig r", "tie l", "tie r", "head", "hair", "eye l", "eye r", "blush l", "blush r", "smile"],
   smug: ["body", "head", "hair", "brow l", "brow r", "eye l", "eye r", "blush l", "blush r", "grin"],
+  miguel: ["body", "hood", "head", "hair", "eye l", "eye r", "blush l", "blush r", "smile"],
+  kevin: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
+  bobm: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
+  stuart: ["body", "over", "strap", "hair", "eye c", "mouth"],
+  mike: ["body", "horn l", "horn r", "eye c", "mouth"],
+  sulley: ["body", "spot a", "spot b", "horn l", "horn r", "face", "eye l", "eye r", "nose", "mouth"],
+  joe: ["body", "head", "hat", "brim", "eye l", "eye r", "smile"],
+  ttwo: ["aura", "head", "eye l", "eye r", "blush l", "blush r", "smile"],
+  olaf: ["arm l", "arm r", "low", "head", "hair", "eye l", "eye r", "nose", "smile", "btn"],
   pair: ["one", "two", "nose1", "nose2", "fed", "shirt"],
 };
 
@@ -76,16 +102,19 @@ const rProps = (kinds) => { const row = rel("div", "props"); row.setAttribute("a
 
 // ---- Board colour: the data's hex when present, else the table above ----
 const HEX = /^#[0-9a-f]{6}$/i;
-const rColor = (role) => [role.hex, role.boardColor, role.color].find((c) => HEX.test(String(c || ""))) || CREW[rKeyOf(role.id)]?.hex || R_CLAUDE_HEX[String(role.color || "").toLowerCase()] || "#6b7280";
+const rColor = (role) => [role.hex, role.boardColor, role.color].find((c) => HEX.test(String(c || ""))) || R_CLAUDE_HEX[String(role.color || "").toLowerCase()] || CREW[rKeyOf(role.id)]?.hex || "#6b7280";
 // Light yellows and oranges get a dark outline so they still read on a light floor.
 const rLight = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150; };
 
 // ---- Small touches: own pixel art on or beside each desk, drawn in CSS. Each is [class, number of child pieces, floor?] ----
 const TOUCHES = {
-  doraemon: [["t-dorayaki"]], dorami: [["t-melon"], ["t-cards", 3]],
+  doraemon: [["t-dorayaki"]], "miguel-rivera": [["t-guitar", 1, 1], ["t-marigolds", 3]],
   shizuka: [["t-violin", 0, 1], ["t-teacup", 1]], shinchan: [["t-figure", 2], ["t-shiro", 2, 1]],
-  scrooge: [["t-dime", 1], ["t-hatstand", 2, 1]], "bob-the-builder": [["t-toolbox", 3, 1]], "chhota-bheem": [["t-laddoos", 4]],
-  "scooby-doo": [["t-snacks"]], tom: [["t-hole", 1, 1]], dexter: [["t-beaker", 3]], velma: [["t-lens"]], "chip-and-dale": [["t-acorns", 5, 1]],
+  kevin: [["t-banana", 1]], bob: [["t-tim", 2, 1], ["t-goggles", 1]],
+  "mike-wazowski": [["t-clip", 1]], sulley: [["t-can", 1, 1]],
+  "ninja-hattori": [["t-shuriken", 1], ["t-shishi", 3, 1]],
+  "joe-gardner": [["t-piano", 0, 1]], "twenty-two": [["t-badge", 1]],
+  dekisugi: [["t-books", 3]], olaf: [["t-flake", 2]], stuart: [["t-banana", 1], ["t-uke", 1, 1]],
 };
 function rTouches(key) {
   return (TOUCHES[key] || []).map(([cls, n, floor]) => {
@@ -118,7 +147,7 @@ const NAP_MS = 10 * 60000;
 const rNaps = (key, m) => key === "nobita" && m.status === "done" && !!m.since && Date.now() - Date.parse(m.since) >= NAP_MS;
 
 let rProj = rGet("crewProject", "");     // "" = all projects
-function rDesk(role, m, i) {
+function rDesk(role, m, i, showTeam) {
   const waiting = rPending.has(role.id);                       // assigned but Doraemon has not arrived yet: seated, waiting
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
   const key = rKeyOf(role.id), nap = rNaps(key, m);
@@ -129,7 +158,7 @@ function rDesk(role, m, i) {
   const hex = rColor(role); desk.style.setProperty("--c", hex); desk.style.setProperty("--c-edge", rLight(hex) ? "#7a5c00" : "var(--wall-ink)");
   if (rProj && m.status === "working" && m.project && m.project !== rProj) desk.dataset.dim = "1";
   if (rAway.has(role.id)) desk.classList.add("away");
-  desk.tabIndex = 0; desk.setAttribute("role", "button"); { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${role.role}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""} Show details`); }
+  desk.tabIndex = 0; desk.setAttribute("role", "button"); { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle({ ...role, ...m })}${rTeam({ ...role, ...m }) ? ", " + rTeam({ ...role, ...m }) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""} Show details`); }
   const pace = rel("span", "pace"), scale = rel("span", "scale"); scale.append(rAvatar(role.id, s, i)); pace.append(scale);
   const stage = rel("div", "stage"); stage.append(pace);
   if (s === "queued") stage.append(rel("span", "zzz", "z"));
@@ -141,7 +170,9 @@ function rDesk(role, m, i) {
   const sw = rel("i", "swatch"); sw.setAttribute("aria-hidden", "true");
   nm.append(sw, rel("b", null, role.mascot), st);
   plate.append(nm); const chips = rChips({ ...role, ...m }); if (chips) plate.append(chips);
-  plate.append(rel("div", "plate-role", role.role), rel("div", "plate-task", m.line));
+  plate.append(rel("div", "plate-role", rTitle({ ...role, ...m })));
+  if (showTeam && rTeam({ ...role, ...m })) plate.append(rel("div", "pteam", rTeam({ ...role, ...m })));
+  plate.append(rel("div", "plate-task", m.line));
   if (m.project && m.status === "working") plate.append(rel("div", "ptag", m.project));
   if (m.ref) plate.append(rel("div", "plate-ref", m.ref));
   desk.append(seat, plate);
@@ -213,14 +244,17 @@ function renderRoom(s) {
   // Facts: at most three, for the picked project.
   RSVG("r-facts").replaceChildren(...rFactsFor(s).slice(0, 3).map((f) => { const c = rel("span", "count", `${f.label.toUpperCase()}  ${f.value}`); if (f.tone) c.dataset.s = f.tone === "run" ? "working" : f.tone === "ok" ? "done" : "blocked"; return c; }));
   // Rooms: only rebuilt when something changed, so the pop-in and pacing do not restart every poll.
-  const sig = JSON.stringify([r.roles, rProj, r.members.map((m) => [m.id, m.status, m.line, m.ref, m.project, rNaps(rKeyOf(m.id), m)])]);
+  const sig = JSON.stringify([r.roles, rProj, r.members.map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])]);
   if (sig !== rSig) {
     rSig = sig;
     const retired = new Set(Object.keys(R_RETIRED_KIND));
     const roles = Object.fromEntries(r.roles.filter((x) => !retired.has(x.id)).map((x) => [x.id, x])), mem = Object.fromEntries(r.members.map((x) => [x.id, x]));
-    const placed = new Set(R_ROOMS.flatMap(([, , ids]) => ids));
-    const teams = R_ROOMS.map(([k, name, ids, decor, furn]) => ({ k, name, decor, furn, ids: ids.filter((id) => roles[id]) }));
-    const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "OTHERS", decor: ["sconce", "window"], furn: ["plant"], ids: others });
+    const placed = new Set(R_ROOMS.flatMap((r) => r[3]));
+    const teams = R_ROOMS.map(([k, team, lore, ids, decor, furn]) => {
+      const here = ids.filter((id) => roles[id]), names = [...new Set(here.map((id) => rTeam({ ...roles[id], ...mem[id] })).filter(Boolean))];
+      return { k, name: `${names.length ? names.join(" + ") : team} \u00b7 ${lore}`, shared: names.length > 1, decor, furn, ids: here };
+    });
+    const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "Others", decor: ["sconce", "window"], furn: ["plant"], ids: others });
     let i = 0;
     const rooms = teams.filter((t) => t.ids.length).map((t) => {
       const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name);
@@ -228,7 +262,7 @@ function renderRoom(s) {
       const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
       const sign = rel("b", "sign", t.name); if (busy) sign.dataset.busy = busy;
       wall.append(sign, rDecor(t.decor));
-      for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++));
+      for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared));
       floor.append(grid, rProps(t.furn)); team.append(wall, floor);
       return team;
     });
@@ -266,16 +300,17 @@ function rFxPaint(desk, id) {
   if (fx.cls) desk.classList.add("fx-" + fx.cls);
   if (fx.say) { const q = rel("div", "quip", fx.say); const idx = Math.round((parseInt(desk.style.getPropertyValue("--i")) || 0) / 60); q.dataset.side = idx % 2 ? "r" : "l"; desk.append(q); }
 }
-const FX_CRIT = /\bcritical\b/i, FX_SOURCE = /\b(verified|confirmed|checks? out|cross-?checked|sources? (?:agree|confirm|match))\b/i;
+const FX_CRIT = /\bcritical\b/i;
 // Called once for every fresh feed item.
 function rReact(f, age) {
   if (age > 20000) return;
   const key = rKeyOf(f.role || ""), text = f.text || "";
-  if (f.tone === "start" && key === "bob-the-builder") rFxSet(f.role, { say: "Can we fix it?" }, 3500);
-  if ((f.tone === "start" || f.tone === "assign" || f.tone === "talk") && rKeyOf(f.to || f.role || "") === "tom") rFxSet(f.to || f.role, { cls: "prep" }, 2000);
-  if (f.tone === "done" && key === "scooby-doo" && FX_CRIT.test(text)) rFxSet(f.role, { say: "Ruh-roh!" }, 3500);
-  if (f.tone === "done" && key === "velma" && FX_SOURCE.test(text)) rFxSet(f.role, { say: "Jinkies!" }, 3500);
-  if (f.tone === "deploy") rFxSet(BHEEM, { cls: "eat" }, 3500);        // a green deploy: Bheem eats a laddoo
+  if (f.tone === "start" && key === "kevin") rFxSet(f.role, { say: "Bello!" }, 3500);
+  if (f.tone === "start" && key === "bob") rFxSet(f.role, { say: "Bello!" }, 3500);
+  if (f.tone === "start" && key === "stuart") rFxSet(f.role, { say: "Banana!" }, 3500);
+  if (f.tone === "done" && key === "ninja-hattori" && FX_CRIT.test(text)) rFxSet(f.role, { say: "Nin nin!" }, 3500);
+  if (f.tone === "done" && key === "olaf") rFxSet(f.role, { say: "Warm hugs!" }, 3500);
+  if (f.tone === "deploy") rFxSet(SRE, { say: "Roar!" }, 3000);        // a green deploy: Sulley roars, softly
 }
 
 
@@ -345,7 +380,7 @@ function rPlanWalks(feed) {
         rPending.delete(f.role);
         job = { kind: "report", role: f.role, say: said && said !== f.text ? said : "Done!", item };
       } else if ((f.tone === "talk" || f.tone === "assign") && (f.to || f.role)) job = { kind: "visit", role: f.from || MGR, to: f.to || f.role, say: (f.say || "").slice(0, 70) };
-      else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(MGR)) job = { kind: "errand", role: MGR, to: BHEEM, say: f.text.slice(0, 40) };
+      else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(MGR)) job = { kind: "errand", role: MGR, to: SRE, say: f.text.slice(0, 40) };
     }
     if (!job) continue;
     if (!rMotion()) { rStatic(job); continue; }
@@ -562,7 +597,7 @@ function rShowCard(id) {
   const hand = m.lastHandback && typeof m.lastHandback === "object" ? m.lastHandback.text : m.lastHandback;   // may be ""
   const state = s === "working" ? (m.since ? `Working for ${rSpan(rMins(m.since))}` : "Working now") : s === "done" ? (m.since ? `Done ${rSpan(rMins(m.since))} ago` : "Done") : "Idle";
   const head = rel("div", "rc-head"), who = rel("div", "rc-who");
-  who.append(rel("b", null, role.mascot), rel("span", null, role.role));
+  who.append(rel("b", null, role.mascot), rel("span", null, [rTitleFull({ ...role, ...m }), rTeam({ ...role, ...m })].filter(Boolean).join(" \u00b7 ")));
   head.append(rMini(id, s, 0), who);
   const x = { ...role, ...m }, rows = [head, rel("div", "rc-state", state), rel("p", "rc-task", m.task || m.line), rel("p", "rc-model", rModelLine(x))];
   if (hand && hand !== m.line) rows.push(rel("p", "rc-hand", "Last hand-back: " + hand));

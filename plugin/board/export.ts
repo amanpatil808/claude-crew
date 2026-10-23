@@ -16,7 +16,7 @@ const MAX_WRITES = 50;    // ArtifactData batch limit
 const FEED_KINDS = new Set(["agent-start", "agent-stop", "commit", "pr", "ci", "deploy"]);
 
 export function toFeed(e: BoardEvent, roles: Map<string, Role>) {
-  const role = e.kind === "ci" ? undefined : e.kind === "deploy" ? roles.get("chhota-bheem") : roleFor(e.agentType, roles);
+  const role = e.kind === "ci" ? undefined : e.kind === "deploy" ? roles.get("sulley") : roleFor(e.agentType, roles);
   const kind = e.kind === "agent-start" ? "start" : e.kind === "agent-stop" ? "done" : (e.kind === "ci" || e.kind === "deploy") && e.ok === false ? "issue" : e.kind === "ci" || e.kind === "deploy" ? "done" : "progress";
   return { at: e.ts, who: role?.id ?? (e.kind === "ci" ? "CI" : e.agentType ?? "Crew"), kind, text: redact(e.text), ...(e.project ? { project: redact(e.project) } : {}), source: "auto-board" };
 }
