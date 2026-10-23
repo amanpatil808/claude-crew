@@ -635,7 +635,9 @@ html[data-tab="room"] { --hall-wood-a: #e2bd8b; --hall-wood-b: #d3a874; }
 #view-room .chips > span { display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 0 4px; border-radius: var(--r-chip); font: 700 13px/1 var(--font); letter-spacing: .02em; text-transform: uppercase; }
 #view-room .mchip.m-opus { background: #5b21b6; color: #fff; }
 #view-room .mchip.m-sonnet { background: #1d4ed8; color: #fff; }
+#view-room .mchip.m-fable { background: #0f766e; color: #fff; }
 #view-room .mchip.m-haiku { border: 2px solid #3f3f46; color: #3f3f46; }
+#view-room .ochip { background: #fff; color: #c81e1e; border: 1px solid #c81e1e; cursor: help; }
 #view-room .vchip { border: 1px solid var(--plate-ink); color: var(--plate-ink); text-transform: none !important; }
 #view-room .lchip { width: 20px; padding: 0 !important; background: #fff; color: #c81e1e; border: 1px solid #c81e1e; }
 #view-room .rc-model { color: var(--muted); }

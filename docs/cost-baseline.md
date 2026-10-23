@@ -10,6 +10,10 @@ usage.
 **Names:** measured on 23 Oct 2026 under the old agent names; ids below are the cast-v2 names
 (`docs/planning/cast-v2.md`), numbers unchanged. Eval case and grader ids are the renamed ones in `plugin/evals/`.
 
+**Plugin 0.2.1 changed tools after this baseline:** `Agent` is now disallowed for every read-only role except
+dekisugi, and the guard limits who may spawn. The cost figures below were not re-measured; the tool rows in section 2
+were updated on 23 Oct 2026.
+
 Total spent on this baseline: **$2.72** (8 agent runs, 1 run each, one arm).
 
 ## 1. Always-on context
@@ -33,7 +37,8 @@ What that costs:
 From `agents/*.md` frontmatter (measured). Prompt tokens are the "on-invoke" figures from `plugin details`. The
 "Tools in practice" column adds what `memory: project` turns on by itself. The
 [Subagents docs](https://code.claude.com/docs/en/sub-agents) (read 2026-10-23) say Read, Write and Edit are "automatically
-enabled" when memory is on, and they don't limit those writes to the memory folder.
+enabled" when memory is on, and they don't limit those writes to the memory folder. Only stuart was checked live; the
+other "+ Edit" cells follow the docs and were not re-measured.
 
 | Agent | Model | Effort | maxTurns | Isolation | Declared tools | Tools in practice | Prompt | Eval cost (measured) |
 |---|---|---|---|---|---|---|---|---|
@@ -45,20 +50,28 @@ enabled" when memory is on, and they don't limit those writes to the memory fold
 | kevin | opus | high | 80 | worktree | all but Agent | same | ~1.5k | not run |
 | bob | sonnet | medium | 60 | worktree | all but Agent | same | ~1.5k | not run |
 | mike-wazowski / sulley (one role then) | sonnet | high | 100 | worktree | all but Agent | same | ~1.8k | not run |
-| dekisugi | opus | high | 80 | - | all | all | ~1.2k | not run |
+| dekisugi | opus | high | 80 | - | Read, Grep, Glob, Write, WebSearch, WebFetch, Agent | **+ Edit** | ~1.2k | not run |
 | olaf | sonnet | medium | 40 | - | Read, Grep, Glob, Write, WebSearch, WebFetch | **+ Edit** | ~1.0k | not run |
 | ninja-hattori | opus | high | 80 | - | Read, Grep, Glob, Bash, Write, Skill | **+ Edit** | ~1.5k | ~$0.48 (est. split of $0.93) |
 | joe-gardner | haiku | low | 40 | - | Read, Grep, Glob, Bash, Write | **+ Edit** | ~1.2k | $0.008 |
-| stuart | haiku | low | 15 | - | Read, Grep, Glob | **+ Write, Edit** | ~0.6k | $0.002 |
+| stuart | haiku | low | 15 | - | Read, Grep, Glob | **+ Write** (measured, 2.1.309; this table first listed Edit too) | ~0.6k | $0.002 |
 
-So **five roles meant to be read-only by tools (plan section 4) can edit files.** Only their prompts and the plugin's
-guard hook stop them. In the runs so far none of them did (the `only-read-tools`, `joe-never-fixes` and
-`product-code-unchanged` graders passed).
+Stuart, measured: `claude -p --plugin-dir ./plugin --agent toon-crew:stuart` on Claude Code 2.1.309 listed Read, Write,
+Grep, Glob. So `memory:` re-adds Write, but not Edit, in this version.
+
+So **roles meant to be read-only by tools (plan section 4) can still write files.** In the runs so far none of them
+wrote outside their memory (the `only-read-tools`, `joe-never-fixes` and `product-code-unchanged` graders passed).
+
+**The guard is the write lock for read-only roles.** Their tool lists can't stop Write while `memory:` is on, so the
+plugin guard does: a read-only role may write only its own `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, the temp
+folder or session scratchpad, and its doc folders (`docs/research/` for dekisugi and olaf; `docs/design/` and
+`docs/research/` for nobita). Edit-type tools are refused for them too.
 
 Model choice per call: a `model` that Doraemon passes on an Agent call beats the agent's frontmatter, which beats
 `CLAUDE_CODE_SUBAGENT_MODEL` (docs, since v2.1.251). Doraemon passed `model: haiku` for Joe Gardner and for general-purpose,
-and passed nothing for Stuart and Ninja Hattori (measured, trace `Agent` inputs). The Crew Room should log this
-`model` field, or a role's real model can differ from its file without anyone seeing it.
+and passed nothing for Stuart and Ninja Hattori (measured, trace `Agent` inputs). Since 0.2.1 the Crew Room records the
+declared and the effective model for each spawn and shows an "override" badge when the call's model differs from the
+file's, and Doraemon's prompt says never to pass `model` except for the listed escalations.
 
 ## 3. Per-task cost from the eval COST column (measured)
 

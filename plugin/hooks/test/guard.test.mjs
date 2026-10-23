@@ -132,7 +132,7 @@ test('tokenizer: quotes, separators and substitutions', () => {
   assert.deepEqual(tokenize('g""it push').commands.map((c) => c.words), [['git', 'push']]);
 });
 
-test('CLI: JSON ask on stdout (exit 0), exit 2 + one-line reason on deny, 0 on allow, 1 on garbage', () => {
+test('CLI: JSON ask on stdout (exit 0), exit 2 + one-line reason on deny, 0 on allow, 2 on garbage', () => {
   const run = (stdin) => spawnSync('node', ['--no-warnings', GUARD], { input: stdin, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: project } });
   const ask = run(JSON.stringify({ tool_name: 'Bash', cwd: project, tool_input: { command: 'gh pr merge 5' } }));
   assert.equal(ask.status, 0); assert.equal(ask.stderr, '');
@@ -141,7 +141,7 @@ test('CLI: JSON ask on stdout (exit 0), exit 2 + one-line reason on deny, 0 on a
   assert.equal(hit.status, 2); assert.match(hit.stderr, /^toon-crew guard: .+\n$/); assert.equal(hit.stderr.trim().split('\n').length, 1);
   assert.equal(run(JSON.stringify({ tool_name: 'Bash', cwd: project, tool_input: { command: 'ls' } })).status, 0);
   assert.equal(run(JSON.stringify({ tool_name: 'Read', cwd: project, tool_input: { file_path: 'x' } })).status, 0);
-  assert.equal(run('not json').status, 1);
+  assert.equal(run('not json').status, 2); // exit 1 would let the call through
 });
 
 test('hooks.json wires the guard and every board event', () => {
@@ -150,7 +150,7 @@ test('hooks.json wires the guard and every board event', () => {
   for (const ev of ['SubagentStart', 'SubagentStop', 'PostToolUse', 'Stop', 'SessionStart', 'SessionEnd']) {
     const cmds = hooks[ev].flatMap((g) => g.hooks);
     const board = cmds.find((h) => h.command.includes('board/hook.ts'));
-    assert.ok(board, ev); assert.equal(board.async, true); assert.ok(board.timeout <= 10);
+    assert.ok(board, ev); assert.equal(board.async, true); assert.equal(board.timeout, undefined); // not enforced for async hooks
     assert.equal(board.command, 'node --no-warnings "${CLAUDE_PLUGIN_ROOT}/board/hook.ts"');
   }
   assert.equal(hooks.PostToolUse[0].matcher, 'Bash|Agent|SendMessage');

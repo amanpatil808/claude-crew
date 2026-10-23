@@ -2,7 +2,19 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
-## 0.2.0 - unreleased
+## 0.2.1 - 23 Oct 2026: fixes from the Claude Code docs review
+
+- Guard: new spawn rule. Only Doraemon (the main session) starts crew agents; Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart` (prefixed names only); other crew roles may not spawn. Agents outside the crew are unchanged.
+- Guard fails closed: unreadable input or an internal error now blocks (exit 2, not exit 1). The guard hook sets `"onFailure": "block"`, so **Claude Code 2.1.295 or later is needed**.
+- Guard matcher now also covers `Agent` and `Monitor` (Monitor runs shell commands).
+- Read-only roles: `Agent` added to `disallowedTools` for stuart, joe-gardner, nobita, olaf and ninja-hattori. `memory:` adds Write back to their tools (seen on 2.1.309), so the guard is the lock on their writes.
+- Security review (3 rounds): no subagent may write, move or replace the live plugin or a folder holding it, including through git in the plugin's checkout, exported `GIT_*` variables, `checkout-index --prefix`, unpacking and `patch`. Read-only roles with Bash may not write git config, branches, refs or archives outside temp; dangerous git config keys are refused for everyone. Crew other than Doraemon may not use SendMessage, CronCreate, Workflow or RemoteTrigger. Own-memory writes are tied to the current project. Known limit: a script file run from temp is not caught; the Claude Code sandbox is the real boundary for Bash.
+- Doraemon never passes `model` when spawning, except the listed escalations (a per-call model beats the agent file).
+- Board: records the declared and the effective model per spawn, and shows an "override" badge when they differ.
+- Async board hooks no longer set a timeout (Claude Code doesn't enforce it on async hooks); `scripts/check-structure.mjs` requires timeouts only on blocking hooks.
+- Docs: README corrects the `CLAUDE_CODE_SUBAGENT_MODEL` advice (it only affects agents without a model, so it doesn't make the crew cheaper) and says which settings go in each project; cost baseline and roster updated.
+
+## 0.2.0 - 23 Oct 2026
 
 Cast v2: the engineering crew re-cast with the owner's favourite cartoons (see `docs/planning/cast-v2.md`). 15 agents, every prompt tag now `(v0.4)`.
 
@@ -14,7 +26,7 @@ Cast v2: the engineering crew re-cast with the owner's favourite cartoons (see `
 - Evals: cases renamed to the new ids (for example `joe-not-run-vs-passed`, `hattori-proof-fails-before-fix`, `stuart-path-line-read-only`), plus `twenty-two-edge-case-repro`.
 - Retired characters hang as framed pictures; `docs/roster.md` maps old memory folders to new ones.
 
-## 0.1.0 - unreleased
+## 0.1.0 - 23 Oct 2026
 
 First scaffold.
 

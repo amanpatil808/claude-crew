@@ -124,14 +124,19 @@ function rTouches(key) {
   });
 }
 
-const R_MODEL = /opus|sonnet|haiku/;
-const rModelOf = (x) => (x.modelOverride || x.model || "").toLowerCase().match(R_MODEL)?.[0];
+const R_MODEL = /opus|sonnet|haiku|fable/;
+// ranOn is the model the run actually used (call > file > env > main); older payloads only have the file model.
+const rModelOf = (x) => (x.ranOn || x.modelOverride || x.model || "").toLowerCase().match(R_MODEL)?.[0];
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 // Chips under the name: [OPUS] [HIGH bars]. Each carries its own word, so nothing depends on colour.
 const R_EFFORT = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
 function rChips(x) {
   const row = rel("div", "chips"), mod = rModelOf(x), eff = String(x.effort || "").toLowerCase();
-  if (mod) row.append(rel("span", "mchip m-" + mod, mod.toUpperCase() + (x.modelOverride ? "*" : "")));
+  if (mod) row.append(rel("span", "mchip m-" + mod, mod.toUpperCase()));
+  if (x.modelOverride) {               // the call beat the agent file: the one thing worth spotting on a cost check
+    const b = rel("span", "ochip", "override"), asked = x.modelOverride, file = x.fileModel || "inherit";
+    b.title = `asked for ${asked}, file says ${file}`; row.append(b);
+  }
   if (eff && R_EFFORT[eff]) {          // quiet outlined chip with 1 to 4 bars, so levels compare at a glance
     const c = rel("span", "echip"), bars = rel("span", "bars"); bars.setAttribute("aria-hidden", "true");
     for (let i = 1; i <= 4; i++) bars.append(rel("i", i <= R_EFFORT[eff] ? "on" : ""));
@@ -139,7 +144,7 @@ function rChips(x) {
   }
   return row.childElementCount ? row : null;
 }
-const rModelLine = (x) => { const mod = rModelOf(x); return mod ? [cap(mod), x.effort && x.effort + " effort", x.maxTurns && "up to " + x.maxTurns + " turns"].filter(Boolean).join(" · ") : "Inherits the lead's model"; };
+const rModelLine = (x) => { const mod = rModelOf(x); return mod ? [cap(mod) + (x.modelOverride ? ` (asked for ${x.modelOverride}, file says ${x.fileModel || "inherit"})` : ""), x.effort && x.effort + " effort", x.maxTurns && "up to " + x.maxTurns + " turns"].filter(Boolean).join(" · ") : "Inherits the lead's model"; };
 const rStageLine = (x) => [x.version, x.stage === "training" && "in training"].filter(Boolean).join(" · ");
 
 // Nobita dozes off after 10 minutes without work; everyone else just sits.
