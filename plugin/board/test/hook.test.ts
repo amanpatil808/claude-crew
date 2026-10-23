@@ -56,7 +56,7 @@ const known = (id: string) => (id === "a1f3" ? "shinchan" : undefined);
 
 test("Agent and SendMessage from the main session become assign events", () => {
   const start = toEvent(post("Agent", { subagent_type: "shinchan", description: "Build the hallway", prompt: "SECRET-FULL-PROMPT" }), () => false, known);
-  assert.deepEqual(start, { project: "acme", sid: "a9dd6b0f", kind: "assign", from: "doraemon", to: "shinchan", text: "Build the hallway" });
+  assert.deepEqual(start, { project: "acme", sid: "a9dd6b0f", kind: "assign", from: "doraemon", to: "shinchan", text: "Build the hallway", effectiveModel: "main" });
   const msg = toEvent(post("SendMessage", { to: "a1f3", summary: "keep old numbers while fetching", message: "FULL-MESSAGE-BODY" }), () => false, known);
   assert.deepEqual(msg, { project: "acme", sid: "a9dd6b0f", kind: "assign", from: "doraemon", to: "shinchan", toId: "a1f3", text: "keep old numbers while fetching" });
   assert.ok(!JSON.stringify([start, msg]).match(/SECRET-FULL|FULL-MESSAGE/));

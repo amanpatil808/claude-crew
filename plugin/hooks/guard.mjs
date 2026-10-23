@@ -5,12 +5,15 @@
 //
 // This is a text guard: a seatbelt against mistakes and lazy bypasses, NOT a sandbox. The real boundary
 // is each agent's tool list. When the guard cannot parse something that touches git/gh/rm/docker/settings
-// it fails closed (deny) rather than open.
+// it fails closed (deny) rather than open; unreadable input or an internal error also denies (exit 2).
+// For roles that have Bash, the Claude Code sandbox is the real boundary: a script written to temp and then
+// run (bash /tmp/w.sh) does what it likes, and no text check can see inside it.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INDIRECT, inlineWriteSites, SPAWNS_OR_EVALS } from './inline-writes.mjs';
 
 const PROTECTED = new Set(['main', 'master']);
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);
@@ -19,11 +22,17 @@ const INTERPRETERS = /^(python[\d.]*|node(js)?|bun|deno|perl|ruby|php|osascript|
 const MAX_COMMAND = 100_000;
 const BUDGET_MS = 6000; // well under the 10 s hook timeout
 // Roles without write tools by design: they may only write their own memory file and temp files.
-const ROLE_GIT_BLOCKED = new Set(['reset', 'checkout', 'switch', 'restore', 'apply', 'am', 'stash', 'clean', 'commit', 'merge', 'rebase', 'cherry-pick', 'revert', 'pull', 'rm', 'mv', 'add']);
+const ROLE_GIT_BLOCKED = new Set(['reset', 'checkout', 'switch', 'restore', 'apply', 'am', 'clean', 'commit', 'merge', 'rebase', 'cherry-pick', 'revert', 'pull', 'rm', 'mv', 'add',
+  'update-ref', 'read-tree', 'checkout-index', 'update-index', 'filter-branch', 'replace']);
 // Where a read-only role may Write its deliverables inside the project (besides its memory file and temp).
 const ROLE_DOC_DIRS = { dekisugi: ['docs/research'], olaf: ['docs/research'], nobita: ['docs/design', 'docs/research'] };
 const READ_ONLY_ROLES = /^(?:toon-crew:)?(ninja-hattori|joe-gardner|twenty-two|nobita|dekisugi|olaf|stuart)$/i;
 const CREW_REPO = 'amanpatil808/claude-crew';
+// Who may start which agents. A role that spawns a builder gets edits the guard refuses for the role itself.
+const CREW = new Set(['bob', 'dekisugi', 'doraemon', 'joe-gardner', 'kevin', 'miguel-rivera', 'mike-wazowski', 'ninja-hattori', 'nobita', 'olaf', 'shinchan', 'shizuka', 'stuart', 'sulley', 'twenty-two']);
+const SPAWN_LIMITS = { dekisugi: new Set(['olaf', 'stuart']) };
+// Tools that hand work to another session or a later run: crew roles other than Doraemon never use them.
+const RELAY_TOOLS = new Set(['SendMessage', 'CronCreate', 'Workflow', 'RemoteTrigger']);
 
 // Words that can sit in front of the real program: name -> options that take a value.
 const WRAPPERS = {
@@ -213,6 +222,20 @@ function protectedPathReason(abs, ctx) {
   if (path.basename(lower) === '.mcp.json') return '.mcp.json';
   return null;
 }
+// The plugin Claude Code is running (CLAUDE_PLUGIN_ROOT), wherever it is installed, inline (--plugin-dir) too.
+// A subagent that rewrites it switches the guard off for everyone: subagents are refused, the main thread is asked.
+function livePluginRule(abs, ctx) {
+  if (!ctx.pluginRoot) return null;
+  const a = abs.toLowerCase().replace(/\/+$/, ''); const root = ctx.pluginRoot.toLowerCase();
+  if (a !== root && !a.startsWith(root.endsWith('/') ? root : `${root}/`)) {
+    // A folder that holds the plugin: moving or replacing it (mv repo, ln -sfn over it) swaps the plugin out.
+    return ctx.subagent && root.startsWith(`${a}/`) ? 'Moving or replacing a folder that holds the live toon-crew plugin is blocked for subagents.' : null;
+  }
+  return ctx.subagent ? 'The live toon-crew plugin (guard, hooks, agents) cannot be changed by a subagent: the owner edits it.'
+    : ask('This changes the live toon-crew plugin Claude Code is running (its guard and crew): confirm.');
+}
+// A file with other hard links: writing it changes the other names too (a temp-dir link to a project file).
+const hardLinked = (p) => { try { const st = fs.lstatSync(p); return st.isFile() && st.nlink > 1; } catch { return false; } };
 // Project hook/agent/skill/command definitions: normal project work, so the owner is asked rather than blocked.
 const crewConfigAsk = (abs) => (/\/\.claude\/(hooks|agents|skills|commands)(\/|$)/.test(abs.toLowerCase()) ? ask('Editing .claude hooks, agents, skills or commands changes how Claude behaves: confirm.') : null);
 const isMemoryPath = (abs) => /\/agent-memory[^/]*\//i.test(abs);
@@ -232,7 +255,7 @@ function writeTargetReason(raw, ctx, { memory = true } = {}) {
   if (typeof raw !== 'string' || !raw) return null;
   if (ctx.role && !/^\/dev\/(null|stdout|stderr)$/.test(raw)) {
     const abs = resolveIn(ctx, raw);
-    if (!abs || !ctx.writeRoots.some((r) => within(real(abs), r))) return `${ctx.role} is a read-only role: shell writes are allowed only under the system temp dir or the session scratchpad.`;
+    if (!abs || !ctx.writeRoots.some((r) => within(real(abs), r)) || hardLinked(abs)) return `${ctx.role} is a read-only role: shell writes are allowed only under the system temp dir or the session scratchpad.`;
   }
   const x = expandVars(raw, ctx);
   if (/[*?[]/.test(x)) {
@@ -243,7 +266,7 @@ function writeTargetReason(raw, ctx, { memory = true } = {}) {
       probe.push(path.join(d, '.claude/settings.json'), path.join(d, '.claude/settings.local.json'), path.join(d, '.mcp.json'), path.join(d, '.claude.json'),
         path.join(d, '.git/config'), path.join(d, '.git/hooks/x'));
     }
-    if (ctx.pluginRoot?.includes('/.claude/plugins/')) probe.push(path.join(ctx.pluginRoot, 'hooks/guard.mjs'), path.join(ctx.pluginRoot, 'hooks/hooks.json'));
+    if (ctx.pluginRoot && (ctx.subagent || ctx.pluginRoot.includes('/.claude/plugins/'))) probe.push(path.join(ctx.pluginRoot, 'hooks/guard.mjs'), path.join(ctx.pluginRoot, 'hooks/hooks.json'));
     probe.push(path.join(home, '.claude/plugins/x'));
     const abs = path.isAbsolute(x) ? x : (ctx.cwd ? path.join(ctx.cwd, x) : null);
     const re = abs ? globRe(abs) : null;
@@ -256,6 +279,8 @@ function writeTargetReason(raw, ctx, { memory = true } = {}) {
   const r = real(abs);
   const why = protectedPathReason(r, ctx) ?? protectedPathReason(abs, ctx);
   if (why) return `${why} cannot be changed from here: the owner edits them by hand.`;
+  const live = livePluginRule(r, ctx) ?? livePluginRule(abs, ctx);
+  if (live) return live;
   const soft = crewConfigAsk(r) ?? crewConfigAsk(abs);
   if (soft) return soft;
   if (memory && (isMemoryPath(r) || isMemoryPath(abs))) return 'Shell writes into agent-memory are blocked: use the Edit/Write tools so the secret scan runs.';
@@ -268,7 +293,10 @@ const GIT_BUILTINS = new Set(['add', 'am', 'apply', 'archive', 'bisect', 'blame'
   'count-objects', 'describe', 'diff', 'difftool', 'fetch', 'format-patch', 'fsck', 'gc', 'grep', 'hash-object', 'help', 'init', 'log', 'ls-files', 'ls-remote', 'ls-tree', 'maintenance',
   'merge', 'merge-base', 'mergetool', 'mv', 'name-rev', 'notes', 'pull', 'push', 'range-diff', 'rebase', 'reflog', 'remote', 'request-pull', 'reset', 'restore', 'rev-list', 'rev-parse',
   'revert', 'rm', 'send-email', 'shortlog', 'show', 'show-ref', 'sparse-checkout', 'stash', 'status', 'submodule', 'switch', 'symbolic-ref', 'tag', 'update-ref', 'version', 'worktree', 'lfs']);
-const DANGEROUS_CFG = /^(alias\.|remote\..*\.(push|pushurl)$|push\.|core\.(sshcommand|fsmonitor)$|url\..*\.(insteadof|pushinsteadof)$|include(if\..*)?\.path$|credential\.)/i;
+// Keys that hide a push or run a program on a later git command (also the owner's, once written to the shared config).
+const DANGEROUS_CFG = /^(alias\.|remote\..*\.(push|pushurl|uploadpack|receivepack)$|push\.|core\.(sshcommand|fsmonitor|pager|editor|askpass|gitproxy)$|sequence\.editor$|diff\.external$|diff\..*\.(textconv|command)$|.*\.textconv$|filter\.|merge\..*\.driver$|gpg\.(.*\.)?program$|pager\.|url\..*\.(insteadof|pushinsteadof)$|include(if\..*)?\.path$|credential\.)/i;
+// Plain pager/editor values are harmless: `git -c core.pager=cat log` stays allowed.
+const SAFE_CFG_VALUE = (key, value) => /^(core\.(pager|editor)|sequence\.editor|pager\..*)$/i.test(key) && /^(cat|less|more|vi|vim|nvim|nano|true|)$/.test(value.trim());
 const PUSH_LONG = ['--all', '--atomic', '--delete', '--dry-run', '--exec', '--follow-tags', '--force', '--force-if-includes', '--force-with-lease', '--ipv4', '--ipv6', '--mirror', '--no-verify',
   '--porcelain', '--progress', '--prune', '--push-option', '--quiet', '--receive-pack', '--recurse-submodules', '--repo', '--set-upstream', '--signed', '--tags', '--thin', '--verbose', '--verify'];
 const PUSH_FORCE = new Set(['--force', '--force-if-includes', '--force-with-lease']);
@@ -311,8 +339,69 @@ function gitAliases(dir, ctx) {
 }
 const isProtectedRef = (name) => PROTECTED.has(name.replace(/^refs\/heads\//, ''));
 
+// branch, tag, worktree and symbolic-ref both read and write: a read-only role gets only the read forms.
+const LIST_VALUE = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format', '--column']);
+const REF_WRITE = { branch: { short: /[dDmMcCftu]/, long: /^--(delete|move|copy|force|set-upstream-to|unset-upstream|edit-description|track|no-track|create-reflog|recurse-submodules)(=|$)/ },
+  tag: { short: /[asufdmFe]/, long: /^--(annotate|sign|local-user|force|delete|message|file|edit|create-reflog|cleanup|trailer)(=|$)/ } };
+const CONFIG_VERBS = new Set(['set', 'unset', 'get', 'list', 'rename-section', 'remove-section', 'edit']);
+// A config write: a key and a value, or a writing option or verb. `git config key` alone reads.
+function configWrite(rest) {
+  const pos = [];
+  for (let k = 0; k < rest.length; k++) {
+    const a = rest[k];
+    if (/^(--(add|unset|unset-all|replace-all|rename-section|remove-section|edit)|-e)$/.test(a)) return `${a} writes the config`;
+    if (['-f', '--file', '--blob', '--type', '--default'].includes(a)) { k++; continue; }
+    if (!a.startsWith('-')) pos.push(a);
+  }
+  if (['set', 'unset', 'rename-section', 'remove-section', 'edit'].includes(pos[0])) return `${pos[0]} writes the config`;
+  if (rest.some((a) => /^--(get|list|show|name-only)/.test(a) || a === '-l') || ['get', 'list'].includes(pos[0])) return null;
+  return pos.length >= 2 ? 'with a value writes the config' : null;
+}
+// Is `dir` inside the git checkout that holds CLAUDE_PLUGIN_ROOT? A worktree has its own .git file, so it is not.
+const checkoutOf = (p) => { for (let d = p; ; d = path.dirname(d)) { if (fs.existsSync(path.join(d, '.git'))) return d; if (path.dirname(d) === d) return null; } };
+function inLiveCheckout(dir, ctx) {
+  if (!dir) return true; // cd to a variable: cannot tell, so assume the worst
+  // The session's own cwd comes from Claude Code, not the command: trust it even before the worktree exists on disk.
+  if (!fs.existsSync(dir) && real(dir) === real(ctx.startCwd)) return false;
+  const live = checkoutOf(ctx.pluginRoot);
+  return !!live && checkoutOf(real(dir))?.toLowerCase() === live.toLowerCase();
+}
+function roleGitWrite(sub, rest) {
+  if (sub === 'stash') return ['list', 'show'].includes(rest.find((a) => !a.startsWith('-'))) ? null : 'changes the working tree';
+  if (sub === 'notes') return ['list', 'show', 'get-ref', undefined].includes(rest.find((a) => !a.startsWith('-'))) ? null : 'changes notes refs';
+  if (sub === 'worktree') return ['list', undefined].includes(rest.find((a) => !a.startsWith('-'))) ? null : 'changes worktrees';
+  if (sub === 'symbolic-ref') return rest.some((a) => a === '-d' || a === '--delete') || rest.filter((a) => !a.startsWith('-')).length > 1 ? 'moves HEAD' : null;
+  const rule = REF_WRITE[sub];
+  if (!rule) return null;
+  let listing = false; const pos = [];
+  for (let k = 0; k < rest.length; k++) {
+    const a = rest[k];
+    if (a === '--') { pos.push(...rest.slice(k + 1)); break; }
+    if (LIST_VALUE.has(a)) { k++; continue; }
+    if (a.startsWith('--')) { if (rule.long.test(a)) return `${a.split('=')[0]} changes refs`; if (/^--(list|show-current|verify)$/.test(a)) listing = true; continue; }
+    if (isShortCluster(a)) { if (rule.short.test(a.slice(1))) return `${a} changes refs`; if (/[lv]/.test(a) && (sub === 'tag' || a.includes('l'))) listing = true; continue; }
+    if (a.startsWith('-')) continue; // -n5 and the like
+    pos.push(a);
+  }
+  return pos.length && !listing ? `with a name creates a ${sub}` : null;
+}
+
+// Variables that point git at another repo or work tree. Set by export/declare or a bare assignment earlier in the
+// command line, they reach every later git command, so the guard remembers them for the rest of the line.
+const GIT_LOCATION_VARS = /^GIT_(DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|NAMESPACE)$/;
+const DECLARERS = new Set(['export', 'declare', 'typeset', 'readonly', 'local']);
+function noteGitEnv(words, ctx) {
+  const names = DECLARERS.has(words[0]) ? words.slice(1) : (words.length && words.every((w) => /^[A-Za-z_]\w*=/.test(w)) ? words : []);
+  if (names.some((w) => GIT_LOCATION_VARS.test(w.split('=')[0]))) ctx.gitEnv = true;
+}
+// Paths git itself writes outside the work tree: checkout-index --prefix=, --output= (diff, archive, format-patch).
+function gitWriteTargets(sub, rest) {
+  return rest.flatMap((a, k) => (a.startsWith('--prefix=') && sub === 'checkout-index' ? [a.slice(9)] : a.startsWith('--output=') ? [a.slice(9)]
+    : (a === '--output' || (a === '-o' && ['archive', 'format-patch'].includes(sub))) ? [rest[k + 1] ?? ''] : []));
+}
+
 function checkGit(words, ctx, via, depth) {
-  let i = 1; let dir = ctx.cwd; const cfgs = []; let hookAsk = null; let gitDirUsed = (via.assigns ?? []).some((n) => /^GIT_(DIR|WORK_TREE)$/.test(n));
+  let i = 1; let dir = ctx.cwd; const cfgs = []; let hookAsk = null; let gitDirUsed = ctx.gitEnv || (via.assigns ?? []).some((n) => GIT_LOCATION_VARS.test(n));
   const withValue = new Set(['--git-dir', '--work-tree', '--namespace', '--super-prefix']);
   while (i < words.length && words[i].startsWith('-')) {
     const w = words[i];
@@ -327,7 +416,7 @@ function checkGit(words, ctx, via, depth) {
   }
   for (const c of cfgs) {
     const key = c.split('=')[0].trim();
-    if (DANGEROUS_CFG.test(key)) return `git -c ${key} is blocked: aliases and push settings can hide a push to main.`;
+    if (DANGEROUS_CFG.test(key) && !SAFE_CFG_VALUE(key, c.slice(c.indexOf('=') + 1 || c.length))) return `git -c ${key} is blocked: aliases and push settings can hide a push to main.`;
     if (/^core\.hookspath$/i.test(key)) hookAsk = ask('core.hooksPath runs scripts from another folder on every git command: confirm.');
   }
   let sub = words[i];
@@ -336,6 +425,14 @@ function checkGit(words, ctx, via, depth) {
   // An alternate git dir (--git-dir, --work-tree, GIT_DIR, GIT_WORK_TREE) hides its config and aliases from the checks.
   if (gitDirUsed && (sub === 'push' || !GIT_BUILTINS.has(sub))) return 'git push or an unknown git subcommand with --git-dir/--work-tree/GIT_DIR is blocked: its config and aliases cannot be verified.';
   if (ctx.role && ROLE_GIT_BLOCKED.has(sub)) return `${ctx.role} is a read-only role: git ${sub} changes the working tree or history.`;
+  if (ctx.role) { const w = roleGitWrite(sub, rest); if (w) return `${ctx.role} is a read-only role: git ${sub} ${w}; only its list forms are allowed.`; }
+  // A subagent in the checkout that holds the live plugin (not its own worktree) gets the read-only git rules.
+  if (!ctx.role && ctx.subagent && ctx.pluginRoot && (gitDirUsed || inLiveCheckout(dir, ctx))) {
+    const w = ROLE_GIT_BLOCKED.has(sub) ? 'changes the working tree or history' : roleGitWrite(sub, rest) ?? (sub === 'config' ? configWrite(rest) : null);
+    if (w) return `git ${sub} in the checkout that runs the live toon-crew plugin is blocked for subagents (${w}): work in your own worktree.`;
+  }
+  for (const t of gitWriteTargets(sub, rest)) { const why = writeTargetReason(t || '.', ctx); if (why) return why; }
+  if (ctx.subagent && ctx.pluginRoot && sub === 'apply' && rest.includes('--unsafe-paths')) return 'git apply --unsafe-paths can write outside the work tree, including the live toon-crew plugin: blocked for subagents.';
   if (!GIT_BUILTINS.has(sub)) { // possibly an alias defined in the repo or user config
     const aliases = gitAliases(dir, ctx);
     if (aliases.unknown) return ask('git subcommand could not be verified (alias lookup failed): confirm.');
@@ -352,10 +449,12 @@ function checkGit(words, ctx, via, depth) {
       if (['-f', '--file', '--blob', '--type', '--default'].includes(rest[k])) { k++; continue; }
       if (!rest[k].startsWith('-')) pos.push(rest[k]);
     }
-    const reading = rest.some((a) => /^--(get|list|show|name-only)/.test(a) || a === '-l');
-    if (rest.some((a) => a === '-e' || a === '--edit')) return 'git config --edit is blocked: it opens protected config files.';
-    if (!reading && pos.length >= 1 && DANGEROUS_CFG.test(pos[0])) return `git config ${pos[0]} is blocked: aliases and push settings can hide a push to main.`;
-    if (!reading && pos.length >= 2 && /^core\.hookspath$/i.test(pos[0])) return ask('core.hooksPath runs scripts from another folder on every git command: confirm.');
+    const reading = rest.some((a) => /^--(get|list|show|name-only)/.test(a) || a === '-l') || ['get', 'list'].includes(pos[0]);
+    if (rest.some((a) => a === '-e' || a === '--edit') || pos[0] === 'edit') return 'git config --edit is blocked: it opens protected config files.';
+    if (ctx.role) { const w = configWrite(rest); if (w) return `${ctx.role} is a read-only role: git config ${w}; only reads (--get, --list) are allowed.`; }
+    const keyAt = CONFIG_VERBS.has(pos[0]) ? 1 : 0; const key = pos[keyAt] ?? ''; const value = pos[keyAt + 1] ?? '';
+    if (!reading && key && DANGEROUS_CFG.test(key) && !(pos.length > keyAt + 1 && SAFE_CFG_VALUE(key, value))) return `git config ${key} is blocked: it can hide a push to main or run a program on a later git command.`;
+    if (!reading && pos.length >= keyAt + 2 && /^core\.hookspath$/i.test(key)) return ask('core.hooksPath runs scripts from another folder on every git command: confirm.');
     return hookAsk;
   }
   if (sub === 'clean') {
@@ -573,9 +672,62 @@ function checkInlineCode(code, ctx) {
   if (/\bgh\b.{0,40}\b(merge|delete|alias)\b/.test(flat) || /\bgh auth token\b/.test(flat)) return 'gh merge/delete from inline code is blocked.';
   if (/\brmtree\b|\brmSync\b|\brmdirSync\b|\bunlinkSync\b|\bos\.(remove|unlink|rmdir)\b|\brm -[a-z]*r|\bunlink\(|\bFile\.delete|\bFileUtils\.rm/.test(code)) return 'Deleting files from inline code is blocked.';
   if (PROTECTED_TEXT.test(code)) return 'Inline code touching settings, hooks, plugin files, git config or agent-memory is blocked.';
-  if (ctx?.role && /\bopen\s*\(|writeFile|appendFile|write_text|write_bytes|\.write\(|createWriteStream|shutil|os\.(rename|replace|mkdir)|fs\.(rename|copy|mkdir)|File\.(write|open)|Set-Content/.test(code)
-    && !/tmpdir|\/tmp\/|\/private\/tmp|\/var\/folders|tempfile|mkdtemp/.test(code)) return `${ctx.role} is a read-only role: inline code may only write to the temp dir.`;
+  if (!ctx || !(ctx.role || (ctx.subagent && ctx.pluginRoot))) return null;
+  const sites = inlineWriteSites(code);
+  for (const p of sites.flatMap((x) => x.paths)) {
+    const a = p === null ? null : resolveIn(ctx, p);
+    if (a && ctx.subagent && typeof (livePluginRule(real(a), ctx) ?? livePluginRule(a, ctx)) === 'string') return 'Inline code writing into the live toon-crew plugin is blocked for subagents.';
+  }
+  if (!ctx.role) return null;
+  // Each written path must be a literal under temp: a "/tmp/" mention elsewhere in the code proves nothing.
+  if (SPAWNS_OR_EVALS.test(code)) return `${ctx.role} is a read-only role: inline code may not start programs or evaluate strings.`;
+  if (INDIRECT.test(code)) return `${ctx.role} is a read-only role: inline code may not reach files or programs through aliases or reflection.`;
+  for (const site of sites) {
+    if (site.kind === 'link') return `${ctx.role} is a read-only role: inline code may not create links.`;
+    for (const p of site.paths) if (!inWriteRoots(p, ctx)) return `${ctx.role} is a read-only role: inline code may only write to literal paths under the temp dir.`;
+  }
   return null;
+}
+const inWriteRoots = (p, ctx) => { const a = p === null ? null : resolveIn(ctx, p); return !!a && ctx.writeRoots.some((r) => within(real(a), r)) && !hardLinked(a); };
+
+// patch writes under -d DIR (or the cwd), or to -o FILE; it refuses absolute and ../ names on its own.
+function patchTargets(words) {
+  const args = words.slice(1); const out = [];
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k];
+    if (a === '-d' || a === '--directory' || a === '-o' || a === '--output') out.push(args[++k] ?? '');
+    else if (/^--(directory|output)=/.test(a)) out.push(a.slice(a.indexOf('=') + 1));
+    else if (/^-[do]./.test(a)) out.push(a.slice(2));
+  }
+  if (!args.some((a) => /^(-d|--directory)/.test(a))) out.push('.');
+  return out;
+}
+// Archive tools write wherever they unpack (tar -x, unzip, cpio -i) or the archive they create (tar -c -f FILE).
+const ARCHIVERS = /^(tar|gtar|bsdtar|unzip|cpio)$/;
+function archiveTargets(prog, words) {
+  const args = words.slice(1);
+  const valueOf = (short, long) => { // -C dir, -Cdir, --directory=dir, --directory dir
+    for (let k = 0; k < args.length; k++) {
+      const a = args[k];
+      if (long && a.startsWith(`${long}=`)) return a.slice(long.length + 1);
+      if (a === long || (short && a === short) || (short && isShortCluster(a) && a.endsWith(short.slice(1)) && prog !== 'unzip')) return args[k + 1] ?? '';
+      if (short && a.startsWith(short) && a.length > short.length && !isShortCluster(a)) return a.slice(short.length);
+    }
+    return null;
+  };
+  if (prog === 'unzip') return args.some((a) => /^-[ltvZp]/.test(a)) ? [] : [valueOf('-d', null) ?? '.'];
+  const clusters = args.filter((a) => isShortCluster(a)).map((a) => a.slice(1)).join('') + (prog !== 'cpio' && /^[A-Za-z]+$/.test(args[0] ?? '') ? args[0] : '');
+  if (prog === 'cpio') {
+    if (/p/.test(clusters) || args.includes('--pass-through')) return [args.filter((a) => !a.startsWith('-')).pop() ?? ''];
+    return /i/.test(clusters) || args.includes('--extract') ? [valueOf('-D', '--directory') ?? '.'] : [];
+  }
+  const extract = /x/.test(clusters) || args.some((a) => /^--(extract|get)$/.test(a));
+  const create = /[crA]/.test(clusters.replace(/C/g, '')) || args.some((a) => /^--(create|append|update|concatenate|catenate|delete)$/.test(a));
+  if ((extract || create) && (/P/.test(clusters) || args.includes('--absolute-names'))) return null;
+  const out = [];
+  if (extract) out.push(valueOf('-C', '--directory') ?? '.');
+  if (create) { const f = valueOf('-f', '--file') ?? (/^[A-Za-z]*f[A-Za-z]*$/.test(args[0] ?? '') ? args[1] : null); if (f && f !== '-') out.push(f); }
+  return out;
 }
 
 // ---------- command walker ----------
@@ -620,6 +772,23 @@ function writeTargets(prog, words) {
   if (/^(sed|gsed|perl|ruby)$/.test(prog) && args.some((a) => /^-[A-Za-z]*i/.test(a) || a === '--in-place' || a.startsWith('--in-place'))) out.push(...pos);
   return out;
 }
+// Extra write targets for read-only roles only (builders create files and folders all day).
+const VALUE_OPTS = { touch: new Set(['-t', '-d', '-r', '--date', '--reference']), mkdir: new Set(['-m', '--mode']) };
+function roleWriteTargets(prog, words) {
+  const args = words.slice(1); const out = [];
+  if (prog === 'touch' || prog === 'mkdir') {
+    for (let k = 0; k < args.length; k++) { if (VALUE_OPTS[prog].has(args[k])) k++; else if (!args[k].startsWith('-')) out.push(args[k]); }
+  }
+  for (let k = 0; k < args.length; k++) { // --output=FILE / --output FILE on any program (git diff, curl, ...), sort -o FILE
+    const a = args[k];
+    if (a.startsWith('--output=')) out.push(a.slice(9));
+    else if (a === '--output' || (prog === 'sort' && a === '-o')) out.push(args[k + 1] ?? '');
+    else if (prog === 'sort' && /^-o./.test(a)) out.push(a.slice(2));
+  }
+  return out;
+}
+// awk writes with print > "file", and runs programs with system() or "cmd" | getline.
+const AWK_WRITES = /\b(?:print|printf)\b[^;}]*>|\bsystem\s*\(|\|\s*getline|\bfflush\s*\(\s*"/;
 
 function scanWords(inputWords, ctx, viaIn, depth) {
   const { words, assigns, via } = stripWrappers(inputWords);
@@ -630,6 +799,16 @@ function scanWords(inputWords, ctx, viaIn, depth) {
   const prog = path.basename(words[0]);
   if (words[0].startsWith('$') && !words[0].includes('/')) return `Running a program named by a variable (${words[0]}) cannot be verified: blocked.`;
   if (ctx.role && prog === 'patch') return `${ctx.role} is a read-only role: patch changes files.`;
+  if (ctx.role) {
+    for (const t of roleWriteTargets(prog, words)) { const why = writeTargetReason(t || '.', ctx); if (typeof why === 'string') return why; }
+    if (/^[gmn]?awk$/.test(prog) && AWK_WRITES.test(words.slice(1).join(' '))) return `${ctx.role} is a read-only role: awk may not write files or run programs.`;
+  }
+  // Unpacking and patching write where they are told: every subagent's targets go through the plugin rule too.
+  if ((ctx.role || ctx.subagent) && (ARCHIVERS.test(prog) || prog === 'patch')) {
+    const targets = prog === 'patch' ? patchTargets(words) : archiveTargets(prog, words);
+    if (targets === null && (ctx.role || ctx.pluginRoot)) return `${ctx.role ?? 'A subagent'}: tar with absolute names can write anywhere, so it is blocked.`;
+    for (const t of targets ?? []) { const why = writeTargetReason(t || '.', ctx); if (typeof why === 'string') return why; }
+  }
   // A script written earlier in the same command and then run hides what it does.
   const runs = (SHELLS.has(prog) || INTERPRETERS.test(prog)) ? words.slice(1).filter((w) => !w.startsWith('-')).slice(0, 1) : (words[0].includes('/') ? [words[0]] : []);
   for (const f of runs) { const a = resolveIn(ctx, f); if (a && (ctx.written.has(a) || ctx.written.has(real(a)))) return 'Writing a script and running it in the same command hides what it does: blocked.'; }
@@ -700,6 +879,7 @@ function checkCommands(src, ctx, depth = 0) {
       else ctx.cwd = resolveIn(ctx, arg);
       continue;
     }
+    noteGitEnv(cmd.words, ctx);
     const reason = scanWords(cmd.words, ctx, null, depth);
     if (typeof reason === 'string') return reason;
     if (reason?.lazy) ctx.pending.push(reason.lazy);
@@ -787,9 +967,14 @@ function checkFileEdit(input, ctx) {
   const r = real(abs);
   const why = protectedPathReason(r, ctx) ?? protectedPathReason(abs, ctx);
   if (why) return `${why} cannot be edited by Claude: the owner changes them by hand.`;
+  const live = livePluginRule(r, ctx) ?? livePluginRule(abs, ctx);
+  if (live) return live;
   if (ctx.role) { // read-only roles: no Edit-type tools; Write only to their own memory file or temp
     if (!ctx.isWrite) return `${ctx.role} is a read-only role: it cannot use Edit/MultiEdit/NotebookEdit.`;
-    const ownMemory = new RegExp(`/\\.claude/agent-memory/toon-crew-${ctx.role.replace(/[^a-z-]/gi, '')}/MEMORY\\.md$`, 'i').test(r);
+    // Own memory is this project's file only (not ~/.claude or another checkout); a MEMORY.md symlink resolves away from it.
+    const memFile = path.join(real(path.join(ctx.project, '.claude/agent-memory', `toon-crew-${ctx.role}`)), 'MEMORY.md');
+    const ownMemory = r.toLowerCase() === memFile.toLowerCase();
+    if (hardLinked(r)) return `${ctx.role} is a read-only role: the target has other hard links, so writing it would change another file.`;
     const docRoots = (ROLE_DOC_DIRS[ctx.role] ?? []).map((d) => path.join(ctx.project, d));
     // The target is realpath-resolved, the root is not: a symlinked docs/ or docs/research lands outside the root.
     const inDocs = docRoots.some((root) => within(r, root));
@@ -806,6 +991,33 @@ function checkFileEdit(input, ctx) {
   return null;
 }
 
+// ---------- Agent (spawning) and relay tools ----------
+const crewId = (name) => (/^(?:toon-crew:)?([a-z0-9-]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
+// Any toon-crew: agent counts as crew, so a role added later is limited until it is listed in CREW.
+const crewCaller = (input) => {
+  const caller = typeof input.agent_type === 'string' ? input.agent_type : '';
+  if (!caller || (!/^toon-crew:/i.test(caller) && !CREW.has(crewId(caller)))) return null; // main thread or not crew
+  return { id: crewId(caller) };
+};
+function checkSpawn(input) {
+  const caller = crewCaller(input);
+  if (!caller || caller.id === 'doraemon') return null;
+  const { id } = caller;
+  const allowed = SPAWN_LIMITS[id];
+  if (!allowed) return `${id || 'this crew role'} may not start other agents: only Doraemon spawns crew (Dekisugi: olaf or stuart).`;
+  const raw = input.tool_input?.subagent_type;
+  if (raw !== undefined && typeof raw !== 'string') return `${id} may start only named agents: subagent_type is not a string.`;
+  const target = raw ?? '';
+  // Plugin-scoped names only: a bare "olaf" could resolve to a project agent of the same name with more tools.
+  if (/^toon-crew:/i.test(target) && allowed.has(crewId(target))) return null;
+  return `${id} may start only ${[...allowed].map((a) => `toon-crew:${a}`).join(' or ')} (asked for ${target ? JSON.stringify(target.slice(0, 60)) : 'the default agent'}).`;
+}
+function checkRelay(input, tool) {
+  const caller = crewCaller(input);
+  if (!caller || caller.id === 'doraemon') return null;
+  return `${caller.id || 'this crew role'} may not use ${tool}: only Doraemon messages, schedules or triggers other sessions.`;
+}
+
 // ---------- entry ----------
 export function evaluate(input, env = process.env) {
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd();
@@ -817,11 +1029,17 @@ export function evaluate(input, env = process.env) {
   const roots = [...sysRoots, ...projRoots];
   if (typeof input.scratchpad_dir === 'string' && input.scratchpad_dir && !isSymlink(input.scratchpad_dir)) roots.push(real(input.scratchpad_dir));
   const pluginRoot = env.CLAUDE_PLUGIN_ROOT ? real(env.CLAUDE_PLUGIN_ROOT) : null;
-  const ctx = { cwd, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
-    role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null, isWrite: String(input.tool_name) === 'Write', writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
+  const ctx = { cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
+    role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null,
+    // agent_id marks a subagent; agent_type alone is also set for `claude --agent`, the main thread when it is Doraemon.
+    subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
   const tool = String(input.tool_name ?? '');
   const ti = input.tool_input ?? {};
-  if (tool === 'Bash') {
+  if (tool === 'Agent' || tool === 'Task') { const r = checkSpawn(input); return r ? { deny: r } : null; }
+  if (RELAY_TOOLS.has(tool)) { const r = checkRelay(input, tool); return r ? { deny: r } : null; }
+  // Monitor runs its command in the same shell as Bash (a ws watch has no command and no shell).
+  if (tool === 'Bash' || tool === 'Monitor') {
+    if (ti.command !== undefined && typeof ti.command !== 'string') return { deny: `${tool} command is not a string; blocked.` };
     const cmd = typeof ti.command === 'string' ? ti.command : '';
     if (cmd.length > MAX_COMMAND) return { deny: 'Command too long to verify; blocked.' };
     let result = checkCommands(cmd, ctx);
@@ -841,20 +1059,19 @@ export function evaluate(input, env = process.env) {
   return null;
 }
 
+// Every way out of main() that is not an explicit allow blocks: exit 1 is non-blocking in Claude Code.
+const block = (why) => { console.error(`toon-crew guard: ${why}`); process.exitCode = 2; };
 async function main() {
   let raw = '';
   for await (const chunk of process.stdin) raw += chunk;
   let input;
-  try { input = JSON.parse(raw); } catch { console.error('toon-crew guard: unreadable hook input, not checked.'); process.exit(1); }
+  try { input = JSON.parse(raw); } catch { return block('unreadable hook input; blocked to be safe.'); }
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return block('hook input is not a JSON object; blocked to be safe.');
   let result;
   try { result = evaluate(input); } catch (e) {
-    // Fail closed when the call touches something the guard exists for; otherwise do not block.
-    const text = JSON.stringify(input?.tool_input ?? {});
-    const sensitive = input?.tool_name === 'Bash' ? RISKY_MENTION.test(text) || /settings/.test(text) : /\.claude|\.git|\.mcp|agent-memory|settings|plugins/.test(text);
-    console.error(`toon-crew guard: internal error (${e.message}); ${sensitive ? 'blocked to be safe' : 'not checked'}.`);
-    process.exit(sensitive ? 2 : 1);
+    return block(`internal error (${String(e?.message ?? e).split('\n')[0].slice(0, 200)}); blocked to be safe.`);
   }
-  if (result?.deny) { console.error(`toon-crew guard: ${result.deny}`); process.exit(2); }
+  if (result?.deny) return block(result.deny);
   if (result?.ask) {
     console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `toon-crew guard: ${result.ask}` } }));
   }
@@ -865,4 +1082,4 @@ async function main() {
 function isEntry() {
   try { return !!process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return true; }
 }
-if (isEntry()) await main();
+if (isEntry()) await main().catch((e) => block(`could not run (${String(e?.message ?? e).split('\n')[0].slice(0, 200)}); blocked to be safe.`));

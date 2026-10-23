@@ -20,7 +20,9 @@ export interface BoardEvent {
   from?: string;       // assign: who gave the work ("doraemon" for the main session)
   to?: string;         // assign: the agent type receiving it
   toId?: string;       // assign via SendMessage: the receiving agent id, so a resumed agent counts as working again
-  model?: string;      // assign: the Agent tool's model override for this run, when it gave one
+  model?: string;      // assign: the Agent tool's per-call model, when it gave one
+  declaredModel?: string;   // assign: the model in the agent's own file ("inherit" or no file: absent)
+  effectiveModel?: string;  // assign: the model it runs on: call > file > CLAUDE_CODE_SUBAGENT_MODEL > "main"
   ref?: string;        // commit SHA, PR URL, CI run id or deploy version, for dedupe and links
   ok?: boolean;        // CI/deploy outcome
 }

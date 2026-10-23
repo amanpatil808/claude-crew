@@ -55,7 +55,8 @@ test('protected: plugin files, project hooks/agents/skills, git config and hooks
   const pluginRoot = path.join(root, 'plugin-cache');
   fs.mkdirSync(pluginRoot);
   const ev = (tool_name, tool_input) => evaluate({ tool_name, cwd: proj, tool_input }, { CLAUDE_PROJECT_DIR: proj, CLAUDE_PLUGIN_ROOT: pluginRoot });
-  assert.equal(ev('Write', { file_path: path.join(pluginRoot, 'hooks/guard.mjs'), content: 'x' }), null, 'a dev checkout loaded with --plugin-dir is editable');
+  // A dev checkout loaded with --plugin-dir is the live guard: the main thread is asked (subagents are refused, see guard-security).
+  assert.ok(ev('Write', { file_path: path.join(pluginRoot, 'hooks/guard.mjs'), content: 'x' })?.ask, 'the live inline plugin asks the main thread');
   for (const f of [path.join(os.homedir(), '.claude/plugins/cache/x/y.js'), path.join(proj, '.git/config'), path.join(proj, '.git/hooks/pre-commit'), path.join(os.homedir(), '.claude.json'), path.join(proj, '.mcp.json')]) {
     assert.ok(ev('Write', { file_path: f, content: 'x' })?.deny, f);
     assert.ok(ev('Edit', { file_path: f, old_string: 'a', new_string: 'b' })?.deny, f);

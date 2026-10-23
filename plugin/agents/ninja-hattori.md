@@ -7,7 +7,7 @@ color: blue
 maxTurns: 80
 memory: project
 tools: Read, Grep, Glob, Bash, Write, Skill
-disallowedTools: Edit, MultiEdit, NotebookEdit
+disallowedTools: Edit, MultiEdit, NotebookEdit, Agent, SendMessage, CronCreate, Workflow, RemoteTrigger
 skills:
   - toon-crew:security-backend
   - toon-crew:integrations

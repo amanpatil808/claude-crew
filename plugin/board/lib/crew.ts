@@ -52,7 +52,7 @@ export function crewFrom(events: BoardEvent[], roles: Map<string, Role>): CrewMe
 
 // The agent file is the single source of truth for model, effort, colour, turns and the "(v0.2, training)" tag.
 export interface AgentInfo { model?: string; effort?: string; color?: string; maxTurns?: number; version?: string; stage?: string }
-const MODELS = ["opus", "sonnet", "haiku"];
+const MODELS = ["opus", "sonnet", "haiku", "fable"];
 const modelWord = (s: unknown) => MODELS.find((m) => String(s ?? "").toLowerCase().includes(m));
 const infoCache = new Map<string, { mtime: number; info: AgentInfo }>();   // by file, reparsed only when it changes
 
