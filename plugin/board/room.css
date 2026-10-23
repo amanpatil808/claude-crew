@@ -708,7 +708,6 @@ html[data-tab="room"] {
   #view-room .team { grid-column: span 2; }
 }
 #view-room .hall { padding-top: var(--s4); }
-#view-room .hall .gallery[hidden] + .rooms { margin-top: calc(var(--corr) - var(--s4)); }
 
 /* ---------- Project strip ---------- */
 #view-room .pstrip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
@@ -730,7 +729,7 @@ html[data-tab="room"] {
 #view-room .seat::before { background: color-mix(in srgb, var(--c, var(--team, var(--idle))) 62%, var(--panel)); border-color: var(--c-edge, var(--wall-ink)); }
 
 /* ---------- Framed pictures on the hallway wall ---------- */
-#view-room .gallery { position: relative; margin: 0 0 var(--corr); padding: var(--s3) var(--s4) var(--s4); border: var(--bw) solid var(--wall-ink); border-radius: var(--r-chip); box-shadow: var(--sh);
+#view-room .gallery { position: relative; margin: 0; padding: var(--s3) var(--s4) var(--s4); border: var(--bw) solid var(--wall-ink); border-radius: var(--r-chip); box-shadow: var(--sh);
   background: linear-gradient(transparent 0 calc(100% - 22px), var(--wains) calc(100% - 22px)), var(--wall-hall); }
 #view-room .gallery[hidden] { display: none; }
 #view-room .g-head { display: flex; margin-bottom: var(--s3); }
@@ -786,15 +785,11 @@ html[data-tab="room"] {
 #view-room .t-teacup::before { content: ""; position: absolute; right: -6px; top: 1px; width: 5px; height: 4px; border: var(--bw) solid var(--wall-ink); border-left: 0; border-radius: 0 4px 4px 0; }
 #view-room .t-teacup b { left: 5px; top: -9px; width: 2px; height: 5px; background: var(--muted); opacity: 0; }
 #view-room .desk[data-s="working"] .t-teacup b { animation: steam 1.8s steps(4) infinite; }
-/* Shinchan: an Action Kamen figure; Shiro asleep under the desk */
+/* Shinchan: an Action Kamen figure (his dog Shiro is drawn by rDog) */
 #view-room .t-figure { left: 26px; bottom: 17px; width: 12px; height: 22px; }
 #view-room .t-figure::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--dark); border-radius: 1px; }
 #view-room .t-figure b:nth-child(1) { left: 2px; top: 0; width: 8px; height: 8px; border: 1.5px solid var(--wall-ink); border-radius: 50%; background: #fff; box-shadow: inset 0 -3px 0 var(--red); }
 #view-room .t-figure b:nth-child(2) { left: 1px; top: 8px; width: 10px; height: 11px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: linear-gradient(var(--red) 0 60%, var(--gold) 60%); }
-#view-room .t-shiro { left: 44px; bottom: 0; width: 28px; height: 11px; transform-origin: 50% 100%; animation: breathe 3.4s ease-in-out infinite; }
-#view-room .t-shiro::before { content: ""; position: absolute; inset: 0; border: var(--bw) solid var(--wall-ink); border-radius: 10px 10px 4px 4px; background: #fff; }
-#view-room .t-shiro b:nth-child(1) { left: 2px; top: -2px; width: 7px; height: 7px; background: #cfd3de; border: 1.5px solid var(--wall-ink); border-radius: 50% 50% 0 50%; }
-#view-room .t-shiro b:nth-child(2) { right: -4px; top: 3px; width: 6px; height: 4px; background: #fff; border: 1.5px solid var(--wall-ink); border-radius: 3px; }
 
 /* catchphrases: a short bubble over the desk; neighbouring desks lean opposite ways so they never collide */
 #view-room .quip { position: absolute; left: 50%; top: -18px; z-index: 6; width: max-content; max-width: 140px; padding: 3px 8px; border: var(--bw) solid var(--edge); border-radius: var(--r-bubble); background: var(--panel); color: var(--ink); font: 700 var(--t-xs)/1.3 var(--font); box-shadow: var(--sh); pointer-events: none; animation: bubbleIn .25s ease-out; }
@@ -886,38 +881,21 @@ html[data-tab="room"] {
 .av-stuart .hair { left: 15px; top: 4px; width: 2px; height: 6px; background: #3a2a14; box-shadow: 5px -1px 0 #3a2a14, 10px 1px 0 #3a2a14, 14px 3px 0 #3a2a14; }
 .av-stuart .eye.c { left: 14px; top: 14px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid #9aa3b0; background: radial-gradient(circle, #3b2a1a 0 3.5px, #fff 4px); animation: none; }
 .av-stuart .mouth { left: 18px; top: 32px; width: 12px; height: 5px; border-radius: 0 0 10px 10px; background: #3a2a14; }
-.av-kevin .eye::after, .av-bobm .eye::after, .av-stuart .eye::after, .av-mike .eye::after { display: none; }
-.av[data-s="queued"].av-kevin .eye, .av[data-s="queued"].av-bobm .eye, .av[data-s="queued"].av-stuart .eye, .av[data-s="queued"].av-mike .eye { height: 3px; background: #3a2a14; border-width: 1.5px; }
-.av[data-s="done"].av-kevin .eye, .av[data-s="done"].av-bobm .eye, .av[data-s="done"].av-stuart .eye, .av[data-s="done"].av-mike .eye { border-bottom: 2.5px solid #9aa3b0; border-radius: 50%; }
-/* Mike: one big eye, two small horns */
-.av-mike .body { left: 2px; right: 2px; top: 5px; bottom: 5px; border-radius: 50%; background: #79c94a; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .1); }
-.av-mike .horn { top: 0; width: 7px; height: 10px; background: #f4ecc4; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.av-mike .horn.l { left: 12px; } .av-mike .horn.r { right: 12px; }
-.av-mike .eye.c { left: 12px; top: 13px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #2b4a1c; background: radial-gradient(circle, #111 0 3.5px, #3a8a2a 4px 7px, #fff 7.5px); animation: none; }
-.av-mike .mouth { left: 12px; top: 39px; width: 24px; height: 7px; border-radius: 0 0 14px 14px; background: #2b3a1f; box-shadow: inset 0 2px 0 #fff; }
-/* Sulley: big blue fur, purple spots, cream horns */
-.av-sulley .body { left: 0; right: 0; top: 4px; bottom: 0; border-radius: 42% 42% 18% 18%; background: #5fb4e8; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .12); }
-.av-sulley .spot { width: 9px; height: 9px; border-radius: 50%; background: #8a5fd0; }
-.av-sulley .spot.a { left: 3px; top: 24px; } .av-sulley .spot.b { right: 3px; top: 36px; }
-.av-sulley .horn { top: -1px; width: 9px; height: 12px; background: #f3e6b6; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.av-sulley .horn.l { left: 8px; } .av-sulley .horn.r { right: 8px; }
-.av-sulley .face { left: 9px; right: 9px; top: 15px; height: 30px; border-radius: 50%; background: #bfe4f7; }
-.av-sulley .eye { top: 20px; } .av-sulley .eye.l { left: 14px; } .av-sulley .eye.r { right: 14px; }
-.av-sulley .nose { left: 19px; top: 29px; width: 10px; height: 7px; border-radius: 50%; background: #3d3a7a; }
-.av-sulley .mouth { left: 15px; top: 38px; width: 18px; height: 6px; border-radius: 0 0 12px 12px; background: #2a2540; }
-/* Joe: pork-pie hat, plum jacket */
-.av-joe .body { left: 10px; right: 10px; top: 38px; bottom: 0; border-radius: 8px 8px 4px 4px; background: #6a4fa0; }
-.av-joe .head { left: 6px; right: 6px; top: 8px; height: 36px; border-radius: 48% 48% 46% 46%; background: #8a5a3a; }
-.av-joe .hat { left: 10px; right: 10px; top: 1px; height: 11px; border-radius: 5px 5px 0 0; background: #3a3340; box-shadow: inset 0 -3px 0 #8d86a0; }
-.av-joe .brim { left: 3px; right: 3px; top: 10px; height: 4px; border-radius: 3px; background: #2c2733; }
-.av-joe .eye { top: 22px; } .av-joe .eye.l { left: 13px; } .av-joe .eye.r { right: 13px; }
-.av-joe .smile { left: 17px; top: 34px; width: 14px; height: 6px; border-radius: 0 0 12px 12px; background: #fff; box-shadow: inset 0 -2px 0 #7a2f2f; }
-/* 22: a round lavender soul with a glow and a cheeky grin */
-.av-ttwo .aura { inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(170, 190, 255, .6), transparent 70%); }
-.av-ttwo .head { left: 5px; right: 5px; top: 7px; bottom: 5px; border-radius: 50% 50% 46% 46%; background: #a8b9ff; box-shadow: inset -3px -4px 0 rgba(0, 0, 0, .1); }
-.av-ttwo .eye { top: 20px; width: 10px; height: 12px; } .av-ttwo .eye.l { left: 12px; } .av-ttwo .eye.r { right: 12px; }
-.av-ttwo .blush { top: 31px; } .av-ttwo .blush.l { left: 8px; } .av-ttwo .blush.r { right: 8px; }
-.av-ttwo .smile { left: 15px; top: 33px; width: 18px; height: 8px; border-radius: 0 0 18px 18px; background: #fff; box-shadow: inset 0 -3px 0 #2d2a5a; }
+.av-kevin .eye::after, .av-bobm .eye::after, .av-stuart .eye::after { display: none; }
+.av[data-s="queued"].av-kevin .eye, .av[data-s="queued"].av-bobm .eye, .av[data-s="queued"].av-stuart .eye { height: 3px; background: #3a2a14; border-width: 1.5px; }
+.av[data-s="done"].av-kevin .eye, .av[data-s="done"].av-bobm .eye, .av[data-s="done"].av-stuart .eye { border-bottom: 2.5px solid #9aa3b0; border-radius: 50%; }
+/* Film look (Mike, Sulley): inline SVG; the eye groups switch with the state, the drawn legs and paws replace the shared walker feet */
+.av .fl { position: absolute; left: 0; top: 0; width: 48px; height: 54.4px; overflow: visible; }
+.av .fl-eyes.happy, .av .fl-eyes.shut, .av .fl-drop { display: none; }
+.av[data-s="done"] .fl-eyes.open, .av[data-s="queued"] .fl-eyes.open { display: none; }
+.av[data-s="done"] .fl-eyes.happy, .av[data-s="queued"] .fl-eyes.shut { display: inline; }
+.av[data-s="blocked"] .fl-drop { display: inline; }
+/* blink: flash the shut eyes now and then (working, idle, blocked); motion off keeps them hidden */
+.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.shut { display: inline; opacity: 0; animation: flBlink 4.6s steps(1) infinite; animation-delay: var(--blink, 0s); }
+.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.open { animation: flOpen 4.6s steps(1) infinite; animation-delay: var(--blink, 0s); }
+@keyframes flBlink { 0%, 95%, 100% { opacity: 0; } 96%, 98% { opacity: 1; } }
+@keyframes flOpen { 0%, 95%, 100% { opacity: 1; } 96%, 98% { opacity: 0; } }
+#view-room .av-mike .foot, #view-room .av-sulley .foot, #view-room .av-joe .foot, #view-room .av-ttwo .foot { display: none !important; }
 /* Olaf: two snowballs, twig hair and arms, a carrot nose, coal buttons */
 .av-olaf .low { left: 6px; right: 6px; bottom: 0; height: 24px; border-radius: 50%; background: #fff; box-shadow: inset -3px -3px 0 #dbe8f5, 0 0 0 1.5px #aebfd4; }
 .av-olaf .head { left: 9px; right: 9px; top: 6px; height: 28px; border-radius: 50%; background: #fff; box-shadow: inset -3px -3px 0 #dbe8f5, 0 0 0 1.5px #aebfd4; }
@@ -956,11 +934,6 @@ html[data-tab="room"] {
 #view-room .desk[data-s="working"] .t-can { animation: ledPulse 2.4s ease-in-out infinite; }
 #view-room .t-shuriken { left: 24px; bottom: 17px; width: 16px; height: 16px; background: #aab4c6; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 #view-room .t-shuriken b { left: 6px; top: 6px; width: 4px; height: 4px; border-radius: 50%; background: #2b3350; }
-#view-room .t-shishi { left: 44px; bottom: 0; width: 28px; height: 11px; transform-origin: 50% 100%; animation: breathe 3.4s ease-in-out infinite; }
-#view-room .t-shishi::before { content: ""; position: absolute; inset: 0; border: var(--bw) solid var(--wall-ink); border-radius: 10px 10px 4px 4px; background: #f3e3c2; }
-#view-room .t-shishi b:nth-child(1) { left: 2px; top: -2px; width: 7px; height: 7px; background: #a8743f; border: 1.5px solid var(--wall-ink); border-radius: 50% 50% 0 50%; }
-#view-room .t-shishi b:nth-child(2) { right: -4px; top: 3px; width: 6px; height: 4px; background: #f3e3c2; border: 1.5px solid var(--wall-ink); border-radius: 3px; }
-#view-room .t-shishi b:nth-child(3) { left: 10px; top: 0; width: 6px; height: 9px; background: #3b6fd1; border-radius: 2px; }
 #view-room .t-piano { right: -16px; bottom: 10px; width: 28px; height: 26px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: #2a2433; }
 #view-room .t-piano::before { content: ""; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 8px; background: repeating-linear-gradient(90deg, #fff 0 3px, #2a2433 3px 4px); }
 #view-room .t-piano::after { content: ""; position: absolute; left: 4px; top: 3px; width: 16px; height: 8px; background: #fff7c4; border: 1px solid var(--wall-ink); }
@@ -978,3 +951,21 @@ html[data-tab="room"] {
 #view-room .t-uke::before { content: ""; position: absolute; left: 6px; top: 0; width: 3px; height: 16px; background: #5a3a22; border: 1px solid var(--wall-ink); }
 #view-room .t-uke::after { content: ""; position: absolute; left: 1px; bottom: 0; width: 14px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: #e0a050; }
 #view-room .t-uke b { left: 5px; bottom: 5px; z-index: 1; width: 5px; height: 5px; border-radius: 50%; background: #2a1b14; }
+/* Companion dogs: Shiro (Shinchan) and Shishimaru (Ninja Hattori). At the desk the dog stands on the floor in front of it and, while the owner is
+   working, ambles back and forth and flips to face where it goes. When the owner walks, the desk dog hides and a copy rides inside his walker's
+   .fig (so it flips with him, trails a little behind and settles close when he stops). Legs step only while the dog is moving. */
+#view-room .dog { z-index: 3; width: 26px; height: 18px; }
+#view-room .dog svg { display: block; width: 100%; height: 100%; overflow: visible; }
+#view-room .dog .o { stroke: var(--wall-ink); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+#view-room .dog .lg { transform-box: fill-box; }
+#view-room .seat > .dog { left: 6px; bottom: -4px; transform-origin: 50% 100%; }
+#view-room .desk[data-s="working"] .seat > .dog { animation: dogWander 18s linear infinite; }
+#view-room .desk[data-s="working"] .seat > .dog .lg.a, #view-room .desk[data-s="working"] .seat > .dog .lg.d,
+#view-room .walker:not([data-frame="s"]) .dog .lg.a, #view-room .walker:not([data-frame="s"]) .dog .lg.d { animation: dogStep .46s steps(1) infinite; }
+#view-room .desk[data-s="working"] .seat > .dog .lg.b, #view-room .desk[data-s="working"] .seat > .dog .lg.c,
+#view-room .walker:not([data-frame="s"]) .dog .lg.b, #view-room .walker:not([data-frame="s"]) .dog .lg.c { animation: dogStep .46s steps(1) infinite reverse; }
+@keyframes dogStep { 0% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes dogWander { 0%, 8% { transform: translateX(0) scaleX(1); } 44% { transform: translateX(82px) scaleX(1); } 46%, 54% { transform: translateX(82px) scaleX(-1); } 90% { transform: translateX(0) scaleX(-1); } 92%, 100% { transform: translateX(0) scaleX(1); } }
+#view-room .desk.away .dog { visibility: hidden; }
+#view-room .walker .dog { left: -14px; bottom: -3px; transform: scale(.85); transform-origin: 50% 100%; transition: left .6s ease-out; }
+#view-room .walker:not([data-frame="s"]) .dog { left: -27px; }
