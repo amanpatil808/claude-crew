@@ -1,6 +1,6 @@
 // toon-crew safety guard: a PreToolUse hook. Dependency-free (Node built-ins only).
 // Reads the hook JSON on stdin. Hard blocks: one-line reason on stderr, exit 2 ("deny").
-// Merges and pushes to main/master are "ask": exit 0 with hookSpecificOutput.permissionDecision "ask",
+// Pushes to main/master, and merges by the DevOps Team, are "ask": exit 0 with hookSpecificOutput.permissionDecision "ask",
 // so Claude Code shows the owner its own approval prompt. Otherwise exit 0 allows.
 //
 // This is a text guard: a seatbelt against mistakes and lazy bypasses, NOT a sandbox. The real boundary
@@ -42,11 +42,41 @@ const WRAPPERS = {
   caffeinate: new Set(['-t']), sudo: new Set(['-u', '-g', '-h', '-p', '-C', '-D', '-R', '-T']), doas: new Set(['-u', '-C']),
   xargs: new Set(['-I', '-n', '-P', '-L', '-s', '-d', '-E', '-a']), timeout: new Set(['-s', '-k']),
 };
+// Programs that run a command given as a string or as their trailing words (watch, tmux, su -c, ssh host cmd, ...).
+const LAUNCHERS = new Set(['script', 'watch', 'unbuffer', 'flock', 'tmux', 'screen', 'su', 'runuser', 'ssh', 'parallel']);
+const CHECKED_PROG = (name) => /^(git|gh|curl|wget|http|https|xh|xhs|rm|find|eval|alias|rsync|mv|ln|security)$/.test(name) || /^git-credential-/.test(name)
+  || DOCKERS.has(name) || SHELLS.has(name) || INTERPRETERS.test(name) || !!WRAPPERS[name] || LAUNCHERS.has(name);
+// Variables that point gh elsewhere, or that name a program git/gh will run later.
+function checkAssigns(pairs, ctx, depth) {
+  for (const [n, v] of pairs) {
+    if (/^(GH_CONFIG_DIR|GH_HOST)$/.test(n)) return `${n} is blocked: it points gh at another config or host, with aliases and tokens the guard cannot see.`;
+    if (/(PAGER|EDITOR|BROWSER|VISUAL|ASKPASS|SSH_COMMAND|EXTERNAL_DIFF)$/.test(n) && v && checkCommands(v, ctx, depth + 1)) return `${n} names a command the guard would stop or ask about: blocked.`;
+  }
+  return null;
+}
 const LEADING_KEYWORDS = new Set(['!', 'if', 'then', 'else', 'elif', 'do', 'while', 'until', '{', '}', 'fi', 'done']);
 const RISKY_MENTION = /\b(git|gh|rm|docker|podman|find|rsync|curl|wget|dd|mv|ln|shred|unlink)\b|\.claude|\.mcp|agent-memory|\.git\//;
 
 const PUSH_ASK = 'Pushing to main/master deploys to production: confirm.';
 const MERGE_ASK = 'Merging deploys to production: confirm.';
+// Owner rule: only the DevOps Team merges, and the owner confirms each merge; every other caller, the main thread
+// and Doraemon included, is refused. The owner's own `!` shell commands do not go through hooks.
+// Prefixed, exact names only: a bare "sulley" could be a project agent of the same name with other tools.
+const DEVOPS = /^toon-crew:(mike-wazowski|sulley)$/;
+const MERGE_DENY = "Only the DevOps Team (Mike Wazowski, Sulley) may merge pull requests, with the owner's approval.";
+const PUSH_DENY = "Only the DevOps Team (Mike Wazowski, Sulley) may push to main/master, with the owner's approval.";
+const AUTO_MERGE_DENY = 'Auto-merge is blocked for every role: merge once the checks are green.';
+// The ask text names the PR and repo only when they are plain ids, so a crafted value cannot reword the owner's prompt.
+const mergeAsk = ({ pr, repo } = {}) => {
+  const p = /^\d{1,9}$/.test(pr ?? '') ? `PR #${pr}` : null; const r = /^[\w.-]{1,100}\/[\w.-]{1,100}$/.test(repo ?? '') ? repo : null;
+  return p ? `Merging ${p}${r ? ` in ${r}` : ''} deploys to production: confirm.` : MERGE_ASK;
+};
+const mergeGate = (ctx, info) => (ctx.devops ? ask(mergeAsk(info)) : MERGE_DENY);
+const pushGate = (ctx) => (ctx.devops ? ask(PUSH_ASK) : PUSH_DENY);
+const devopsGate = (ctx, what) => (ctx.devops ? ask(`${what} can reach production: confirm.`) : `Only the DevOps Team (Mike Wazowski, Sulley) may use ${what}, with the owner's approval.`);
+// gh credentials: the hosts file (token when not in the keychain), git's credential store. No role reads them.
+const CRED_PATH = /\/\.config\/gh(\/|$)|\/\.git-credentials$|\/\.config\/git\/credentials$/;
+const CRED_TEXT = /\.config\/gh(?![\w.-])|\bgh\/hosts\.ya?ml\b|\.git-credentials\b|\.config\/git\/credentials\b|XDG_CONFIG_HOME\}?\/gh(?![\w.-])/;
 const ask = (reason) => ({ ask: reason });
 
 // ---------- shell tokenizer ----------
@@ -422,6 +452,7 @@ function checkGit(words, ctx, via, depth) {
   let sub = words[i];
   if (!sub) return null;
   const rest = words.slice(i + 1);
+  if ((sub === 'credential' && rest.includes('fill')) || (/^credential-/.test(sub) && rest.includes('get'))) return 'Reading stored git credentials (git credential fill/get) is blocked for every role.';
   // An alternate git dir (--git-dir, --work-tree, GIT_DIR, GIT_WORK_TREE) hides its config and aliases from the checks.
   if (gitDirUsed && (sub === 'push' || !GIT_BUILTINS.has(sub))) return 'git push or an unknown git subcommand with --git-dir/--work-tree/GIT_DIR is blocked: its config and aliases cannot be verified.';
   if (ctx.role && ROLE_GIT_BLOCKED.has(sub)) return `${ctx.role} is a read-only role: git ${sub} changes the working tree or history.`;
@@ -505,25 +536,25 @@ function checkGit(words, ctx, via, depth) {
   for (const spec of refspecs) {
     const dst = spec.split(':').pop();
     if (dst === 'HEAD' || dst === '@') needsLookup.push('head');
-    else if (isProtectedRef(dst)) return ask(PUSH_ASK);
+    else if (isProtectedRef(dst)) return pushGate(ctx);
   }
-  if (via.xargs) return ask(PUSH_ASK); // the refspec arrives on stdin: cannot be verified
+  if (via.xargs) return pushGate(ctx); // the refspec arrives on stdin: cannot be verified, so treat it as main
   if (refspecs.length === 0 && !tagsOnly) needsLookup.push('bare');
   if (needsLookup.length) {
     return { lazy: () => {
       const info = gitInfo(dir, ctx);
       if (info.unknown) return ask('Could not verify which branch this push updates: confirm.');
       if (info.notRepo) return null;
-      if (isProtectedRef(info.branch)) return ask(PUSH_ASK);
+      if (isProtectedRef(info.branch)) return pushGate(ctx);
       if (needsLookup.includes('bare')) {
         const rules = remotePushRules(dir, remote ?? 'origin', ctx);
         if (rules === null) return ask('Could not verify the remote push rules: confirm.');
         for (const rule of rules) {
           if (rule.startsWith('+')) return `remote.${remote ?? 'origin'}.push holds a +refspec (${rule}): a bare push would force-push. Blocked.`;
-          if (isProtectedRef(rule.split(':').pop())) return ask(PUSH_ASK);
+          if (isProtectedRef(rule.split(':').pop())) return pushGate(ctx);
         }
         if (info.pushFailed) return ask('Could not verify where a bare push goes (no @{push} target): confirm.');
-        if (info.pushDst && isProtectedRef(info.pushDst)) return ask(PUSH_ASK);
+        if (info.pushDst && isProtectedRef(info.pushDst)) return pushGate(ctx);
       }
       return null;
     } };
@@ -532,38 +563,65 @@ function checkGit(words, ctx, via, depth) {
 }
 
 // ---------- gh / GitHub API ----------
-const ghRules = (method, endpoint, text) => {
-  const ep = endpoint.replace(/^https?:\/\/[^/]+\//, '').replace(/^\/+/, '').replace(/\?.*$/, '');
-  if (/graphql/.test(ep) || /\b(mutation|query)\b/.test(text)) {
-    if (/\b(deleteRepository|deleteRef|deleteBranchProtectionRule|transferRepository|archiveRepository|updateRef)\b/.test(text)) return 'Deleting or rewriting repo data through the GitHub API is blocked.';
-    if (/\b(mergePullRequest|enablePullRequestAutoMerge|mergeBranch)\b/.test(text)) return ask(MERGE_ASK);
+// Normalised API path: no scheme/host, no query, no "." segments, no repeated or leading slashes.
+const apiPath = (endpoint) => endpoint.replace(/[?#].*$/, '').replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, '').replace(/^[^/]*github\.com(?=\/|$)/i, '')
+  .replace(/\/\.(?=\/|$)/g, '').replace(/\/{2,}/g, '/').replace(/^\/+/, '');
+const GQL_GUARDS = /\b(createBranchProtectionRule|updateBranchProtectionRule|deleteBranchProtectionRule|createRepositoryRuleset|updateRepositoryRuleset|deleteRepositoryRuleset|createCommitOnBranch)\b/;
+const ghRules = (method, endpoint, text, ctx) => {
+  const ep = apiPath(endpoint);
+  if (/(^|\/)graphql\/?$/.test(ep) || /\b(mutation|query)\b/.test(text)) {
+    if (/\b(deleteRepository|deleteRef|transferRepository|archiveRepository|updateRef)\b/.test(text)) return 'Deleting or rewriting repo data through the GitHub API is blocked.';
+    if (GQL_GUARDS.test(text)) return 'Changing branch protection or rulesets, or committing straight to a branch, through GraphQL is blocked.';
+    if (/\benablePullRequestAutoMerge\b/.test(text)) return AUTO_MERGE_DENY;
+    if (/\b(mergePullRequest|mergeBranch)\b/.test(text)) return mergeGate(ctx);
+    if (/\b(addPullRequestReview|submitPullRequestReview)\b/.test(text) && /APPROVE/i.test(text)) return devopsGate(ctx, 'PR approvals');
   }
   if (method === 'GET') return null;
   if (/^repos\/[^/]+\/[^/]+\/?$/.test(ep)) return 'Deleting or editing a repo through the GitHub API is blocked.';
   if (/git\/refs\/heads\/(main|master)\b/.test(ep) || /git\/refs\/?$/.test(ep) && /\b(main|master)\b/.test(text)) return 'Moving or deleting main/master through the GitHub API is blocked.';
   if (/branches\/[^/]+\/protection/.test(ep)) return 'Changing branch protection through the GitHub API is blocked.';
-  if (/\/pulls\/[^/]+\/merge\/?$/.test(ep) || /\/merges\/?$/.test(ep)) return ask(MERGE_ASK);
+  if (/(^|\/)rulesets(\/|$)/.test(ep)) return 'Changing rulesets through the GitHub API is blocked.';
+  const pull = /^repos\/([^/]+\/[^/]+)\/pulls\/([^/]+)\/merge\/?$/.exec(ep);
+  if (pull || /\/pulls\/[^/]+\/merge\/?$/.test(ep) || /\/merges\/?$/.test(ep)) return mergeGate(ctx, pull ? { repo: pull[1], pr: pull[2] } : undefined);
+  // A contents write without a branch goes to the default branch: treat it as a push to main.
+  if (/^repos\/[^/]+\/[^/]+\/contents(\/|$)/.test(ep) && (method === 'PUT' || method === 'DELETE')) {
+    const br = /\bbranch["']?\s*[=:]\s*["']?([^\s"',}&]+)/.exec(text);
+    if (!br || isProtectedRef(br[1])) return pushGate(ctx);
+  }
+  if (/\/dispatches\/?$/.test(ep)) return devopsGate(ctx, 'workflow dispatches');
+  // A review (or a pending review's submit) that approves; a body the guard cannot read counts as one.
+  if (/\/pulls\/[^/]+\/reviews(\/[^/]+\/events)?\/?$/.test(ep) && (/APPROVE/i.test(text) || /\s--input\b/.test(text))) return devopsGate(ctx, 'PR approvals');
   return null;
 };
 
-function apiMethod(words) {
-  let method = null; let hasBody = false; let endpoint = '';
+// gh api: a field or body the guard cannot read (a file, stdin, a shell variable) could carry any mutation.
+const GH_API_VALUE = new Set(['-X', '--method', '--request', '-f', '-F', '--field', '--raw-field', '--input', '-H', '--header', '-q', '--jq', '-t', '--template', '--cache', '-R', '--repo', '--hostname', '-p', '--preview']);
+const GH_API_BODY = new Set(['-f', '-F', '--field', '--raw-field', '--input']);
+const dynamicValue = (v) => /^\$|\$[({]|`/.test(v) || /(^|[{\s])\$[A-Za-z_]\w*\s*[({]/.test(v);
+function apiArgs(words) {
+  let method = null; let hasBody = false; const fields = []; let input = false; const candidates = [];
   for (let k = words.indexOf('api') + 1; k < words.length; k++) {
     const a = words[k];
-    if (a === '-X' || a === '--method' || a === '--request') { method = (words[++k] ?? '').toUpperCase(); continue; }
-    if (/^-X./.test(a)) { method = a.slice(2).toUpperCase(); continue; }
-    if (/^--(method|request)=/.test(a)) { method = a.split('=')[1].toUpperCase(); continue; }
-    if (['-f', '-F', '--field', '--raw-field', '-d', '--data', '--data-raw', '--data-binary', '--input', '--form', '-H', '--header', '-q', '--jq', '-t', '--template', '--cache', '-R', '--repo', '--hostname', '-u', '--user', '-o', '--output'].includes(a)) {
-      if (!['-H', '--header', '-q', '--jq', '-t', '--template', '--cache', '-R', '--repo', '--hostname', '-u', '--user', '-o', '--output'].includes(a)) hasBody = true;
-      k++; continue;
+    const eq = a.indexOf('=');
+    const name = a.startsWith('--') && eq !== -1 ? a.slice(0, eq) : (/^-[A-Za-z]./.test(a) && !a.startsWith('--') ? a.slice(0, 2) : a);
+    const attached = name !== a ? a.slice(a.startsWith('--') ? eq + 1 : 2) : null;
+    if (GH_API_VALUE.has(name)) {
+      const v = attached ?? words[++k] ?? '';
+      if (['-X', '--method', '--request'].includes(name)) method = v.toUpperCase();
+      if (GH_API_BODY.has(name)) { hasBody = true; if (name === '--input') input = true; else fields.push(v); }
+      continue;
     }
     if (a.startsWith('-')) continue;
-    if (!endpoint) endpoint = a;
+    candidates.push(a); // every positional is checked: an option the guard does not know cannot hide the endpoint
   }
-  return { method: method ?? (hasBody ? 'POST' : 'GET'), endpoint };
+  return { method: method ?? (hasBody ? 'POST' : 'GET'), candidates, fields, input };
 }
+const firstHit = (results) => results.find((r) => typeof r === 'string') ?? results.find(Boolean) ?? null;
 
-function checkGh(words, ctx) {
+// gh's built-in commands; anything else is an alias or an extension whose commands the guard cannot see.
+const GH_COMMANDS = new Set(['agent-task', 'alias', 'api', 'attestation', 'auth', 'browse', 'cache', 'codespace', 'completion', 'config', 'copilot', 'cs', 'extension', 'extensions', 'ext',
+  'gist', 'gpg-key', 'help', 'issue', 'label', 'org', 'pr', 'preview', 'project', 'release', 'repo', 'rs', 'ruleset', 'run', 'search', 'secret', 'ssh-key', 'status', 'variable', 'version', 'workflow']);
+function checkGh(words, ctx, via) {
   const positionals = [];
   for (let k = 1; k < words.length; k++) {
     const a = words[k];
@@ -574,31 +632,98 @@ function checkGh(words, ctx) {
   const [a, b] = positionals;
   const repoFlag = words.findIndex((w) => w === '-R' || w === '--repo' || w.startsWith('--repo='));
   const repoVal = repoFlag === -1 ? '' : (words[repoFlag].includes('=') ? words[repoFlag].split('=')[1] : words[repoFlag + 1] ?? '');
+  if (via?.xargs) return 'gh behind xargs takes its arguments from stdin, which the guard cannot see: blocked.';
+  if (a === undefined) return null;
+  if (!GH_COMMANDS.has(a)) return `gh ${a.slice(0, 40)} is not a built-in gh command (an alias or extension the guard cannot see): blocked.`;
   if (a === 'alias') return 'gh alias is blocked: aliases hide gh commands from the guard.';
   if (a === 'auth' && (b === 'token' || b === 'refresh' || b === 'setup-git')) return 'Reading or changing GitHub credentials (gh auth token) is blocked.';
+  if (a === 'auth' && b === 'status' && words.some((w) => /^--show-token(=|$)/.test(w) || /^-[A-Za-z]*t/.test(w))) return 'gh auth status --show-token prints the GitHub token: blocked.';
+  if (a === 'config' && b === 'set' && /^(editor|pager|browser|http_unix_socket)$/.test(positionals[2] ?? '')) return `gh config set ${positionals[2]} runs a program on later gh commands: blocked.`;
+  if (['extension', 'extensions', 'ext'].includes(a) && b === 'exec') return 'gh extension exec runs code the guard cannot see: blocked.';
   if (a === 'repo' && b === 'delete') return 'gh repo delete is blocked.';
-  if (a === 'pr' && b === 'merge') return ctx.km ? 'Miguel Rivera cannot merge pull requests.' : ask(MERGE_ASK);
+  if (a === 'repo' && b === 'edit') return devopsGate(ctx, 'gh repo edit');
+  if (a === 'workflow' && b === 'run') return devopsGate(ctx, 'gh workflow run');
+  if (a === 'pr' && b === 'review' && words.some((w) => /^--approve(=|$)/.test(w) || /^-[A-Za-z]*a/.test(w))) return devopsGate(ctx, 'PR approvals');
+  if (a === 'pr' && b === 'merge') {
+    // --admin skips branch protection; --auto merges later, after the owner's look. Both refused for every role.
+    if (words.some((w) => /^--admin(=|$)/.test(w))) return 'Merging with --admin bypasses branch protection: blocked for every role.';
+    if (words.some((w) => /^--auto(=|$)/.test(w))) return AUTO_MERGE_DENY;
+    const target = positionals[2] ?? ''; const url = /github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/.exec(target);
+    return mergeGate(ctx, url ? { repo: url[1], pr: url[2] } : { repo: repoVal || via?.vals?.GH_REPO, pr: target });
+  }
   if (ctx.km && a === 'pr' && b === 'create') return repoVal === CREW_REPO ? null : `Miguel Rivera may only run: gh pr create -R ${CREW_REPO}.`;
   if (a === 'api') {
-    const { method, endpoint } = apiMethod(words);
+    const { method, candidates, fields, input } = apiArgs(words);
     if (ctx.km && method !== 'GET') return 'Miguel Rivera may not change GitHub data through gh api.';
-    return ghRules(method, endpoint, words.join(' '));
+    if (candidates.some((c) => /(^|\/)graphql\/?$/.test(apiPath(c)))) {
+      if (input || fields.some((f) => /^[^=]*=@/.test(f) || dynamicValue(f.slice(f.indexOf('=') + 1)))) return 'A GraphQL query read from a file, stdin or a shell variable cannot be checked: blocked.';
+    }
+    const text = words.join(' ');
+    return firstHit((candidates.length ? candidates : ['']).map((c) => ghRules(method, c, text, ctx)));
   }
   return null;
 }
 
-function checkCurl(words) {
-  const text = words.join(' ');
-  if (!/github\.com/i.test(text)) return null;
-  let method = null; let hasBody = false; const url = words.find((w) => /^https?:\/\//.test(w)) ?? '';
+// curl, wget, httpie (http/https) and xh/xhs: the method, the URLs, and bodies the guard cannot read.
+const CURL_VALUE = new Set(['-d', '--data', '--data-raw', '--data-binary', '--data-urlencode', '--data-ascii', '-F', '--form', '--form-string', '--json', '-T', '--upload-file', '-H', '--header',
+  '-u', '--user', '-o', '--output', '-A', '--user-agent', '-e', '--referer', '-b', '--cookie', '-c', '--cookie-jar', '-x', '--proxy', '-w', '--write-out', '--oauth2-bearer', '-E', '--cert',
+  '--key', '--cacert', '-m', '--max-time', '--connect-timeout', '-r', '--range', '-D', '--dump-header', '--retry', '-z', '--time-cond', '--resolve', '--connect-to', '-U', '--proxy-user',
+  '--url-query', '-X', '--request', '--url']);
+const CURL_BODY = /^(-d|--data|--data-raw|--data-binary|--data-urlencode|--data-ascii|-F|--form|--form-string|--json|-T|--upload-file)$/;
+const WGET_VALUE = new Set(['-O', '-o', '-a', '-P', '-U', '-e', '-i', '-t', '-T', '-w', '-Q', '-l', '-D', '-A', '-R', '-I', '-X', '--header', '--user', '--password', '--method', '--post-data',
+  '--post-file', '--body-data', '--body-file', '--execute', '--input-file', '--output-document', '--config']);
+const HTTPIE_VALUE = new Set(['-a', '--auth', '-o', '--output', '--session', '--session-read-only', '-A', '--auth-type', '--proxy', '--cert', '--cert-key', '--verify', '--timeout', '--pretty', '-s', '--style', '-p', '--print']);
+const HTTP_METHODS = /^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/i;
+const looksLikeUrl = (w) => /^[a-z][a-z0-9+.-]*:\/\//i.test(w) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/|$)/.test(w) || /^localhost(:\d+)?(\/|$)/.test(w) || /^:\d*\//.test(w);
+// Splits one argument into [name, attached value]: --opt=v, -Xv, and short clusters (-sX PUT -> -s, then -X).
+function optionsOf(a, valueOpts) {
+  if (a.startsWith('--')) { const eq = a.indexOf('='); return [[eq === -1 ? a : a.slice(0, eq), eq === -1 ? null : a.slice(eq + 1)]]; }
+  if (!/^-[A-Za-z:]/.test(a)) return [];
+  const out = [];
+  for (let j = 1; j < a.length; j++) {
+    const n = `-${a[j]}`;
+    if (valueOpts.has(n)) { out.push([n, j + 1 < a.length ? a.slice(j + 1) : null]); break; }
+    out.push([n, null]);
+  }
+  return out;
+}
+function httpArgs(prog, words) {
+  const httpie = /^(http|https|xh|xhs)$/.test(prog);
+  const valueOpts = prog === 'curl' ? CURL_VALUE : prog === 'wget' ? WGET_VALUE : HTTPIE_VALUE;
+  let method = null; let hasBody = false; const urls = []; const bodies = []; let hidden = null; let hiddenOnWrite = null; const pos = [];
   for (let k = 1; k < words.length; k++) {
     const a = words[k];
-    if (a === '-X' || a === '--request') method = (words[++k] ?? '').toUpperCase();
-    else if (/^-X./.test(a)) method = a.slice(2).toUpperCase();
-    else if (/^--request=/.test(a)) method = a.split('=')[1].toUpperCase();
-    else if (/^(-d|--data|--data-raw|--data-binary|--data-urlencode|-F|--form|-T|--upload-file|--json)/.test(a)) hasBody = true;
+    if (!a.startsWith('-') || a === '-') { pos.push(a); continue; }
+    for (const [name, attached] of optionsOf(a, valueOpts)) {
+      const v = valueOpts.has(name) ? attached ?? words[++k] ?? '' : '';
+      if (prog === 'curl' && (['-K', '--config', '-:', '--next', '--variable'].includes(name) || name.startsWith('--expand-'))) hidden = `curl ${name} reads options or URLs the guard cannot see: blocked.`;
+      if (prog === 'wget' && (name === '--config' || (['-e', '--execute'].includes(name) && /method|post|body|header/i.test(v)))) hidden = `wget ${name} sets the request in a way the guard cannot check: blocked.`;
+      if (prog === 'wget' && ['-i', '--input-file'].includes(name)) hiddenOnWrite = 'wget -i reads URLs from a file the guard cannot see: blocked for writes.';
+      if ((prog === 'curl' && (name === '-X' || name === '--request')) || (prog === 'wget' && name === '--method')) method = v.toUpperCase();
+      if (name === '--url') urls.push(v);
+      if ((prog === 'curl' && CURL_BODY.test(name)) || (prog === 'wget' && /^--(post|body)-(data|file)$/.test(name))) { hasBody = true; bodies.push([name, v]); }
+    }
   }
-  return ghRules(method ?? (hasBody ? 'POST' : 'GET'), url, text);
+  if (httpie) {
+    let k = 0;
+    if (pos.length > 1 && HTTP_METHODS.test(pos[0])) method = pos[k++].toUpperCase();
+    if (pos[k] !== undefined) urls.push(pos[k]);
+    if (!method && pos.slice(k + 1).some((it) => /^[^:=@]+(=|:=|@|=@|:=@)/.test(it) && !/^[^:=]+:[^=]/.test(it))) hasBody = true;
+  } else urls.push(...pos);
+  return { method: method ?? (hasBody ? 'POST' : 'GET'), urls, bodies, hidden, hiddenOnWrite };
+}
+function checkHttp(prog, words, ctx) {
+  const { method, urls, bodies, hidden, hiddenOnWrite } = httpArgs(prog, words);
+  if (hidden) return hidden;
+  if (hiddenOnWrite && method !== 'GET') return hiddenOnWrite;
+  const dynamic = urls.filter((u) => /\$|`|\{\{/.test(u));
+  if (method !== 'GET' && (dynamic.length || !urls.some(looksLikeUrl))) return `A ${method} request to a URL held in a variable or file cannot be checked: blocked.`;
+  const gh = urls.filter((u) => /^([a-z]+:\/\/)?[^/\s]*github\.com(\/|$|:)/i.test(u));
+  if (!gh.length) return null;
+  if (gh.some((u) => /(^|\/)graphql\/?$/.test(apiPath(u))) && bodies.some(([n, v]) => /^@/.test(v) || (n === '--data-urlencode' && /^[^=]*@/.test(v)) || dynamicValue(v) || /^--(post|body)-file$/.test(n) || /^(-T|--upload-file)$/.test(n)))
+    return 'A GraphQL body read from a file, stdin or a shell variable cannot be checked: blocked.';
+  const text = words.join(' ');
+  return firstHit(gh.map((u) => ghRules(method, u, text, ctx)));
 }
 
 // ---------- rm and other deletes ----------
@@ -666,10 +791,14 @@ function checkDocker(words, ctx) {
 }
 
 // ---------- inline interpreter code ----------
+const HTTP_WRITE = /\b(requests|httpx|axios|session|client|urllib3)\.(put|post|patch|delete)\s*\(|method\s*[=:]\s*['"`](PUT|POST|PATCH|DELETE)\b|\.request\s*\(\s*['"`](PUT|POST|PATCH|DELETE)\b|\bRequest\s*\([^)]*\bdata\s*=|\bHTTP(Put|Post|Patch|Delete)\b|Net::HTTP::(Put|Post|Patch|Delete)/i;
 function checkInlineCode(code, ctx) {
   const flat = code.replace(/["'\s,[\]()]+/g, ' ');
   if (/\bgit\b.{0,40}\bpush\b/.test(flat)) return 'git push from inline code (python/node/perl -c/-e) is blocked.';
   if (/\bgh\b.{0,40}\b(merge|delete|alias)\b/.test(flat) || /\bgh auth token\b/.test(flat)) return 'gh merge/delete from inline code is blocked.';
+  // A write request from inline code: refused when it names GitHub or when its URL is not a literal the guard can read.
+  if (HTTP_WRITE.test(code) && (/github\.com/i.test(code) || !/['"`]https?:\/\/[^'"`$]+['"`]/.test(code))) return 'Inline code sending a write request to GitHub, or to a URL in a variable, is blocked.';
+  if (CRED_TEXT.test(code)) return 'Reading the gh hosts file or git credentials is blocked for every role.';
   if (/\brmtree\b|\brmSync\b|\brmdirSync\b|\bunlinkSync\b|\bos\.(remove|unlink|rmdir)\b|\brm -[a-z]*r|\bunlink\(|\bFile\.delete|\bFileUtils\.rm/.test(code)) return 'Deleting files from inline code is blocked.';
   if (PROTECTED_TEXT.test(code)) return 'Inline code touching settings, hooks, plugin files, git config or agent-memory is blocked.';
   if (!ctx || !(ctx.role || (ctx.subagent && ctx.pluginRoot))) return null;
@@ -732,9 +861,10 @@ function archiveTargets(prog, words) {
 
 // ---------- command walker ----------
 function stripWrappers(words) {
-  let w = words.slice(); const assigns = []; const via = { xargs: false };
+  let w = words.slice(); const assigns = []; const via = { xargs: false, vals: {} };
+  const note = (a) => { const n = a.split('=')[0]; assigns.push(n); via.vals[n] = a.slice(n.length + 1); };
   for (;;) {
-    while (w.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0]) || LEADING_KEYWORDS.has(w[0]))) { if (/=/.test(w[0])) assigns.push(w[0].split('=')[0]); w.shift(); }
+    while (w.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0]) || LEADING_KEYWORDS.has(w[0]))) { if (/=/.test(w[0])) note(w[0]); w.shift(); }
     if (!w.length) return { words: w, assigns, via };
     const name = path.basename(w[0]);
     const spec = WRAPPERS[name];
@@ -746,7 +876,7 @@ function stripWrappers(words) {
       if (spec.has(w[k])) k += 2;
       else if (w[k].startsWith('-') && w[k] !== '--') k++;
       else if (w[k] === '--') { k++; break; }
-      else if (name === 'env' && /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[k])) { assigns.push(w[k].split('=')[0]); k++; }
+      else if (name === 'env' && /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[k])) { note(w[k]); k++; }
       else if (name === 'timeout' && /^\d/.test(w[k])) k++;
       else break;
     }
@@ -794,9 +924,29 @@ function scanWords(inputWords, ctx, viaIn, depth) {
   const { words, assigns, via } = stripWrappers(inputWords);
   if (viaIn?.xargs) via.xargs = true;
   via.assigns = assigns;
+  const env = checkAssigns(Object.entries(via.vals), ctx, depth);
+  if (env) return env;
   if (!words.length) return null;
   if (assigns.some((n) => /^GIT_CONFIG(_COUNT|_KEY_\d+|_VALUE_\d+|_GLOBAL|_SYSTEM|_PARAMETERS)$/.test(n))) return 'GIT_CONFIG_* environment overrides are blocked: they can hide a push to main.';
   const prog = path.basename(words[0]);
+  if (/^(export|declare|typeset|readonly|local)$/.test(prog)) {
+    const r = checkAssigns(words.slice(1).filter((a) => /^[A-Za-z_]\w*=/.test(a)).map((a) => [a.split('=')[0], a.slice(a.indexOf('=') + 1)]), ctx, depth);
+    if (r) return r;
+  }
+  if (via.xargs && words.some((x) => /(^|\/)gh$/.test(x) || /\bgh\s/.test(x))) return 'gh behind xargs takes its arguments from stdin, which the guard cannot see: blocked.';
+  if (/^git-credential-/.test(prog) && words.includes('get')) return 'Reading stored git credentials (git credential fill/get) is blocked for every role.';
+  if (prog === 'security' && words.some((x) => /^find-(generic|internet)-password$/.test(x)) && words.some((x) => /github|^gh:/i.test(x))) return 'Reading the GitHub token from the keychain is blocked for every role.';
+  // Programs that run another command: check the command they are given, as a string or as the rest of the words.
+  if (LAUNCHERS.has(prog)) {
+    const hits = [];
+    for (let k = 1; k < words.length; k++) {
+      if (/\s/.test(words[k])) hits.push(checkCommands(words[k], ctx, depth + 1));
+      else if (CHECKED_PROG(path.basename(words[k]))) hits.push(scanWords(words.slice(k), ctx, via, depth + 1));
+      if (typeof hits.at(-1) === 'string') return hits.at(-1);
+    }
+    for (const h of hits) if (h?.lazy) ctx.pending.push(h.lazy);
+    const asked = hits.find((h) => h && !h.lazy); if (asked) return asked;
+  }
   if (words[0].startsWith('$') && !words[0].includes('/')) return `Running a program named by a variable (${words[0]}) cannot be verified: blocked.`;
   if (ctx.role && prog === 'patch') return `${ctx.role} is a read-only role: patch changes files.`;
   if (ctx.role) {
@@ -820,8 +970,8 @@ function scanWords(inputWords, ctx, viaIn, depth) {
     else if (!words.slice(1).some((w) => !w.startsWith('-')) || words.includes('-s')) ctx.stdinShell = true;
   } else if (prog === 'eval') r = checkCommands(words.slice(1).join(' '), ctx, depth + 1);
   else if (prog === 'git') r = checkGit(words, ctx, via, depth);
-  else if (prog === 'gh') r = checkGh(words, ctx);
-  else if (prog === 'curl' || prog === 'wget' || prog === 'http' || prog === 'https' || prog === 'xh') r = checkCurl(words);
+  else if (prog === 'gh') r = checkGh(words, ctx, via);
+  else if (/^(curl|wget|http|https|xh|xhs)$/.test(prog)) r = checkHttp(prog, words, ctx);
   else if (prog === 'rm') r = checkRm(words, ctx);
   else if (prog === 'find') r = checkFind(words, ctx, via, depth);
   else if (DOCKERS.has(prog)) r = checkDocker(words, ctx);
@@ -877,6 +1027,7 @@ function checkCommands(src, ctx, depth = 0) {
       const arg = probe.slice(1).find((a) => !a.startsWith('-'));
       if (prog === 'popd' || !arg || arg === '-') ctx.cwd = null;
       else ctx.cwd = resolveIn(ctx, arg);
+      if (ctx.cwd && CRED_PATH.test(`${ctx.cwd}/`)) return 'The gh and git credential folders are off limits for every role.';
       continue;
     }
     noteGitEnv(cmd.words, ctx);
@@ -1032,7 +1183,7 @@ export function evaluate(input, env = process.env) {
   const roots = [...sysRoots, ...projRoots];
   if (typeof input.scratchpad_dir === 'string' && input.scratchpad_dir && !isSymlink(input.scratchpad_dir)) roots.push(real(input.scratchpad_dir));
   const pluginRoot = env.CLAUDE_PLUGIN_ROOT ? real(env.CLAUDE_PLUGIN_ROOT) : null;
-  const ctx = { cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
+  const ctx = { cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), devops: DEVOPS.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
     role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null,
     // agent_id marks a subagent; agent_type alone is also set for `claude --agent`, the main thread when it is Doraemon.
     subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
@@ -1045,6 +1196,7 @@ export function evaluate(input, env = process.env) {
     if (ti.command !== undefined && typeof ti.command !== 'string') return { deny: `${tool} command is not a string; blocked.` };
     const cmd = typeof ti.command === 'string' ? ti.command : '';
     if (cmd.length > MAX_COMMAND) return { deny: 'Command too long to verify; blocked.' };
+    if (CRED_TEXT.test(cmd)) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
     let result = checkCommands(cmd, ctx);
     if (typeof result === 'string') return { deny: result };
     for (const lazy of ctx.pending) { // git lookups run only after every pure check has passed
@@ -1055,8 +1207,28 @@ export function evaluate(input, env = process.env) {
     return result;
   }
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) { const r = checkFileEdit(ti, ctx); return typeof r === 'string' ? { deny: r } : r; }
+  if (tool === 'Read' || tool === 'Grep' || tool === 'Glob') {
+    const home = os.homedir();
+    const given = [ti.file_path, ti.path, ti.notebook_path].filter((x) => typeof x === 'string' && x);
+    for (const p of tool === 'Grep' && !given.length ? [cwd] : given) {
+      const abs = path.resolve(cwd, p.replace(/^~(?=\/|$)/, home));
+      // A content search rooted above the credential files would read them too.
+      const above = tool === 'Grep' && [path.join(home, '.config/gh'), path.join(home, '.git-credentials')].some((c) => c === abs || within(c, abs));
+      if (CRED_PATH.test(abs) || CRED_PATH.test(real(abs)) || CRED_PATH.test(`${abs}/`) || above) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
+    }
+    return null;
+  }
   if (tool.startsWith('mcp__')) {
     const name = tool.slice(tool.lastIndexOf('__') + 2).toLowerCase();
+    const gate = (r) => (typeof r === 'string' ? { deny: r } : r);
+    if (/auto.?merge/.test(name)) return { deny: AUTO_MERGE_DENY };
+    if (/review/.test(name) && /APPROVE/i.test(JSON.stringify(ti))) return gate(devopsGate(ctx, 'PR approvals'));
+    if (/merge/.test(name)) return gate(mergeGate(ctx, { pr: String(ti.pull_number ?? ti.pullNumber ?? ''), repo: typeof ti.owner === 'string' && typeof ti.repo === 'string' ? `${ti.owner}/${ti.repo}` : '' }));
+    // A file write with no branch lands on the default branch: treat it as a push to main.
+    if (/(create_or_update_file|push_files|delete_file|create_file|update_file|write_file|commit)/.test(name)) {
+      const br = typeof ti.branch === 'string' ? ti.branch : '';
+      if (!br || isProtectedRef(br)) return gate(pushGate(ctx));
+    }
     if (/(merge|push|delete|destroy|drop|force|remove|wipe)/.test(name)) return ask(`MCP tool ${tool} can change or delete remote data: confirm.`);
   }
   return null;

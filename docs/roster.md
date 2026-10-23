@@ -2,7 +2,7 @@
 
 Fifteen agents in nine teams, one job each. In a project they are called `toon-crew:<id>` (for example `toon-crew:stuart`). Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first, and only Doraemon commits. Source of truth for names and settings: `docs/planning/cast-v2.md`.
 
-The `(v0.4)` at the end of each agent description is the prompt version. It is separate from the plugin version in `plugin/.claude-plugin/plugin.json` (0.2.1).
+The `(v0.4)` at the end of each agent description is the prompt version. It is separate from the plugin version in `plugin/.claude-plugin/plugin.json` (0.2.2).
 
 ## Teams
 
@@ -53,6 +53,7 @@ The manager keeps cheap defaults and passes `model: opus` for one run when it ma
   - `memory: project` adds tools back so an agent can keep its memory. On Claude Code 2.1.309, stuart got Read, Write, Grep, Glob: Write came back, Edit did not. So each prompt says: update memory by reading the file and writing it back whole.
   - **The guard is the lock on writes** for these roles. The plugin guard (`plugin/hooks/guard.mjs`, keyed on the hook's `agent_type`) blocks Edit-type tools and tree-changing git for them, and allows Write only to the agent's own `toon-crew-<id>/MEMORY.md`, the temp folder or session scratchpad, plus deliverable folders: `docs/research/` for dekisugi and olaf; `docs/design/` and `docs/research/` for nobita.
 - **Knowledge Manager pushes**: miguel-rivera may push only `crew-lessons/*` branches to amanpatil808/claude-crew and open pull requests there; never main, never a merge.
+- **Merging**: only the DevOps Team (mike-wazowski, sulley) may merge pull requests, and only after the owner approves that specific PR; the guard asks the owner to confirm each merge. Approving a pull request (`gh pr review --approve`) is also DevOps only, with the owner's confirmation. DevOps rights need the exact plugin names `toon-crew:mike-wazowski` and `toon-crew:sulley`; a project agent with the same bare name gets none. Everyone else is refused, including doraemon and miguel-rivera. `--admin` and `--auto` merges are refused for everyone. The owner can always merge himself: his own `!` commands and GitHub's website are not checked by the guard.
 - **Spawning**: only doraemon (the main session) starts crew agents. dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, with the prefix, for narrow questions. The guard refuses every other crew role, and bare names. Agents outside the crew are not limited.
 - **Models**: Doraemon passes no `model` when spawning, except the escalations above. A per-call model beats the agent file, and the board shows an "override" badge when the call's model differs from the file's.
 

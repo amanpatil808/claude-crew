@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|Agent|^(Task|SendMessage|CronCreate|Workflow|RemoteTrigger)$|mcp__.*",
+        "matcher": "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|Agent|^(Task|SendMessage|CronCreate|Workflow|RemoteTrigger|Read|Grep)$|mcp__.*",
         "hooks": [
           {
             "type": "command",
