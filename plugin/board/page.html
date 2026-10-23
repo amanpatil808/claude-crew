@@ -131,14 +131,16 @@ footer { color: var(--fg-3); font-size: 13px; margin-top: 18px; overflow-wrap: a
       <h2>The crew</h2>
       <div class="hall" id="r-hall">
         <span class="door gate" id="r-door" title="Anywhere Door" aria-hidden="true"></span>
-        <div class="gallery" id="r-gallery" aria-label="Framed pictures of former crew" hidden></div>
         <div class="rooms" id="r-rooms"><p class="empty">Waiting for the crew...</p></div>
         <div class="walkers" id="r-walkers" aria-hidden="true"></div>
       </div>
     </section>
-    <section class="sec" aria-label="What happened">
-      <h2>Outcomes</h2>
-      <div class="log panel"><div class="feed" id="r-feed" tabindex="0" aria-label="Outcomes, newest first"><p class="empty">Nothing yet.</p></div></div>
+    <section class="sec" aria-label="Active tasks">
+      <h2>Active tasks</h2>
+      <div class="log panel"><div class="feed" id="r-feed" tabindex="0" aria-label="Active tasks, newest first"><p class="empty">No active tasks</p></div></div>
+    </section>
+    <section class="sec wallsec" aria-label="On the wall">
+      <div class="gallery" id="r-gallery" aria-label="Framed pictures of former crew" hidden></div>
     </section>
   </div>
 </main>
