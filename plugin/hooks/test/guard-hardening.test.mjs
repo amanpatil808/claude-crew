@@ -25,15 +25,18 @@ sh(repo, 'config', 'alias.p', 'push');
 sh(repo, 'config', 'alias.shout', '!echo hi');
 
 let repo2;
-const run = (command, cwd = repo, extra = {}) => evaluate({ tool_name: 'Bash', cwd, tool_input: { command }, ...extra }, { CLAUDE_PROJECT_DIR: cwd });
+const DEVOPS = { agent_type: 'toon-crew:mike-wazowski', agent_id: 'a1' };
+const run =(command, cwd = repo, extra = {}) => evaluate({ tool_name: 'Bash', cwd, tool_input: { command }, ...extra }, { CLAUDE_PROJECT_DIR: cwd });
 
 test('bare push on a branch that tracks main (push.default=upstream) asks', () => {
-  assert.ok(run('git push')?.ask);
-  assert.ok(run('git push origin')?.ask);
+  assert.ok(run('git push', repo, DEVOPS)?.ask);
+  assert.ok(run('git push origin', repo, DEVOPS)?.ask);
+  assert.ok(run('git push')?.deny, 'the main thread may not push to main');
 });
 test('repo-defined alias for push is resolved, shell aliases are checked', () => {
-  assert.ok(run('git p origin main')?.ask);
-  assert.ok(run('git p')?.ask);
+  assert.ok(run('git p origin main', repo, DEVOPS)?.ask);
+  assert.ok(run('git p', repo, DEVOPS)?.ask);
+  assert.ok(run('git p origin main')?.deny);
   assert.equal(run('git shout'), null);
 });
 test('git config writes of aliases and push settings are denied, reads are fine', () => {
@@ -94,12 +97,16 @@ test('Miguel Rivera (knowledge manager): only lesson pushes to origin and PRs ag
   assert.ok(run('git push origin crew-lessons/x', repo, { agent_type: 'doraemon' }) === null, 'other agents are not limited by the Miguel Rivera rule');
 });
 test('MCP tools that merge, push or delete ask', () => {
-  const mcp = (tool_name) => evaluate({ tool_name, cwd: repo, tool_input: {} }, { CLAUDE_PROJECT_DIR: repo });
-  for (const t of ['mcp__github__merge_pull_request', 'mcp__github__push_files', 'mcp__github__delete_file', 'mcp__plugin_x_y__delete_branch']) assert.ok(mcp(t)?.ask, t);
+  const mcp = (tool_name, tool_input = {}) => evaluate({ tool_name, cwd: repo, tool_input }, { CLAUDE_PROJECT_DIR: repo });
+  for (const t of ['mcp__github__push_files', 'mcp__github__delete_file', 'mcp__plugin_x_y__delete_branch']) assert.ok(mcp(t, { branch: 'feat/x' })?.ask, t);
+  assert.ok(mcp('mcp__github__push_files')?.deny, 'no branch means the default branch: only DevOps');
+  assert.ok(mcp('mcp__github__merge_pull_request')?.deny, 'only DevOps merges');
   for (const t of ['mcp__github__get_file_contents', 'mcp__zepto__search_products']) assert.equal(mcp(t), null, t);
 });
 test('GitHub API variants', () => {
-  for (const c of ['gh api repos/o/r/merges -f base=main -f head=x', `gh api graphql -f query='mutation{mergePullRequest(input:{}){clientMutationId}}'`]) assert.ok(run(c)?.ask, c);
+  for (const c of ['gh api repos/o/r/merges -f base=main -f head=x', `gh api graphql -f query='mutation{mergePullRequest(input:{}){clientMutationId}}'`]) {
+    assert.ok(run(c, repo, { agent_type: 'toon-crew:mike-wazowski' })?.ask, c); assert.ok(run(c)?.deny, c);
+  }
   for (const c of ['gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=x', 'gh api --method=DELETE https://api.github.com/repos/o/r', 'gh auth token', 'gh alias set m "pr merge"',
     `gh api graphql -f query='mutation{deleteRef(input:{refId:"x"}){clientMutationId}}'`, 'curl -X DELETE -H "Authorization: token $(gh auth token)" https://api.github.com/repos/o/r', 'curl -XPATCH https://api.github.com/repos/o/r/git/refs/heads/master -d x'])
     assert.ok(run(c)?.deny, c);
@@ -156,7 +163,8 @@ test('config --file and remote.<name>.push rules are honoured by a later bare pu
   sh(r2, 'config', 'remote.origin.push', '+HEAD:refs/heads/main');
   assert.ok(run('git push origin', r2)?.deny, 'a +refspec in remote.origin.push is a force push');
   sh(r2, 'config', '--replace-all', 'remote.origin.push', 'HEAD:refs/heads/main');
-  assert.ok(run('git push origin', r2)?.ask, 'plain refspec to main asks');
+  assert.ok(run('git push origin', r2, DEVOPS)?.ask, 'plain refspec to main asks DevOps');
+  assert.ok(run('git push origin', r2)?.deny, 'and denies everyone else');
   sh(r2, 'config', '--unset-all', 'remote.origin.push');
   assert.ok(run('git push', r2)?.ask, 'no @{push} target: confirm, never allow');
   assert.equal(run('git push --tags', r2), null, 'tags-only pushes cannot move main');

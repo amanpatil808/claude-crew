@@ -20,7 +20,7 @@ g('init', '-q', '--bare', 'remote.git'); g('init', '-q', '-b', 'main', 'work');
 const work = path.join(W, 'work'); const gw = (...a) => execFileSync('git', ['-C', work, ...a], { stdio: 'ignore' });
 gw('-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'one'); gw('remote', 'add', 'origin', '../remote.git'); gw('push', '-q', 'origin', 'main');
 gw('checkout', '-q', '-b', 'topic', '--track', 'origin/main'); gw('config', 'push.default', 'upstream');
-const inWork = (command) => evaluate({ tool_name: 'Bash', cwd: work, tool_input: { command } }, { CLAUDE_PROJECT_DIR: work });
+const inWork = (command, extra = { agent_type: 'toon-crew:mike-wazowski', agent_id: 'a1' }) => evaluate({ tool_name: 'Bash', cwd: work, tool_input: { command }, ...extra }, { CLAUDE_PROJECT_DIR: work });
 
 const bypass = {
   'alias in an alternate git dir (--git-dir)': ['ask', 'git --git-dir=/tmp/g/.git --work-tree=. p origin HEAD:main'],
