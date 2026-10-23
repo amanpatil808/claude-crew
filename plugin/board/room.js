@@ -43,6 +43,7 @@ const rTitleFull = (x) => x.title || R_PRO[x.id]?.[0] || x.role || "";
 const rTitle = (x) => rTitleFull(x).replace(/\s*\(.*$/, "");
 const rTeam = (x) => x.team || R_PRO[x.id]?.[1] || "";
 // Working people carry a gadget: time machine for deploys, 4D pocket for tools, bamboo-copter for everyone else.
+const R_PET = { shinchan: "t-shiro", "ninja-hattori": "t-shishi" };   // companion dogs that walk with their owner
 const R_GADGET = { "mike-wazowski": "timem", sulley: "timem", kevin: "pocket", bob: "pocket", stuart: "pocket" };
 const R_ICON = { working: "⌨", done: "✓", queued: "z" };
 // Retired characters hang as framed pictures; their art is kept here, keyed by id.
@@ -71,10 +72,6 @@ const KINDS = {
   kevin: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
   bobm: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
   stuart: ["body", "over", "strap", "hair", "eye c", "mouth"],
-  mike: ["body", "horn l", "horn r", "eye c", "mouth"],
-  sulley: ["body", "spot a", "spot b", "horn l", "horn r", "face", "eye l", "eye r", "nose", "mouth"],
-  joe: ["body", "head", "hat", "brim", "eye l", "eye r", "smile"],
-  ttwo: ["aura", "head", "eye l", "eye r", "blush l", "blush r", "smile"],
   olaf: ["arm l", "arm r", "low", "head", "hair", "eye l", "eye r", "nose", "smile", "btn"],
   pair: ["one", "two", "nose1", "nose2", "fed", "shirt"],
 };
@@ -89,8 +86,116 @@ function rCrewKey(role) {
 }
 const rKindOf = (id) => CREW[rKeyOf(id)]?.kind || R_RETIRED_KIND[id] || "cat";
 
+// ---- Film look (Mike, Sulley): one smooth inline SVG in the 48x54 .av box (viewBox 60x68 = the slot after the board's x1.25).
+// Markup is a fixed string built here (no data in it); ids carry a counter so every avatar owns its gradients.
+let flN = 0;
+const flDrop = (x, y) => `<path class="fl-drop" d="M${x} ${y} Q${x - 2.6} ${y + 4.2} ${x} ${y + 5.6} Q${x + 2.6} ${y + 4.2} ${x} ${y} Z" fill="#6EC8FF" stroke="#2C83A8" stroke-width=".7"/>`;
+// Sulley's fluffy outline: a broad superellipse with a soft bump between every pair of points.
+function flFur(cx, cy, rx, ry, n, bumps, puff) {
+  const pt = (a, k) => { const c = Math.cos(a), s = Math.sin(a); return [cx + k * rx * Math.sign(c) * Math.abs(c) ** (2 / n), cy + k * ry * Math.sign(s) * Math.abs(s) ** (2 / n)]; };
+  let d = "";
+  for (let i = 0; i <= bumps; i++) {
+    const a = -Math.PI / 2 + (i / bumps) * 2 * Math.PI, [x, y] = pt(a, 1);
+    if (i === 0) { d += `M${x.toFixed(1)} ${y.toFixed(1)}`; continue; }
+    const [qx, qy] = pt(a - Math.PI / bumps, puff);
+    d += ` Q${qx.toFixed(1)} ${qy.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }
+  return d + " Z";
+}
+const SULLEY_FUR = flFur(30, 39, 26.5, 27, 2.7, 30, 1.09);
+const FILM = {
+  mike(n) {
+    return `<defs><radialGradient id="mk${n}" cx=".38" cy=".3" r=".78"><stop offset="0" stop-color="#C8F59A"/><stop offset=".55" stop-color="#9BE15D"/><stop offset="1" stop-color="#6DBF3A"/></radialGradient></defs>
+      <path d="M24.5 53 L23.5 62.5 M35.5 53 L36.5 62.5" stroke="#5E9E33" stroke-width="2.4" stroke-linecap="round"/>
+      <ellipse cx="22" cy="64" rx="4.2" ry="2.1" fill="#5E9E33" stroke="#2E5A1C" stroke-width=".8"/><ellipse cx="38" cy="64" rx="4.2" ry="2.1" fill="#5E9E33" stroke="#2E5A1C" stroke-width=".8"/>
+      <path d="M9.5 35 Q4.5 40 5.5 46.5 M50.5 35 Q55.5 40 54.5 46.5" stroke="#5E9E33" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <circle cx="5.6" cy="47.6" r="2.3" fill="#6DBF3A" stroke="#2E5A1C" stroke-width=".8"/><circle cx="54.4" cy="47.6" r="2.3" fill="#6DBF3A" stroke="#2E5A1C" stroke-width=".8"/>
+      <path d="M18.5 14.5 Q15.5 8.5 18.6 5 Q20.6 9.5 23.4 12.4 Z" fill="#F1E6C0" stroke="#2E5A1C" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M41.5 14.5 Q44.5 8.5 41.4 5 Q39.4 9.5 36.6 12.4 Z" fill="#F1E6C0" stroke="#2E5A1C" stroke-width="1" stroke-linejoin="round"/>
+      <circle cx="30" cy="32" r="22" fill="url(#mk${n})" stroke="#2E5A1C" stroke-width="1.6"/>
+      <g class="fl-eyes open"><circle cx="30" cy="26" r="11" fill="#fff" stroke="#2E5A1C" stroke-width="1.4"/><circle cx="30" cy="27" r="6.6" fill="#3FA34D" stroke="#2A7A36" stroke-width="1"/><circle cx="30" cy="27" r="3.2" fill="#14210F"/><circle cx="27.3" cy="24.2" r="2" fill="#fff"/><circle cx="32.7" cy="29.6" r=".9" fill="#fff"/></g>
+      <g class="fl-eyes happy"><path d="M20.5 28 Q30 17.5 39.5 28" stroke="#2E5A1C" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+      <g class="fl-eyes shut"><path d="M20.5 27 Q30 31 39.5 27" stroke="#2E5A1C" stroke-width="2.2" fill="none" stroke-linecap="round"/></g>
+      <ellipse cx="14.5" cy="37.5" rx="3" ry="1.8" fill="#FF9DB0" opacity=".75"/><ellipse cx="45.5" cy="37.5" rx="3" ry="1.8" fill="#FF9DB0" opacity=".75"/>
+      <path d="M17.5 38 Q30 40.5 42.5 38 Q40.5 48.5 30 48.5 Q19.5 48.5 17.5 38 Z" fill="#3A1F2B" stroke="#2E5A1C" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M19 38.7 Q30 40.9 41 38.7 L40.5 41 Q30 42.8 19.5 41 Z" fill="#fff"/>
+      <path d="M24 47.4 Q30 42.6 36 47.4 Q30 48.9 24 47.4 Z" fill="#E8727F"/>
+      ${flDrop(52, 10)}`;
+  },
+  sulley(n) {
+    const eye = (x) => `<g class="fl-eyes open"><ellipse cx="${x}" cy="27" rx="3.4" ry="3.7" fill="#fff" stroke="#1E4E60" stroke-width=".8"/><circle cx="${x + .4}" cy="27.6" r="2.3" fill="#2F7FD0"/><circle cx="${x + .4}" cy="27.6" r="1.1" fill="#101828"/><circle cx="${x - .5}" cy="26.4" r=".8" fill="#fff"/></g>`
+      + `<g class="fl-eyes happy"><path d="M${x - 3.2} 28.6 Q${x} 24.4 ${x + 3.2} 28.6" stroke="#1E2A40" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>`
+      + `<g class="fl-eyes shut"><path d="M${x - 3.2} 27.8 Q${x} 29.6 ${x + 3.2} 27.8" stroke="#1E2A40" stroke-width="1.5" fill="none" stroke-linecap="round"/></g>`;
+    const paw = (x, flip) => `<g transform="translate(${x} 53) scale(${flip} 1)"><ellipse cx="0" cy="0" rx="7.2" ry="6.2" fill="#3FB0C6" stroke="#1E4E60" stroke-width="1.2"/><path d="M-4.2 5 l.9 -2.6 l1 2.7 M-.5 5.8 l.9 -2.7 l1 2.8 M3.2 5 l.9 -2.6 l1 2.6" fill="#F1E3B0" stroke="#F1E3B0" stroke-width="1" stroke-linejoin="round"/></g>`;
+    return `<defs><radialGradient id="sg${n}" cx=".36" cy=".26" r=".85"><stop offset="0" stop-color="#9AE6F0"/><stop offset=".5" stop-color="#5CC8DB"/><stop offset="1" stop-color="#3AA6BC"/></radialGradient><clipPath id="sc${n}"><path d="${SULLEY_FUR}"/></clipPath></defs>
+      <path d="M19 14.5 Q15.6 8.4 19.4 4.6 Q20.6 9.6 24 12.6 Z" fill="#F1E3B0" stroke="#1E4E60" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M41 14.5 Q44.4 8.4 40.6 4.6 Q39.4 9.6 36 12.6 Z" fill="#F1E3B0" stroke="#1E4E60" stroke-width="1" stroke-linejoin="round"/>
+      <path d="${SULLEY_FUR}" fill="url(#sg${n})" stroke="#1E4E60" stroke-width="1.3" stroke-linejoin="round"/>
+      <g clip-path="url(#sc${n})" fill="#8E5FD3"><ellipse cx="11" cy="23" rx="4" ry="3.2"/><ellipse cx="49" cy="20" rx="4.4" ry="3.4"/><ellipse cx="30" cy="13.6" rx="3.4" ry="2.2"/><ellipse cx="6" cy="40" rx="3" ry="4.2"/><ellipse cx="54" cy="41" rx="3" ry="4"/><ellipse cx="17" cy="60" rx="4" ry="3"/><ellipse cx="44" cy="61" rx="3.6" ry="2.8"/></g>
+      <g stroke="#2C8EA3" stroke-width="1" fill="none" stroke-linecap="round" opacity=".7"><path d="M9 31 l2 -2.5 M51 31 l-2 -2.5 M14 15.5 l1.6 2.2 M46 15.5 l-1.6 2.2 M24 59 l1 -2.4 M36 59 l-1 -2.4"/></g>
+      <path d="M18.6 22.2 Q23 19.4 27.2 22.4 M32.8 22.4 Q37 19.4 41.4 22.2" stroke="#2C8EA3" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      ${eye(23)}${eye(37)}
+      <ellipse cx="30" cy="33" rx="4.4" ry="2.9" fill="#3B2D6B"/><ellipse cx="28.6" cy="32.1" rx="1.3" ry=".7" fill="#fff" opacity=".55"/>
+      <path d="M19.5 37 Q30 47.5 40.5 37 Q30 41 19.5 37 Z" fill="#2A1F3D" stroke="#1E4E60" stroke-width=".8" stroke-linejoin="round"/>
+      <path d="M24.4 41 l1.2 -2.5 l1.3 2.7 Z M33.1 41.2 l1.3 -2.7 l1.2 2.5 Z" fill="#fff"/>
+      ${paw(8.5, 1)}${paw(51.5, -1)}
+      ${flDrop(55, 9)}`;
+  },
+  // Soul forms (Joe, 22): translucent, volumetric glow (luminous core, cooler edge, soft halo), airbrushed, no outline.
+  joe(n) {
+    const BODY = "M30 12 C41 12 44 22 44 31 C44 41 46.4 47 45.4 54 C44.8 59.6 40 62.5 30 62.5 C20 62.5 15.2 59.6 14.6 54 C13.6 47 16 41 16 31 C16 22 19 12 30 12 Z";
+    const eye = (x) => `<g class="fl-eyes open"><ellipse cx="${x}" cy="24.6" rx="2.9" ry="3" fill="#fff"/><circle cx="${x}" cy="23.6" r="2.1" fill="#7A5230"/><circle cx="${x}" cy="23.4" r="1" fill="#2A1A10"/><circle cx="${x - .7}" cy="22.7" r=".7" fill="#fff"/></g>`
+      + `<g class="fl-eyes happy"><path d="M${x - 2.7} 25.6 Q${x} 21.8 ${x + 2.7} 25.6" stroke="#5B4030" stroke-width="1.4" fill="none" stroke-linecap="round"/></g>`
+      + `<g class="fl-eyes shut"><path d="M${x - 2.7} 24.4 Q${x} 26.6 ${x + 2.7} 24.4" stroke="#5B4030" stroke-width="1.3" fill="none" stroke-linecap="round"/></g>`;
+    return `<defs><linearGradient id="jb${n}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#78B6F4"/><stop offset=".45" stop-color="#62D8D6"/><stop offset="1" stop-color="#A4EE98"/></linearGradient>
+      <radialGradient id="jc${n}" cx=".5" cy=".5" r=".55"><stop offset="0" stop-color="#EFFFFB" stop-opacity=".75"/><stop offset=".6" stop-color="#CFFAF0" stop-opacity=".25"/><stop offset="1" stop-color="#CFFAF0" stop-opacity="0"/></radialGradient>
+      <radialGradient id="je${n}" cx=".5" cy=".5" r=".62"><stop offset=".6" stop-color="#3F80E0" stop-opacity="0"/><stop offset="1" stop-color="#3F80E0" stop-opacity=".42"/></radialGradient>
+      <linearGradient id="jt${n}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9ED0F4"/><stop offset="1" stop-color="#8DE0CE"/></linearGradient>
+      <filter id="jg${n}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter></defs>
+      <path d="${BODY}" fill="#8FEFFF" opacity=".6" filter="url(#jg${n})" transform="translate(30 37) scale(1.16) translate(-30 -37)"/>
+      <ellipse cx="24.4" cy="63.8" rx="3.8" ry="2.9" fill="#98E6B0" opacity=".9"/><ellipse cx="35.6" cy="63.8" rx="3.8" ry="2.9" fill="#98E6B0" opacity=".9"/>
+      <ellipse cx="12.8" cy="45" rx="3" ry="5.6" transform="rotate(12 12.8 45)" fill="#78D8D8" opacity=".85"/><ellipse cx="47.2" cy="45" rx="3" ry="5.6" transform="rotate(-12 47.2 45)" fill="#78D8D8" opacity=".85"/>
+      <path d="${BODY}" fill="url(#jb${n})" fill-opacity=".92"/><path d="${BODY}" fill="url(#jc${n})"/><path d="${BODY}" fill="url(#je${n})"/>
+      <g transform="rotate(-9 30 11)"><path d="M17 12.6 Q16.6 3 30 3 Q43.4 3 43 12.6 Z" fill="url(#jt${n})"/><path d="M17.3 10.4 Q30 12.6 42.7 10.4 L43 12.6 Q30 14.6 17 12.6 Z" fill="#7FC2DE" opacity=".8"/><ellipse cx="30" cy="12.8" rx="15.4" ry="3.2" fill="#B4E4F2"/></g>
+      <path d="M20.4 17.6 Q23.4 15 26.8 17.2 M33.2 17.2 Q36.6 15 39.6 17.6" stroke="#4F9BD0" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".8"/>
+      <g fill="#fff" fill-opacity=".26" stroke="#F4FCFF" stroke-opacity=".95" stroke-width="1.5"><rect x="17.6" y="19.2" width="11.8" height="10.4" rx="4.8"/><rect x="30.6" y="19.2" width="11.8" height="10.4" rx="4.8"/></g><path d="M29.4 23 Q30 22.2 30.6 23" stroke="#F4FCFF" stroke-width="1.4" fill="none"/>
+      ${eye(23.5)}${eye(36.5)}
+      <ellipse cx="30" cy="36.4" rx="2.1" ry="2.7" fill="#2D5E92" opacity=".9"/>
+      ${flDrop(54, 9)}`;
+  },
+  ttwo(n) {
+    const eye = (x) => `<g class="fl-eyes open"><ellipse cx="${x}" cy="28.6" rx="4.7" ry="5.2" fill="#fff"/><circle cx="${x}" cy="28.2" r="3.2" fill="#6D62D8"/><circle cx="${x}" cy="28" r="1.7" fill="#1B1F4A"/><circle cx="${x - 1.2}" cy="26.9" r="1" fill="#fff"/></g>`
+      + `<g class="fl-eyes happy"><path d="M${x - 3.9} 30.4 Q${x} 24.4 ${x + 3.9} 30.4" stroke="#2C3470" stroke-width="1.8" fill="none" stroke-linecap="round"/></g>`
+      + `<g class="fl-eyes shut"><path d="M${x - 3.9} 28.6 Q${x} 31.6 ${x + 3.9} 28.6" stroke="#2C3470" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>`;
+    return `<defs><radialGradient id="tb${n}" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#E2FFF4"/><stop offset=".45" stop-color="#8DE6DC"/><stop offset=".85" stop-color="#7DB6F2"/><stop offset="1" stop-color="#5E92EA"/></radialGradient>
+      <radialGradient id="tk${n}" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FF7D9E" stop-opacity=".85"/><stop offset="1" stop-color="#FF7D9E" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tl${n}" cx=".4" cy=".25" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <filter id="tg${n}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3"/></filter></defs>
+      <circle cx="30" cy="32" r="24" fill="#8FEFFF" opacity=".6" filter="url(#tg${n})"/>
+      <ellipse cx="24" cy="62" rx="4.4" ry="2.8" fill="#82C6EE" opacity=".95"/><ellipse cx="36" cy="62" rx="4.4" ry="2.8" fill="#82C6EE" opacity=".95"/>
+      <ellipse cx="30" cy="54" rx="13" ry="9.6" fill="#86CCEE" opacity=".95"/>
+      <ellipse cx="11" cy="52" rx="3.2" ry="4.8" transform="rotate(20 11 52)" fill="#86CCEE"/>
+      <path d="M43.4 55 Q46.4 52 47 48.6" stroke="#86CCEE" stroke-width="5" fill="none" stroke-linecap="round"/><ellipse cx="44.4" cy="47" rx="4.4" ry="4" fill="#9BE8E0"/><ellipse cx="49.4" cy="45.6" rx="3.6" ry="3.5" fill="#9BE8E0"/>
+      <path d="M13.4 22.6 Q8.4 16.4 11.2 11 Q16.4 14 19.6 19 Z" fill="#8DC4F2"/>
+      <circle cx="30" cy="31" r="19.6" fill="url(#tb${n})" fill-opacity=".95"/><circle cx="30" cy="31" r="19.6" fill="url(#tl${n})"/>
+      <path d="M17.8 21.4 Q22.6 18.6 27.2 20.6 M32.8 20.6 Q37.4 18.6 42.2 21.4" stroke="#4E92CE" stroke-width="1.3" fill="none" stroke-linecap="round" opacity=".6"/>
+      ${eye(23)}${eye(37)}
+      <circle cx="15.2" cy="38.4" r="5.4" fill="url(#tk${n})"/><circle cx="44.8" cy="38.4" r="5.4" fill="url(#tk${n})"/>
+      <path d="M21.6 37.4 Q30 41.6 38.4 37.4 Q36.8 47.8 30 47.8 Q23.2 47.8 21.6 37.4 Z" fill="#5B2A55"/>
+      <path d="M26.2 39.6 L33.8 39.6 L33.8 43.4 L26.2 43.4 Z" fill="#fff"/><path d="M30 39.6 V43.4" stroke="#C9D6E8" stroke-width=".7"/>
+      <path d="M26 46 Q30 42.8 34 46 Q30 47.4 26 46 Z" fill="#F08AA0"/>
+      ${flDrop(54, 9)}`;
+  },
+};
+function rFilm(kind) {
+  const t = document.createElement("template");
+  t.innerHTML = `<svg class="fl" viewBox="0 0 60 68" width="48" height="54.4" aria-hidden="true">${FILM[kind](++flN)}</svg>`;
+  return t.content.firstChild;
+}
+
 function rAvatarKind(kind, status, seed) {
   const a = rel("div", "av av-" + kind); a.dataset.s = status; a.style.setProperty("--blink", (seed % 5) * .7 + "s");
+  if (FILM[kind]) { a.append(rFilm(kind)); a.append(rel("i", "foot l"), rel("i", "foot r")); return a; }
   for (const p of KINDS[kind] || KINDS.cat) a.append(rel("i", p));
   a.append(rel("i", "foot l"), rel("i", "foot r"));
   return a;
@@ -116,8 +221,26 @@ const TOUCHES = {
   "joe-gardner": [["t-piano", 0, 1]], "twenty-two": [["t-badge", 1]],
   dekisugi: [["t-books", 3]], olaf: [["t-flake", 2]], stuart: [["t-banana", 1], ["t-uke", 1, 1]],
 };
+// Companion dogs (Shiro, Shishimaru): a fixed inline-SVG string facing right, four legs (a/b/c/d step in pairs), floppy or alert ears, tail.
+const DOGS = {
+  "t-shiro": `<svg viewBox="0 -3 40 31" aria-hidden="true"><path class="o" d="M8 15 Q2 11 4 5" fill="none" stroke-width="4.4"/><path d="M8 15 Q2 11 4 5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <rect class="o lg a" x="9" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg b" x="14.4" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg c" x="23" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg d" x="28.4" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/>
+    <ellipse class="o" cx="18" cy="16" rx="12" ry="7.8" fill="#fff"/><circle class="o" cx="29" cy="11.4" r="8.2" fill="#fff"/>
+    <path class="o" d="M22.6 4.6 Q18.4 7.4 20.2 15.4 Q25.6 14.6 26.4 7 Z" fill="#dfe3ee"/><path class="o" d="M33.4 3.8 Q39 5.4 37.6 12.6 Q33 11.6 32.6 5.8 Z" fill="#dfe3ee"/>
+    <circle cx="31.6" cy="10.4" r="1.4" fill="#1b1b24"/><circle cx="36" cy="11.2" r="1.2" fill="#1b1b24"/><ellipse cx="38" cy="13.6" rx="1.7" ry="1.3" fill="#1b1b24"/><path d="M33.2 16 Q35.2 17.6 37.2 16" stroke="#1b1b24" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`,
+  "t-shishi": `<svg viewBox="0 -3 40 31" aria-hidden="true"><path class="o" d="M8 15 Q1 14 3 5" fill="none" stroke-width="4.4"/><path d="M8 15 Q1 14 3 5" fill="none" stroke="#c9955a" stroke-width="2" stroke-linecap="round"/>
+    <rect class="o lg a" x="9" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg b" x="14.4" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg c" x="23" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg d" x="28.4" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/>
+    <ellipse class="o" cx="18" cy="16" rx="12" ry="7.8" fill="#c9955a"/><ellipse cx="19" cy="19.6" rx="7" ry="3.4" fill="#f3e3c2"/><path class="o" d="M23.4 6 L24 -2 L29.6 3.6 Z" fill="#a8743f"/><path class="o" d="M32 3.6 L36.4 -2 L37.2 5.6 Z" fill="#a8743f"/>
+    <circle class="o" cx="29" cy="11.4" r="8.2" fill="#c9955a"/><ellipse cx="35" cy="14.4" rx="4.6" ry="3.6" fill="#f3e3c2"/>
+    <path class="o" d="M21.8 8.4 Q29 4.8 36.6 8.6 L36.4 11.4 Q29 8.2 21.8 11.2 Z" fill="#3b6fd1" stroke-width="1"/><path class="o" d="M22 9.4 L16.6 7.6 L18.6 11.6 L22 10.8 Z" fill="#3b6fd1" stroke-width="1"/>
+    <circle cx="31.6" cy="12.6" r="1.4" fill="#1b1b24"/><circle cx="36" cy="12.8" r="1.1" fill="#1b1b24"/><ellipse cx="38.2" cy="14.4" rx="1.7" ry="1.3" fill="#1b1b24"/></svg>`,
+};
+function rDog(cls, seat) {
+  const d = rel("span", "tc dog " + cls); d.setAttribute("aria-hidden", "true"); d.innerHTML = DOGS[cls]; return d;
+}
 function rTouches(key) {
   return (TOUCHES[key] || []).map(([cls, n, floor]) => {
+    if (DOGS[cls]) return rDog(cls, true);
     const t = rel("i", "tc " + cls + (floor ? " fl" : "")); t.setAttribute("aria-hidden", "true");
     for (let i = 0; i < (n || 0); i++) t.append(rel("b"));
     return t;
@@ -278,11 +401,14 @@ function renderRoom(s) {
   const ids = new Set(r.feed.map((f) => f.id));
   const talks = (r.talks || []).filter((t) => !ids.has(t.id)).map((t) => ({ id: t.id, ts: t.ts, tone: "talk", role: t.to, from: t.from, to: t.to, say: t.text, text: `${name(t.from)} → ${name(t.to)}: ${t.text}` }));
   const feed = [...r.feed, ...talks].filter((f) => !rProj || !f.project || f.project === rProj).sort((x, y) => y.ts.localeCompare(x.ts)).slice(0, 25);
-  if (!feed.length) { RSVG("r-feed").replaceChildren(rel("p", "empty", "No outcomes yet.")); }
-  else RSVG("r-feed").replaceChildren(...feed.map((f) => {
-    const row = rel("div", "feed-row"); if (rFeedSeen && !rFeedSeen.has(f.id)) row.classList.add("fresh");
-    const k = rel("span", "kind", { start: "▶", done: "✓", pr: "⇄", deploy: "↑", bad: "!", talk: "»" }[f.tone] || "•"); k.dataset.k = f.tone; k.setAttribute("aria-hidden", "true");
-    row.append(f.role && roleOf[f.role] ? rMini(f.role, f.tone === "start" ? "working" : "done", 0) : rel("span", "mini"), rel("time", null, rclock(f.ts)), k, rel("div", "txt", f.text));
+  // Active tasks: members that are working now (start/assign without a finish), newest first, with elapsed time.
+  const active = r.members.filter((m) => m.status === "working" && (!rProj || !m.project || m.project === rProj)).sort((x, y) => (y.since || "").localeCompare(x.since || ""));
+  if (!active.length) { RSVG("r-feed").replaceChildren(rel("p", "empty", "No active tasks")); }
+  else RSVG("r-feed").replaceChildren(...active.map((m) => {
+    const row = rel("div", "feed-row"), k = rel("span", "kind", "▶"); k.dataset.k = "start"; k.setAttribute("aria-hidden", "true");
+    const what = (m.task || m.line || "Working").replace(/\s+/g, " ").trim(), txt = rel("div", "txt");
+    txt.append(rel("span", "who", name(m.id)), document.createTextNode(" — " + (what.length > 90 ? what.slice(0, 89) + "…" : what) + (m.project ? " · " + m.project : "")));
+    row.append(rMini(m.id, "working", 0), rel("time", null, m.since ? rSpan(rMins(m.since)) : "now"), k, txt);
     return row;
   }));
   rFeedSeen = new Set(feed.map((f) => f.id));
@@ -492,6 +618,8 @@ const rFace = (w, dir) => { w.dataset.dir = dir; w.dataset.frame = "s"; };
 function rWalker(roleId, item, at) {
   const w = rel("div", "walker"), fig = rel("span", "fig"); w.dataset.dir = "down"; w.dataset.frame = "s";
   fig.append(rAvatar(roleId, "walk", 1)); w.append(rel("span", "shadow"), fig);
+  const pet = R_PET[rKeyOf(roleId)];            // only Shinchan and Ninja Hattori have a dog that tags along
+  if (pet) fig.append(rDog(pet, false));
   if (item) w.append(rel("i", "carry " + item));
   if (rKeyOf(roleId) === MGR && rMotion()) { const d = rel("i", "ding"); d.setAttribute("aria-hidden", "true"); w.append(d); setTimeout(() => d.remove(), 1400); }   // the bell tinkles softly when he stands up
   RSVG("r-walkers").append(w); rPlace(w, at[0], at[1]);
