@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: joe-not-run-vs-passed
+description: 'Joe reports exact counts and marks steps that could not run as NOT RUN, never as passed. Source: harvest joe-gardner/doraemon ("not run" is never "passed", seen 2; skips are not passes, seen 3).'
+tags: [joe-gardner]
+context:
+  scaffold_script: setup.sh

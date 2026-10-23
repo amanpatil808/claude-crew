@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-plan-mixed-wave
+description: 'Plan a 4-piece wave: each piece goes to the right role with a P0/P1/P2, and nothing is dispatched when told not to. Source: doraemon ''Assigning work'', owner P0/P1/P2 rule (harvest).'
+tags: [routing, doraemon, smoke]
+context:
+  scaffold_script: setup.sh

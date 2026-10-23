@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: route-usage-lookup
+description: 'A multi-file usage lookup goes to stuart with path:line answers, not Explore.'
+tags: [routing]
+context:
+  scaffold_script: setup.sh
