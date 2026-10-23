@@ -7,7 +7,7 @@ color: yellow
 maxTurns: 80
 memory: project
 isolation: worktree
-disallowedTools: Agent
+disallowedTools: Agent, SendMessage, CronCreate, Workflow, RemoteTrigger
 skills:
   - toon-crew:security-backend
   - toon-crew:integrations

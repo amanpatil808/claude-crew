@@ -2,12 +2,13 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*",
+        "matcher": "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|Agent|^(Task|SendMessage|CronCreate|Workflow|RemoteTrigger)$|mcp__.*",
         "hooks": [
           {
             "type": "command",
             "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.mjs\"",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }
@@ -18,14 +19,12 @@
           {
             "type": "command",
             "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/hooks/projects.mjs\" register",
-            "async": true,
-            "timeout": 5
+            "async": true
           },
           {
             "type": "command",
             "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"",
-            "async": true,
-            "timeout": 5
+            "async": true
           }
         ]
       }
@@ -33,21 +32,21 @@
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true, "timeout": 5 }
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
     ],
     "SubagentStart": [
       {
         "hooks": [
-          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true, "timeout": 5 }
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
     ],
     "SubagentStop": [
       {
         "hooks": [
-          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true, "timeout": 5 }
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
     ],
@@ -55,14 +54,14 @@
       {
         "matcher": "Bash|Agent|SendMessage",
         "hooks": [
-          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true, "timeout": 5 }
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true, "timeout": 5 }
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
     ]

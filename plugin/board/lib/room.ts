@@ -3,11 +3,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BoardEvent } from "./events.ts";
+import { isOverride } from "./model.ts";
 import { roleFor, typesById, type AgentInfo, type CrewMember, type Role } from "./crew.ts";
 
-export interface RoomMember extends AgentInfo { id: string; project?: string; status: "working" | "done" | "idle"; line: string; ref?: string; since?: string; task?: string; lastHandback?: string; lastContactAt?: string; modelOverride?: string }
+export interface RoomMember extends AgentInfo { id: string; project?: string; status: "working" | "done" | "idle"; line: string; ref?: string; since?: string; task?: string; lastHandback?: string; lastContactAt?: string; modelOverride?: string; ranOn?: string; fileModel?: string }
 // What the hover card shows beyond the status line: the latest assignment and the latest hand-back summary per role.
-export interface RoleNotes { task?: string; taskAt?: string; handback?: string; handbackAt?: string; contactAt?: string; modelOverride?: string }
+export interface RoleNotes { task?: string; taskAt?: string; handback?: string; handbackAt?: string; contactAt?: string; asked?: string; declaredModel?: string; effectiveModel?: string }
 // `say` is the short line a character speaks on the board; `from` is the speaker's role when it is not `role` itself.
 export interface RoomFeedItem { id: string; ts: string; tone: "start" | "done" | "pr" | "deploy" | "bad" | "assign"; text: string; role?: string; from?: string; say?: string }
 export interface RoomFact { label: string; value: string; tone?: "ok" | "bad" | "run" }
@@ -27,12 +28,19 @@ export function mainBusy(events: BoardEvent[], now = Date.now()): boolean {
   return busy > end && now - Date.parse(busy) < 10 * 60_000;
 }
 
+// What the desk chip shows: the model it ran on, and the per-call model only when it differs from the agent file's.
+// Events from before these fields existed fall back to the call's model, then the file's.
+function modelFacts(n: RoleNotes | undefined, fileModel?: string): { ranOn?: string; modelOverride?: string; fileModel?: string } {
+  const declared = n?.declaredModel ?? fileModel;
+  return { ranOn: n?.effectiveModel ?? n?.asked ?? fileModel, ...(isOverride(n?.asked, declared) ? { modelOverride: n?.asked, fileModel: declared } : {}) };
+}
+
 export function roomMembers(crew: CrewMember[], roleIds: string[], managerBusy = false, notes: Map<string, RoleNotes> = new Map(), cards: (AgentInfo & { id: string; team?: string; title?: string })[] = [], managerAt?: string): RoomMember[] {
   // Doraemon has no start/stop of his own: he works while the main session is busy, and manages while any of the crew works
   const others = [...new Set(crew.filter((c) => c.status === "working" && c.roleId && c.roleId !== MANAGER && c.agentType !== "agent").map((c) => c.mascot ?? c.agentType))];
   return roleIds.map((id) => {
     const n = notes.get(id), c = cards.find((x) => x.id === id);
-    const extra = { team: c?.team, title: c?.title, task: n?.task, lastHandback: n?.handback, lastContactAt: n?.contactAt, modelOverride: n?.modelOverride, model: c?.model, effort: c?.effort, color: c?.color, maxTurns: c?.maxTurns, version: c?.version, stage: c?.stage };
+    const extra = { team: c?.team, title: c?.title, task: n?.task, lastHandback: n?.handback, lastContactAt: n?.contactAt, ...modelFacts(n, c?.model), model: c?.model, effort: c?.effort, color: c?.color, maxTurns: c?.maxTurns, version: c?.version, stage: c?.stage };
     if (id === MANAGER && (managerBusy || others.length)) return { id, status: "working" as const, line: managerBusy ? "Working now" : clip("Managing " + others.join(", "), 80), project: managerBusy ? managerAt : crew.find((c) => c.status === "working" && c.roleId !== MANAGER)?.project, ...extra };
     const mine = crew.filter((c) => c.roleId === id && c.agentType !== "agent");
     const busy = mine.find((c) => c.status === "working");
@@ -47,11 +55,11 @@ export function roleNotes(events: BoardEvent[], roles: Map<string, Role>): Map<s
   const out = new Map<string, RoleNotes>(), types = typesById(events);
   const note = (id: string) => out.get(id) ?? out.set(id, {}).get(id)!;
   for (const e of events) {
-    if (e.kind === "assign") { const r = e.to ? roleFor(e.to, roles) : undefined; if (r) Object.assign(note(r.id), { task: clip(e.text, 70), taskAt: e.ts, contactAt: e.ts, modelOverride: e.model }); }
+    if (e.kind === "assign") { const r = e.to ? roleFor(e.to, roles) : undefined; if (r) Object.assign(note(r.id), { task: clip(e.text, 70), taskAt: e.ts, contactAt: e.ts, asked: e.model, declaredModel: e.declaredModel, effectiveModel: e.effectiveModel }); }
     else if (e.kind === "agent-start") { const r = roleFor(e.agentType && e.agentType !== "agent" ? e.agentType : undefined, roles); if (r && e.agentType && e.agentType !== "agent") note(r.id).contactAt = e.ts; }
     else if (e.kind === "agent-stop") {
       const type = e.agentType ?? (e.agentId ? types.get(e.agentId) : undefined), r = type ? roleFor(type, roles) : undefined;
-      if (r && type !== "agent") Object.assign(note(r.id), { handback: clip(summary(e.text), 70), handbackAt: e.ts, task: undefined, modelOverride: undefined });
+      if (r && type !== "agent") Object.assign(note(r.id), { handback: clip(summary(e.text), 70), handbackAt: e.ts, task: undefined, asked: undefined, declaredModel: undefined, effectiveModel: undefined });
     }
   }
   return out;
