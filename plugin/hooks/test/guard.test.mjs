@@ -21,7 +21,8 @@ execFileSync('git', ['-C', featRepo, 'init', '-q', '-b', 'feat/x'], { stdio: 'ig
 const env = { CLAUDE_PROJECT_DIR: project };
 const bash = (command, cwd = project) => evaluate({ tool_name: 'Bash', cwd, tool_input: { command } }, env);
 const blocked = (cmd, cwd) => assert.ok(bash(cmd, cwd)?.deny, `should deny: ${cmd}`);
-const asked = (cmd, cwd) => assert.ok(bash(cmd, cwd)?.ask, `should ask: ${cmd}`);
+// Asks are what the DevOps Team sees; the main thread and other roles are denied a push to main or a merge.
+const asked = (cmd, cwd = project) => assert.ok(evaluate({ tool_name: 'Bash', cwd, agent_type: 'toon-crew:sulley', agent_id: 'a1', tool_input: { command: cmd } }, env)?.ask, `should ask: ${cmd}`);
 const allowed = (cmd, cwd) => assert.equal(bash(cmd, cwd), null, `should allow: ${cmd}`);
 const edit = (tool_name, tool_input) => evaluate({ tool_name, cwd: project, tool_input }, env);
 
@@ -39,7 +40,7 @@ test('git push to main/master asks for confirmation, in every spelling', () => {
     'bash -c "git push origin main"', "sh -c 'git push origin main'", 'eval "git push origin main"',
     'echo $(git push origin main)', 'echo `git push origin main`', '( git push origin main )',
     'time git push origin main',
-  ]) asked(c);
+  ]) { asked(c); blocked(c); }
   for (const c of ['git -c push.default=current push origin main', 'git push --all', 'git push --mirror', 'git push origin --delete main', 'git push origin :main', 'git push origin +main', 'git push -d origin master']) blocked(c);
   blocked('git push origin main && git push --force origin x', onMain);
   blocked('gh pr merge 5 && rm -rf src');
@@ -66,10 +67,12 @@ test('normal git use is allowed', () => {
     assert.equal(bash(c, featRepo), null, c);
 });
 
-test('gh pr merge asks; gh repo delete is denied', () => {
-  for (const c of ['gh pr merge 5', 'gh pr merge --squash --auto 5', 'gh -R a/b pr merge 5', 'gh pr -R a/b merge 5', 'gh --repo a/b pr merge',
+test('gh pr merge asks for DevOps and is denied for the main thread; gh repo delete is denied', () => {
+  const devops = (c) => evaluate({ tool_name: 'Bash', cwd: project, agent_type: 'toon-crew:mike-wazowski', agent_id: 'a1', tool_input: { command: c } }, env);
+  assert.ok(devops('gh pr merge --squash --auto 5')?.deny, 'auto-merge is refused even for DevOps');
+  for (const c of ['gh pr merge 5', 'gh pr merge --squash 5', 'gh -R a/b pr merge 5', 'gh pr -R a/b merge 5', 'gh --repo a/b pr merge',
     'cd x && gh pr merge', 'GH_TOKEN=x gh pr merge', 'bash -c "gh pr merge 3"', 'gh api -X PUT repos/a/b/pulls/5/merge',
-    'gh api repos/a/b/pulls/5/merge -X PUT', '"gh" pr "merge"']) asked(c);
+    'gh api repos/a/b/pulls/5/merge -X PUT', '"gh" pr "merge"']) { assert.ok(devops(c)?.ask, `should ask: ${c}`); blocked(c); }
   for (const c of ['gh repo delete a/b --yes', 'gh repo delete', 'gh api -X DELETE repos/a/b']) blocked(c);
   for (const c of ['gh pr create --fill', 'gh pr view 5', 'gh pr list', 'gh repo view', 'gh api repos/a/b/pulls', 'gh pr checks 5', 'gh pr comment 5 -b "merge soon"']) allowed(c);
 });
@@ -134,9 +137,9 @@ test('tokenizer: quotes, separators and substitutions', () => {
 
 test('CLI: JSON ask on stdout (exit 0), exit 2 + one-line reason on deny, 0 on allow, 2 on garbage', () => {
   const run = (stdin) => spawnSync('node', ['--no-warnings', GUARD], { input: stdin, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: project } });
-  const ask = run(JSON.stringify({ tool_name: 'Bash', cwd: project, tool_input: { command: 'gh pr merge 5' } }));
+  const ask = run(JSON.stringify({ tool_name: 'Bash', cwd: project, agent_type: 'toon-crew:sulley', agent_id: 'a1', tool_input: { command: 'gh pr merge 5' } }));
   assert.equal(ask.status, 0); assert.equal(ask.stderr, '');
-  assert.deepEqual(JSON.parse(ask.stdout), { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: 'toon-crew guard: Merging deploys to production: confirm.' } });
+  assert.deepEqual(JSON.parse(ask.stdout), { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: 'toon-crew guard: Merging PR #5 deploys to production: confirm.' } });
   const hit = run(JSON.stringify({ tool_name: 'Bash', cwd: project, tool_input: { command: 'git push --force origin x' } }));
   assert.equal(hit.status, 2); assert.match(hit.stderr, /^toon-crew guard: .+\n$/); assert.equal(hit.stderr.trim().split('\n').length, 1);
   assert.equal(run(JSON.stringify({ tool_name: 'Bash', cwd: project, tool_input: { command: 'ls' } })).status, 0);

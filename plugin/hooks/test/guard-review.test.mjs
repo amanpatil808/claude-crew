@@ -117,7 +117,7 @@ const matches = (matcher, name) => (/^[\w\s,|-]*$/.test(matcher) ? matcher.split
 test('hooks.json: the guard sees Agent and Monitor, blocks when it fails, keeps its sync timeout', () => {
   const hooks = JSON.parse(fs.readFileSync(path.join(HOOKS, 'hooks.json'), 'utf8')).hooks;
   const g = hooks.PreToolUse.find((x) => x.hooks.some((h) => h.command.includes('guard.mjs')));
-  for (const t of ['Bash', 'Monitor', 'Agent', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'mcp__x__push']) assert.ok(matches(g.matcher, t), t);
+  for (const t of ['Bash', 'Monitor', 'Agent', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'mcp__x__push', 'Read', 'Grep']) assert.ok(matches(g.matcher, t), t);
   assert.ok(!/PowerShell/.test(g.matcher));
   const h = g.hooks.find((x) => x.command.includes('guard.mjs'));
   assert.equal(h.onFailure, 'block'); assert.equal(h.async, undefined); assert.ok(h.timeout > 0 && h.timeout <= 10);
@@ -131,7 +131,8 @@ test('hooks.json: async hooks carry no timeout (Claude Code does not enforce it)
 test('Monitor: its command is checked like Bash; a WebSocket watch is not a shell', () => {
   const mon = (tool_input, agent_type) => evaluate({ tool_name: 'Monitor', cwd: project, agent_type, tool_input: { description: 'd', timeout_ms: 1000, ...tool_input } }, env);
   for (const c of ['git push --force origin x', 'rm -rf ~/x', 'docker volume prune -f', 'while true; do git push -f origin x; sleep 1; done']) assert.ok(mon({ command: c })?.deny ?? mon({ command: c })?.ask, c);
-  assert.ok(mon({ command: 'gh pr merge 5' })?.ask);
+  assert.ok(mon({ command: 'gh pr merge 5' }, 'toon-crew:sulley')?.ask);
+  assert.ok(mon({ command: 'gh pr merge 5' })?.deny, 'only DevOps merges');
   assert.ok(mon({ command: 'echo x > src/a.ts' }, 'toon-crew:joe-gardner')?.deny, 'role shell writes');
   assert.equal(mon({ command: 'tail -f app.log | grep --line-buffered ERROR' }), null);
   assert.equal(mon({ ws: { url: 'wss://example.com/s' } }), null);
