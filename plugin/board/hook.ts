@@ -5,8 +5,11 @@ import { writePrivate } from "./lib/private-fs.ts";
 import { join } from "node:path";
 import { appendEvent, readEvents, type BoardEvent } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
-import { LOG_DIR } from "./lib/paths.ts";
+import { AGENTS_DIR, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
+import { readAgentInfo, slug } from "./lib/crew.ts";
+import { ALIASES } from "./lib/roster.ts";
+import { resolveModel } from "./lib/model.ts";
 
 // The fields of a hook payload this file reads; anything else is ignored.
 interface HookInput {
@@ -52,14 +55,20 @@ function typeOfAgent(id: string): string | undefined {
   return hit?.agentType;
 }
 
+// The model in the agent's own file; plugin-scoped ("toon-crew:bob"), helper-copy and retired names resolve like the board's roles.
+function declaredModelOf(agentType: string): string | undefined {
+  const base = slug(agentType.split(":").pop() ?? agentType).replace(/-\d+$/, "");
+  return readAgentInfo(join(AGENTS_DIR, `${ALIASES[base] ?? base}.md`)).model;
+}
+
 // Main-session tool use that hands work to the crew: starting an agent, or messaging (resuming) one.
-function assignEvent(input: HookInput, lookup: (id: string) => string | undefined): Draft | null {
+function assignEvent(input: HookInput, lookup: (id: string) => string | undefined, env: Record<string, string | undefined>): Draft | null {
   const ti = input.tool_input ?? {};
   const from = input.agent_id ? input.agent_type || "agent" : "doraemon";
   if (input.tool_name === "Agent" || input.tool_name === "Task") {
     const to = clip(ti.subagent_type, 60);
-    const model = clip(ti.model, 20).toLowerCase() || undefined;
-    return to ? { kind: "assign", from, to, text: say(ti.description) || "new task", ...(model ? { model } : {}) } : null;
+    const m = resolveModel(ti.model, declaredModelOf(to), env);
+    return to ? { kind: "assign", from, to, text: say(ti.description) || "new task", ...(m.requested ? { model: m.requested } : {}), ...(m.declared ? { declaredModel: m.declared } : {}), effectiveModel: m.effective } : null;
   }
   if (input.tool_name === "SendMessage") {
     const target = clip(ti.to, 80);
@@ -96,7 +105,7 @@ export function toEvent(input: HookInput, due: () => boolean = () => heartbeatDu
       return { ...base, kind: "session-end", text: `Session ended (${clip(input.reason, 30) || "other"})` };
     case "PostToolUse": {
       if (input.tool_name === "Agent" || input.tool_name === "Task" || input.tool_name === "SendMessage") {
-        const a = assignEvent(input, lookup);
+        const a = assignEvent(input, lookup, env);
         return a ? { ...(project ? { project } : {}), sid: base.sid, ...a } : null;
       }
       if (input.tool_name !== "Bash") return null;

@@ -13,6 +13,8 @@ In Claude Code, inside any project:
 
 From a shell, the same install is `claude plugin marketplace add amanpatil808/claude-crew` then `claude plugin install toon-crew@crew`. The repo is private, so git must already be able to read it (`gh auth status` is green, or an SSH key is set up).
 
+Needs Claude Code 2.1.295 or later: the guard hook uses `"onFailure": "block"`, which older versions don't support.
+
 ## Update
 
 `version` in `.claude-plugin/plugin.json` pins each project to a release, so nothing changes until you ask:
@@ -24,15 +26,26 @@ From a shell, the same install is `claude plugin marketplace add amanpatil808/cl
 
 Then `/reload-plugins`. Read `CHANGELOG.md` first.
 
-## Per-project setup (one line)
+## Per-project setup
 
-The plugin sets the main agent to Doraemon (`"agent": "toon-crew:doraemon"` in its `settings.json`). A plugin cannot set environment variables (only `agent` and `subagentStatusLine` take effect from plugin settings), so each project adds one line to its own `.claude/settings.json` to run subagents on the cheaper model by default:
+The plugin sets the main agent to Doraemon (`"agent": "toon-crew:doraemon"` in its `settings.json`). A user's own `agent` setting overrides it.
+
+Plugin settings can only set `agent` and `subagentStatusLine`; Claude Code drops every other key. So anything else goes in each project's own `.claude/settings.json`:
 
 ```json
-{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" } }
+{
+  "worktree": { "baseRef": "head" },
+  "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" }
+}
 ```
 
-An agent's own `model` field still wins over this default. A user's own `agent` setting also overrides the plugin's. The guards block Claude from editing `.claude/settings*.json`, so make this edit yourself.
+- `worktree.baseRef: head` (recommended): builders that work in their own worktree (kevin, bob, shinchan, mike-wazowski, sulley) start from your working branch, not the default branch.
+- `CLAUDE_CODE_SUBAGENT_MODEL` (optional): this does **not** make the crew cheaper. Claude Code picks a subagent's model in this order: the `model` passed on the call, then the agent file's `model`, then this variable, then the main session's model. Every crew agent sets its own `model`, so the variable only reaches agents without one, such as the built-in general-purpose agent. For those, it stops them from running on the main session's model (often Opus).
+- Don't set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`. It makes Claude Code ignore every agent file's `model` and every per-call model, so it would quietly move every crew role onto one model.
+
+The guards block Claude from editing `.claude/settings*.json`, so make these edits yourself.
+
+Optional, your choice: `/model opusplan` runs the main session on Opus in plan mode and on Sonnet the rest of the time.
 
 ## The crew
 
@@ -50,11 +63,15 @@ Fifteen agents in nine teams. Call them as `toon-crew:<id>`; full details (model
 | Documentation Team | Shizuka, Technical Writer (`shizuka`) |
 | Helpers | Stuart, Code Search Assistant (`stuart`) |
 
-Only Doraemon commits. Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first; the `project-profile` skill writes that file.
+Only Doraemon commits, and only Doraemon (the main session) starts crew agents; Dekisugi may hand narrow questions to Olaf or Stuart. Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first; the `project-profile` skill writes that file.
 
 ## Guards
 
-**A text guard is a seatbelt, not a sandbox.** `plugin/hooks/guard.mjs` reads the command text before every Bash, Edit, Write, MultiEdit, NotebookEdit and `mcp__*` call. It catches mistakes and lazy bypasses; a determined agent with a shell can still get around any text check (a script file, a variable it built itself, a tool you did not think of). The real boundary is each agent's tool list (read-only roles have no Edit/Write/Bash). If the guard cannot parse something that touches git, gh, rm, docker, settings or memory files, it fails closed (blocks).
+**A text guard is a seatbelt, not a sandbox.** `plugin/hooks/guard.mjs` reads the call before every Bash, Monitor (it runs shell commands too), Edit, Write, MultiEdit, NotebookEdit, Agent (and its old name Task), SendMessage, CronCreate, Workflow, RemoteTrigger and `mcp__*` call. Crew members other than Doraemon may not use the last four at all, and no subagent may write the plugin's own files. It catches mistakes and lazy bypasses; a determined agent with a shell can still get around any text check (a script file, a variable it built itself, a tool you did not think of).
+
+The other boundary is each agent's tool list, but it has a gap: `memory: project` adds Write back even for a role that doesn't list it. On Claude Code 2.1.309, Stuart (declared Read, Grep, Glob) got Read, Write, Grep, Glob. So for read-only roles, **the guard is the lock on writes.**
+
+It fails closed. If it can't read its input, hits an internal error, or can't parse something that touches git, gh, rm, docker, settings or memory files, it blocks (exit 2). The hook also sets `"onFailure": "block"`, so a crash or a timeout blocks the call instead of letting it through.
 
 It either asks you to confirm (Claude Code's own approval prompt, `permissionDecision: "ask"`) or hard-blocks (exit 2, one-line reason):
 
@@ -71,13 +88,16 @@ It either asks you to confirm (Claude Code's own approval prompt, `permissionDec
 | Project crew config (ask) | Edit/Write and shell writes to a project's `.claude/hooks`, `.claude/agents`, `.claude/skills`, `.claude/commands`: you are asked to confirm |
 | Memory files (hard block) | Shell writes into any `agent-memory*` folder; file-tool writes whose resulting content has a token, key, private key, URL password, `password=` value, UPI id, email, Luhn-valid card number, or phone number (Indian 10-digit with `0`/`+91`/spaces/dots/dashes, or international) |
 | Read-only roles | ninja-hattori, joe-gardner, twenty-two, nobita, dekisugi, olaf and stuart (bare or `toon-crew:` name): Edit/MultiEdit/NotebookEdit denied; tree-changing git (reset, checkout, restore, apply, am, stash, clean, commit, merge, rebase, cherry-pick, revert, pull, rm, mv, add), `patch` and inline-code file writes outside temp denied; Write only to `.claude/agent-memory/toon-crew-<name>/MEMORY.md`, the system temp dir / session scratchpad, and their deliverable folders (dekisugi and olaf: `docs/research/`; nobita: `docs/design/` and `docs/research/`; paths are realpath-resolved, so `..` and symlinks cannot escape; the secret scan applies to all of these); shell writes only to temp |
+| Spawning (hard block) | Only the main session (Doraemon) starts crew agents. Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, written with the prefix (a bare `olaf` could match a project agent with more tools, so it is refused). Every other crew role is refused. Agents that aren't crew are not limited |
 | Miguel Rivera, the knowledge manager (to confirm in the first live session: the hook input's `agent_type` for a plugin agent may be `miguel-rivera` or `toon-crew:miguel-rivera`; the guard accepts both) | The lessons agent may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`; no merges, no other pushes |
 
 It looks through quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`/`;`/`|` chains, subshells, env/sudo/xargs/`env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings and pipes into a shell, `find -exec`, and inline `python/node/perl -c/-e` code. It blocks shell functions and aliases that mention these programs, and programs named by a variable. Limits: it cannot see inside a script file (`python build.py`), or what a tool does by itself. Other limits: a script written and run in the same command is blocked, and `projects.mjs set` from the shell asks. Miguel Rivera's push also requires `origin` to be the crew repo.
 
 ## Crew Room board
 
-Hooks send SubagentStart, SubagentStop, PostToolUse (Bash, Agent, SendMessage), Stop, SessionStart and SessionEnd to `board/hook.ts`. They are async with a 5 second timeout, so they never slow a session.
+Hooks send SubagentStart, SubagentStop, PostToolUse (Bash, Agent, SendMessage), Stop, SessionStart and SessionEnd to `board/hook.ts`. They are async, so they never slow a session (Claude Code doesn't enforce a timeout on async hooks, so they don't set one).
+
+For each spawn the board records the model the agent file declares and the model the run really uses (per-call model, then the file, then `CLAUDE_CODE_SUBAGENT_MODEL`, then the main model). When the call asked for a different model than the file, the desk shows an "override" badge.
 
 ## Project registry
 

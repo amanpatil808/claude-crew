@@ -58,7 +58,8 @@ if (hooksFile) {
     if (!EVENTS.has(ev)) fail(`hooks.json: unknown event ${ev}`);
     for (const g of groups) for (const h of g.hooks ?? []) {
       if (h.type !== 'command' || typeof h.command !== 'string') { fail(`hooks.json: ${ev} hook needs type command`); continue; }
-      if (typeof h.timeout !== 'number' || h.timeout <= 0) fail(`hooks.json: ${ev} hook needs a timeout in seconds`);
+      // Claude Code doesn't enforce timeouts on async hooks, so only blocking ones need one.
+      if (!h.async && (typeof h.timeout !== 'number' || h.timeout <= 0)) fail(`hooks.json: ${ev} hook needs a timeout in seconds`);
       const m = h.command.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/);
       if (!h.command.includes('${CLAUDE_PLUGIN_ROOT}')) fail(`hooks.json: ${ev} command must use \${CLAUDE_PLUGIN_ROOT}`);
       // board/hook.ts is owned by the board work and may not exist yet on a partial branch.
