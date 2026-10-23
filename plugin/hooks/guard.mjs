@@ -940,8 +940,11 @@ export function findSecret(text) {
   // credential assignments: password: "x y z", api_key=abc..., ignoring placeholders
   const credRe = /\b(?:api[_-]?key|secret|token|passwd|password|pwd|client[_-]?secret|access[_-]?key)\b["']?\s*[:=]\s*["']?([^\s"']{6,})/gi;
   for (let m = credRe.exec(text); m; m = credRe.exec(text)) if (!PLACEHOLDER.test(m[1]) && (m[1].length >= 16 || /\d/.test(m[1]) || /^["']/.test(m[0].slice(-m[1].length - 1)) || /password|passwd|pwd/i.test(m[0]))) return 'credential assignment';
-  const mail = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-  for (let m = mail.exec(text); m; m = mail.exec(text)) if (!SAFE_EMAIL_DOMAINS.test(m[0])) return 'email address';
+  // The domain must end in a letters-only TLD and not start like a version (digits.digits), so package
+  // specs (react@18.3.1, x@1.0.0-canary.beta) and IPs pass. A scp-style `git@host:path` remote is not personal.
+  const mail = /\b[\w.+-]+@(?!\d+\.\d)[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b/g;
+  const gitRemote = (m) => m[0].startsWith('git@') && text[m.index + m[0].length] === ':' && !/[\w.+-]/.test(text[m.index - 1] ?? '');
+  for (let m = mail.exec(text); m; m = mail.exec(text)) if (!SAFE_EMAIL_DOMAINS.test(m[0]) && !gitRemote(m)) return 'email address';
   const cards = /(?<![\d])\d(?:[ -]?\d){12,18}(?![\d])/g;
   for (let m = cards.exec(text); m; m = cards.exec(text)) {
     const digits = m[0].replace(/\D/g, '');
