@@ -2,6 +2,10 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.2.2 - unreleased
+
+- Guard: the memory email check no longer flags package specs (`mermaid@11.4.1`, `@types/node@20.1.0`, prereleases), IPs or `git@host:path` remotes; a domain must end in a letters-only TLD. Real emails (`someone@gmail.com`, `a.b+c@company.co.in`) are still refused.
+
 ## 0.2.1 - 23 Oct 2026: fixes from the Claude Code docs review
 
 - Guard: new spawn rule. Only Doraemon (the main session) starts crew agents; Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart` (prefixed names only); other crew roles may not spawn. Agents outside the crew are unchanged.
