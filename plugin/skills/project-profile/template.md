@@ -27,15 +27,17 @@ Lines marked `(owner)` were set by the owner; agents keep them as they are.
 ## Docs per role
 | Role | Read first |
 |---|---|
-| doraemon (manager) | <plan, architecture, team rules> |
-| scrooge (data, auth, connectors) | <architecture, API spec, security notes> |
-| bob-the-builder (specs, routes, ports) | <API spec, route contract, legacy code> |
-| chhota-bheem (DevOps) | <compose files, CI workflows, runbook> |
-| nobita, shinchan (UX, UI) | <design direction, tokens, how to run with fake data> |
-| shizuka (docs) | <README, user docs, which doc serves which version> |
-| dexter, velma (research) | <product plan, data model> |
-| scooby-doo (security) | <architecture, threat notes> |
-| tom (tests) | <this page's Commands section> |
+| doraemon (Engineering Manager) | <plan, architecture, team rules> |
+| miguel-rivera (Knowledge Manager) | <where lessons and crew records live> |
+| kevin (Backend Lead) | <architecture, API spec, security notes> |
+| bob (Backend Developer) | <API spec, route contract, legacy code> |
+| mike-wazowski (DevOps Engineer) | <compose files, CI workflows, build scripts> |
+| sulley (SRE) | <runbook, deploy and backup scripts, monitoring> |
+| nobita, shinchan (UX & Design Lead, Frontend Developer) | <design direction, tokens, how to run with fake data> |
+| shizuka (Technical Writer) | <README, user docs, which doc serves which version> |
+| dekisugi, olaf (Research Lead, Research Analyst) | <product plan, data model> |
+| ninja-hattori (Security Engineer) | <architecture, threat notes> |
+| joe-gardner, twenty-two (QA Engineer, Exploratory Tester) | <this page's Commands section; main user journeys> |
 
 ## No-go areas
 - <production hosts and data: never touched without the owner's approval in the session>

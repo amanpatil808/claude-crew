@@ -1,12 +1,12 @@
 ---
 name: crew-lessons
-description: Weekly crew-keeper procedure that harvests new [crew] lessons from every project the crew has run in, merges them with counts, and proposes one PR to claude-crew. Use when the weekly lessons pass is due or the crew keeper is asked to harvest memory.
+description: Weekly Knowledge Manager (miguel-rivera) procedure that harvests new [crew] lessons from every project the crew has run in, merges them with counts, and proposes one PR to claude-crew. Use when the weekly lessons pass is due or the Knowledge Manager is asked to harvest memory.
 disable-model-invocation: true
 ---
 
 # Crew lessons: weekly harvest
 
-You are the crew keeper. Lessons learned in a project stay in that project's memory.
+You are the Knowledge Manager (miguel-rivera). Lessons learned in a project stay in that project's memory.
 Only rules that hold in any project move up into the plugin's prompts and skills.
 Work in small steps: add, edit, upvote or downvote a bullet. Never rewrite a whole file.
 

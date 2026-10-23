@@ -34,6 +34,24 @@ The plugin sets the main agent to Doraemon (`"agent": "toon-crew:doraemon"` in i
 
 An agent's own `model` field still wins over this default. A user's own `agent` setting also overrides the plugin's. The guards block Claude from editing `.claude/settings*.json`, so make this edit yourself.
 
+## The crew
+
+Fifteen agents in nine teams. Call them as `toon-crew:<id>`; full details (models, colours, rooms, retired characters) are in [docs/roster.md](docs/roster.md).
+
+| Team | Who (id) |
+|---|---|
+| Management | Doraemon, Engineering Manager (`doraemon`); Miguel Rivera, Knowledge Manager (`miguel-rivera`) |
+| Frontend Team | Nobita, UX & Design Lead (`nobita`); Shinchan, Frontend Developer (`shinchan`) |
+| Backend Team | Kevin, Backend Lead (`kevin`); Bob, Backend Developer (`bob`) |
+| DevOps Team | Mike Wazowski, DevOps Engineer (`mike-wazowski`); Sulley, SRE (`sulley`) |
+| Security Team | Ninja Hattori, Security Engineer (`ninja-hattori`) |
+| QA Team | Joe Gardner, QA Engineer (`joe-gardner`); 22, Exploratory Tester (`twenty-two`) |
+| Research Team | Dekisugi, Research Lead (`dekisugi`); Olaf, Research Analyst (`olaf`) |
+| Documentation Team | Shizuka, Technical Writer (`shizuka`) |
+| Helpers | Stuart, Code Search Assistant (`stuart`) |
+
+Only Doraemon commits. Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first; the `project-profile` skill writes that file.
+
 ## Guards
 
 **A text guard is a seatbelt, not a sandbox.** `plugin/hooks/guard.mjs` reads the command text before every Bash, Edit, Write, MultiEdit, NotebookEdit and `mcp__*` call. It catches mistakes and lazy bypasses; a determined agent with a shell can still get around any text check (a script file, a variable it built itself, a tool you did not think of). The real boundary is each agent's tool list (read-only roles have no Edit/Write/Bash). If the guard cannot parse something that touches git, gh, rm, docker, settings or memory files, it fails closed (blocks).
@@ -52,10 +70,10 @@ It either asks you to confirm (Claude Code's own approval prompt, `permissionDec
 | Protected files (hard block) | Edit/Write and shell writes (`>`, `tee`, `cp`, `mv`, `ln`, `sed -i`, `dd of=`, `python/node/perl -c/-e`) to: `.claude/settings*.json`, the installed plugin (`~/.claude/plugins`; a `--plugin-dir` checkout stays editable), any `config` or `hooks/` inside a git-dir-looking folder, `.git/config`, `.git/hooks`, `~/.claude.json`, `.mcp.json` |
 | Project crew config (ask) | Edit/Write and shell writes to a project's `.claude/hooks`, `.claude/agents`, `.claude/skills`, `.claude/commands`: you are asked to confirm |
 | Memory files (hard block) | Shell writes into any `agent-memory*` folder; file-tool writes whose resulting content has a token, key, private key, URL password, `password=` value, UPI id, email, Luhn-valid card number, or phone number (Indian 10-digit with `0`/`+91`/spaces/dots/dashes, or international) |
-| Read-only roles | scooby-doo, nobita, velma, tom, chip-and-dale and dexter (bare or `toon-crew:` name): Edit/MultiEdit/NotebookEdit denied; tree-changing git (reset, checkout, restore, apply, am, stash, clean, commit, merge, rebase, cherry-pick, revert, pull, rm, mv, add), `patch` and inline-code file writes outside temp denied; Write only to `.claude/agent-memory/toon-crew-<name>/MEMORY.md` (secret scan still applies) or the system temp dir / session scratchpad; shell writes only to temp |
-| Dorami (to confirm in the first live session: the hook input's `agent_type` for a plugin agent may be `dorami` or `toon-crew:dorami`; the guard accepts both) | The lessons agent may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`; no merges, no other pushes |
+| Read-only roles | ninja-hattori, joe-gardner, twenty-two, nobita, dekisugi, olaf and stuart (bare or `toon-crew:` name): Edit/MultiEdit/NotebookEdit denied; tree-changing git (reset, checkout, restore, apply, am, stash, clean, commit, merge, rebase, cherry-pick, revert, pull, rm, mv, add), `patch` and inline-code file writes outside temp denied; Write only to `.claude/agent-memory/toon-crew-<name>/MEMORY.md`, the system temp dir / session scratchpad, and their deliverable folders (dekisugi and olaf: `docs/research/`; nobita: `docs/design/` and `docs/research/`; paths are realpath-resolved, so `..` and symlinks cannot escape; the secret scan applies to all of these); shell writes only to temp |
+| Miguel Rivera, the knowledge manager (to confirm in the first live session: the hook input's `agent_type` for a plugin agent may be `miguel-rivera` or `toon-crew:miguel-rivera`; the guard accepts both) | The lessons agent may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`; no merges, no other pushes |
 
-It looks through quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`/`;`/`|` chains, subshells, env/sudo/xargs/`env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings and pipes into a shell, `find -exec`, and inline `python/node/perl -c/-e` code. It blocks shell functions and aliases that mention these programs, and programs named by a variable. Limits: it cannot see inside a script file (`python build.py`), or what a tool does by itself. Other limits: a script written and run in the same command is blocked, and `projects.mjs set` from the shell asks. Dorami's push also requires `origin` to be the crew repo.
+It looks through quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`/`;`/`|` chains, subshells, env/sudo/xargs/`env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings and pipes into a shell, `find -exec`, and inline `python/node/perl -c/-e` code. It blocks shell functions and aliases that mention these programs, and programs named by a variable. Limits: it cannot see inside a script file (`python build.py`), or what a tool does by itself. Other limits: a script written and run in the same command is blocked, and `projects.mjs set` from the shell asks. Miguel Rivera's push also requires `origin` to be the crew repo.
 
 ## Crew Room board
 

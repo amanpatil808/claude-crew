@@ -20,8 +20,10 @@ const MAX_COMMAND = 100_000;
 const BUDGET_MS = 6000; // well under the 10 s hook timeout
 // Roles without write tools by design: they may only write their own memory file and temp files.
 const ROLE_GIT_BLOCKED = new Set(['reset', 'checkout', 'switch', 'restore', 'apply', 'am', 'stash', 'clean', 'commit', 'merge', 'rebase', 'cherry-pick', 'revert', 'pull', 'rm', 'mv', 'add']);
-const READ_ONLY_ROLES = /^(?:toon-crew:)?(scooby-doo|nobita|velma|tom|chip-and-dale|dexter)$/i;
-const DORAMI_REPO = 'amanpatil808/claude-crew';
+// Where a read-only role may Write its deliverables inside the project (besides its memory file and temp).
+const ROLE_DOC_DIRS = { dekisugi: ['docs/research'], olaf: ['docs/research'], nobita: ['docs/design', 'docs/research'] };
+const READ_ONLY_ROLES = /^(?:toon-crew:)?(ninja-hattori|joe-gardner|twenty-two|nobita|dekisugi|olaf|stuart)$/i;
+const CREW_REPO = 'amanpatil808/claude-crew';
 
 // Words that can sit in front of the real program: name -> options that take a value.
 const WRAPPERS = {
@@ -388,12 +390,12 @@ function checkGit(words, ctx, via, depth) {
   const refspecs = repoGiven ? positionals : positionals.slice(1);
   for (const spec of refspecs) if (spec.startsWith('+')) return 'git push with a +refspec is a force push and is blocked.';
 
-  if (ctx.dorami) { // Dorami may only push lesson branches to origin
+  if (ctx.km) { // Miguel Rivera may only push lesson branches to origin
     const ok = remote === 'origin' && refspecs.length === 1 && /^([^:+]*:)?(refs\/heads\/)?crew-lessons\/[A-Za-z0-9._/-]+$/.test(refspecs[0]) && !deleting;
-    if (!ok) return 'Dorami may only run: git push origin crew-lessons/<branch>.';
+    if (!ok) return 'Miguel Rivera may only run: git push origin crew-lessons/<branch>.';
     return { lazy: () => { // the lessons repo only: origin must be the crew repo, never a product repo
       const url = dir ? gitRun(dir, ['remote', 'get-url', 'origin'], ctx) : { unknown: true };
-      return url.out && url.out.includes(DORAMI_REPO) ? null : `Dorami may only push when origin is ${DORAMI_REPO}.`;
+      return url.out && url.out.includes(CREW_REPO) ? null : `Miguel Rivera may only push when origin is ${CREW_REPO}.`;
     } };
   }
   for (const spec of refspecs) {
@@ -476,11 +478,11 @@ function checkGh(words, ctx) {
   if (a === 'alias') return 'gh alias is blocked: aliases hide gh commands from the guard.';
   if (a === 'auth' && (b === 'token' || b === 'refresh' || b === 'setup-git')) return 'Reading or changing GitHub credentials (gh auth token) is blocked.';
   if (a === 'repo' && b === 'delete') return 'gh repo delete is blocked.';
-  if (a === 'pr' && b === 'merge') return ctx.dorami ? 'Dorami cannot merge pull requests.' : ask(MERGE_ASK);
-  if (ctx.dorami && a === 'pr' && b === 'create') return repoVal === DORAMI_REPO ? null : `Dorami may only run: gh pr create -R ${DORAMI_REPO}.`;
+  if (a === 'pr' && b === 'merge') return ctx.km ? 'Miguel Rivera cannot merge pull requests.' : ask(MERGE_ASK);
+  if (ctx.km && a === 'pr' && b === 'create') return repoVal === CREW_REPO ? null : `Miguel Rivera may only run: gh pr create -R ${CREW_REPO}.`;
   if (a === 'api') {
     const { method, endpoint } = apiMethod(words);
-    if (ctx.dorami && method !== 'GET') return 'Dorami may not change GitHub data through gh api.';
+    if (ctx.km && method !== 'GET') return 'Miguel Rivera may not change GitHub data through gh api.';
     return ghRules(method, endpoint, words.join(' '));
   }
   return null;
@@ -788,7 +790,11 @@ function checkFileEdit(input, ctx) {
   if (ctx.role) { // read-only roles: no Edit-type tools; Write only to their own memory file or temp
     if (!ctx.isWrite) return `${ctx.role} is a read-only role: it cannot use Edit/MultiEdit/NotebookEdit.`;
     const ownMemory = new RegExp(`/\\.claude/agent-memory/toon-crew-${ctx.role.replace(/[^a-z-]/gi, '')}/MEMORY\\.md$`, 'i').test(r);
-    if (!ownMemory && !ctx.writeRoots.some((root) => within(r, root))) return `${ctx.role} is a read-only role: Write is allowed only to .claude/agent-memory/toon-crew-${ctx.role}/MEMORY.md or the temp dir.`;
+    const docRoots = (ROLE_DOC_DIRS[ctx.role] ?? []).map((d) => path.join(ctx.project, d));
+    // The target is realpath-resolved, the root is not: a symlinked docs/ or docs/research lands outside the root.
+    const inDocs = docRoots.some((root) => within(r, root));
+    if (!ownMemory && !inDocs && !ctx.writeRoots.some((root) => within(r, root))) return `${ctx.role} is a read-only role: Write is allowed only to ${[...docRoots.map((d) => path.relative(ctx.project, d) + '/'), `.claude/agent-memory/toon-crew-${ctx.role}/MEMORY.md`, 'the temp dir'].join(', ')}.`;
+    if (inDocs) { const hit = findSecret(input.content); if (hit) return `Documents must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
   }
   const soft = crewConfigAsk(r) ?? crewConfigAsk(abs);
   if (soft) return soft;
@@ -811,7 +817,7 @@ export function evaluate(input, env = process.env) {
   const roots = [...sysRoots, ...projRoots];
   if (typeof input.scratchpad_dir === 'string' && input.scratchpad_dir && !isSymlink(input.scratchpad_dir)) roots.push(real(input.scratchpad_dir));
   const pluginRoot = env.CLAUDE_PLUGIN_ROOT ? real(env.CLAUDE_PLUGIN_ROOT) : null;
-  const ctx = { cwd, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, dorami: /(^|:)dorami$/i.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
+  const ctx = { cwd, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
     role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null, isWrite: String(input.tool_name) === 'Write', writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
   const tool = String(input.tool_name ?? '');
   const ti = input.tool_input ?? {};

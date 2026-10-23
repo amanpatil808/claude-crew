@@ -1,16 +1,16 @@
 # Crew lessons, 2026-10-23
 
-Harvested by Dorami (crew keeper) on 2026-10-22 18:47 UTC (`date -u`), one day before the India-time run date.
+Harvested by Dorami (crew keeper; the role is now miguel-rivera) on 2026-10-22 18:47 UTC (`date -u`), one day before the India-time run date.
 Source: 17 agent memory files in the RupeeLens `.claude/agent-memory/*/MEMORY.md` (read-only; nothing changed there).
-Raw bullets: 300 (chip-and-dale has only a "no lessons yet" placeholder, so it is not counted).
+Raw bullets: 300 (stuart's source, chip-and-dale, has only a "no lessons yet" placeholder, so it is not counted).
 
-Role mapping to the 13 roles: dekisugi -> chhota-bheem, suneo -> shizuka, ninja-hattori -> bob-the-builder, shaktimaan -> scrooge.
+Role mapping (cast v2, 23 Oct): dorami -> miguel-rivera; scrooge and shaktimaan -> kevin; bob-the-builder and ninja-hattori's old routes role -> bob; chhota-bheem and dekisugi's old SRE role -> mike-wazowski (CI, builds, local stack) or sulley (deploys, backups, incidents); scooby-doo -> ninja-hattori; tom -> joe-gardner; dexter -> dekisugi; velma -> olaf; chip-and-dale -> stuart; suneo -> shizuka. Source file names below are the old ones.
 Tag: `[crew]` = true in any project. Project-specific facts never appear in this repo; they stay in each project. `(seen n)` = the same lesson in n files.
 Secrets, credentials, phone numbers and keys were not copied.
 
 ---
 
-## bob-the-builder (absorbs ninja-hattori)
+## bob (from bob-the-builder and ninja-hattori's old routes role)
 
 - [crew] Keep in-flight state (pending logins, queues) in a database table, not process memory. Why: memory is lost on restart and breaks with several instances.
 - [crew] Use `private, no-cache`, not `no-store`, on routes that need ETag revalidation. Why: `no-store` stops revalidation and the 304 path.
@@ -29,7 +29,7 @@ Secrets, credentials, phone numbers and keys were not copied.
 
 ---
 
-## chhota-bheem (absorbs dekisugi)
+## mike-wazowski and sulley (from chhota-bheem and dekisugi's old SRE role)
 
 Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
@@ -71,13 +71,13 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## chip-and-dale
+## stuart (from chip-and-dale)
 
 - No lessons recorded (placeholder only). Nothing to harvest.
 
 ---
 
-## dexter
+## dekisugi (from dexter)
 
 - [crew] Check every insight idea against the data the product really has before proposing it. Why: ideas that need missing fields waste design time. (seen 2: dexter, velma)
 - [crew] Count repetitions concretely (fact, then every place it renders) before recommending cuts. Why: a table of facts by places convinces faster than opinion.
@@ -117,7 +117,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## dorami (board keeper)
+## miguel-rivera (from dorami)
 
 - [crew] Use the real clock for any "updated" time; a future placeholder makes "updated N min ago" wrong for everyone. Why: the lie shows on the board. (seen 2: dorami, doraemon)
 - [crew] Before reporting a document as missing, read it directly by id; a partial listing proves nothing. Why: a listing can omit a document. (seen 3: dorami, shinchan, doraemon's verify rule)
@@ -132,7 +132,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 - [crew] Do not claim security properties in copy (such as "encrypted") unless verified on the server. Why: overclaims mislead users. (seen 3: nobita, suneo, shizuka)
 - [crew] Drive the real journey with a CDP script against a fake server, and byte-compare legacy screenshots, to prove polish broke nothing. Why: the fake server runs the real flow.
-- [crew] Device emulation gives true phone-width screenshots; an iframe is the fallback. Why: a clipped window is not a phone. (seen 4; merged into the headless Chrome rule under bob-the-builder)
+- [crew] Device emulation gives true phone-width screenshots; an iframe is the fallback. Why: a clipped window is not a phone. (seen 4; merged into the headless Chrome rule under bob)
 - [crew] Bun may be missing from PATH; Node 26 has fetch and WebSocket, so a CDP screenshot script can run on Node. Why: avoids a missing-tool skip. (seen 5; merged, see bob-the-builder)
 - [crew] Write a draft file early in long design tasks, so a sudden stop leaves something saved. Why: sessions can stop without warning.
 - [crew] Every screen must handle 401 by returning to sign-in with a clear message. Why: a consent screen retried silently ten times. (seen 2: nobita, shinchan)
@@ -158,7 +158,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## scooby-doo
+## ninja-hattori (from scooby-doo)
 
 - [crew] Look for races between user actions and background work (a fetch that commits after a disconnect or a consent withdrawal). Why: deleted data can come back.
 - [crew] Hand proofs over as tests that fail before the fix; the manager reruns them. Why: no second review round needed. (seen 3; merged under doraemon)
@@ -179,7 +179,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## scrooge (absorbs shaktimaan)
+## kevin (from scrooge and shaktimaan)
 
 - [crew] Rate limits keyed on the socket address collapse to one bucket behind a proxy; make the client-IP source explicit config. Why: a proxy hides the real client. (seen 2: scrooge, bob-the-builder's proxy rule)
 - [crew] Never trust `X-Forwarded-For` by default; pick the client-IP source by explicit config and refuse to start if two sources are set. Why: a client can forge it.
@@ -256,7 +256,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 - [crew] Validate Mermaid in a page loaded over local http and captured in the browser; file URLs give misleading captures. Why: file URLs block scripts.
 - [crew] When templating diagrams into a README, match placeholders by name; a hexagon shape collides with a plain brace check. Why: the syntax is shared.
 - [crew] Desktop README shots: patch the real registry into a copy of the fake server, check the port is free first. Why: another server may hold it.
-- [crew] The shared index is used by crew who commit often: `git rm` and commit in one command, or your staged changes land in theirs. Why: one index. (seen 3; merged under bob-the-builder shared worktree)
+- [crew] The shared index is used by crew who commit often: `git rm` and commit in one command, or your staged changes land in theirs. Why: one index. (seen 3; merged under bob, shared worktree)
 
 ---
 
@@ -278,7 +278,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## tom
+## joe-gardner (from tom)
 
 - [crew] Report typecheck errors split by test files and source files; both block the gate. Why: a split shows where the fix goes.
 - [crew] Run the no-services pass too; it should show skips, never failures. Why: a skip is not a pass; a failure there is a real bug. (seen 3; see doraemon's skip rule)
@@ -290,10 +290,10 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ---
 
-## velma
+## olaf (from velma)
 
-- [crew] Desk research: check each idea against what the product has, and read the current plan first so ideas go beyond it. Why: repeats waste time. (seen 2; merged under dexter)
-- [crew] WebSearch summaries have no reliable dates and cannot read app stores or forums; mark dates "n.d." and confidence, and flag thin areas. Why: the summaries mislead. (seen 2; merged under dexter)
+- [crew] Desk research: check each idea against what the product has, and read the current plan first so ideas go beyond it. Why: repeats waste time. (seen 2; merged under dekisugi)
+- [crew] WebSearch summaries have no reliable dates and cannot read app stores or forums; mark dates "n.d." and confidence, and flag thin areas. Why: the summaries mislead. (seen 2; merged under dekisugi)
 - [crew] Fee and market numbers conflict across sources; note the definition and mark unverified figures. Why: definitions differ.
 - [crew] Look for peer-reviewed or research-group sources before saying none exist. Why: they often exist.
 - [crew] Survey evidence: use journal abstract pages, reviews, or summaries when a PDF or a publisher blocks fetches. Why: those sources are blocked here.
@@ -307,7 +307,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 ## Counts
 
-- Raw bullets read: 300 (chip-and-dale's placeholder not counted).
+- Raw bullets read: 300 (the chip-and-dale placeholder not counted).
 - Bullets written: 278 (crew 222, project 56). The 22 difference are raw bullets folded into another bullet as duplicates or dropped as obsolete.
 - Duplicates merged: 19 DevOps lessons shared by chhota-bheem and dekisugi (one copy, seen 2), plus cross-role repeats folded into one line with (seen n).
 
@@ -317,17 +317,17 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 
 Crew lessons seen in 2 or more files, or set by the owner:
 
-1. Verify hand-back claims with a direct read before relaying them. (seen 4+, doraemon, dorami, shizuka, shinchan, suneo)
-2. Headless Chrome cannot go below about 1300 px; use device emulation or an iframe for phone widths. (seen 4+, bob-the-builder, nobita, shinchan, ninja-hattori)
+1. Verify hand-back claims with a direct read before relaying them. (seen 4+, doraemon, miguel-rivera, shizuka, shinchan)
+2. Headless Chrome cannot go below about 1300 px; use device emulation or an iframe for phone widths. (seen 4+, bob, nobita, shinchan)
 3. Shared worktree: stage only your own files by path; never commit someone else's index. (seen 3)
-4. A skipped test is not a pass; report the skip and do not call the run green. (seen 3, doraemon, tom)
-5. Proof tests must fail before the fix; the manager reruns them. (seen 3, doraemon, scooby-doo, shaktimaan)
+4. A skipped test is not a pass; report the skip and do not call the run green. (seen 3, doraemon, joe-gardner)
+5. Proof tests must fail before the fix; the manager reruns them. (seen 3, doraemon, ninja-hattori, kevin)
 6. Do not overclaim security or encryption in copy. (seen 3, nobita, suneo, shizuka)
-7. Use the real clock (`date -u`) for every timestamp. (seen 2, dorami, doraemon; owner-stated lesson)
+7. Use the real clock (`date -u`) for every timestamp. (seen 2, miguel-rivera, doraemon; owner-stated lesson)
 8. Bun is not on PATH: use the repo's own binary. (seen 5)
 9. `light-dark()` takes colours only; shadows need a separate dark block. (seen 2, nobita, shinchan)
 10. A 401 is handled once, centrally, with a calm sign-in message. (seen 2, nobita, shinchan)
-11. Migration numbers are reserved per role before parallel work. (seen 2, doraemon, scrooge)
+11. Migration numbers are reserved per role before parallel work. (seen 2, doraemon, kevin)
 12. Follow the code path before correcting a crew member; cite file and line. (seen 2, doraemon, shizuka)
 13. Dupes: DevOps pair (19 lessons) should be one shared lesson in the crew skill, not two copies. (seen 2, structural)
 
@@ -335,15 +335,15 @@ Owner-set rules (promote on the owner's word):
 
 - Every task gets P0, P1 or P2; helpers go first to late P0 tasks. (doraemon)
 - When a task runs late, add a helper on your own with disjoint files. (doraemon, 22 Oct 2026)
-- Keep status-board entries short: one outcome line each, role tasks six words or fewer. (dorami, 22 Oct)
+- Keep status-board entries short: one outcome line each, role tasks six words or fewer. (miguel-rivera, 22 Oct)
 - After every hand-back, the manager adds the agent's new lessons to its memory file. (doraemon)
-- Plain, honest English, checked against the code. (shizuka, suneo)
-- Owner decisions outrank general research. (suneo)
+- Plain, honest English, checked against the code. (shizuka)
+- Owner decisions outrank general research. (shizuka)
 
 ---
 
 ## Files touched by this harvest
 
 - `docs/lessons/2026-10-23-crew-lessons.md` (this file)
-- `skills/crew-lessons/SKILL.md` (weekly procedure)
+- `plugin/skills/crew-lessons/SKILL.md` (weekly procedure)
 - No memory files were changed; the 17 sources were read only.

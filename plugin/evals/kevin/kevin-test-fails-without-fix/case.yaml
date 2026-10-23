@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: kevin-test-fails-without-fix
+description: 'Kevin fixes the isolation bug with a rule test and proves the test fails without the fix. Source: harvest kevin (''prove a fix by running the new tests against the unfixed code'', seen 2).'
+tags: [kevin, worktree]
+context:
+  scaffold_script: setup.sh

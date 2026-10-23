@@ -30,11 +30,11 @@ const bypass = {
   'python heredoc running git push -f': ['deny', "python3 - <<'EOF'\nimport subprocess\nsubprocess.run(['git','push','-f','origin','main'])\nEOF"],
   'node heredoc deleting home': ['deny', "node <<'EOF'\nrequire('fs').rmSync(require('os').homedir()+'/Documents',{recursive:true})\nEOF"],
   'write a script to /tmp then run it': ['deny', "printf 'git push -f origin main' > /tmp/p.sh && sh /tmp/p.sh"],
-  'reviewer (scooby-doo) edits a src file via python': ['deny', `python3 -c "open('src/app.ts','w').write('x')"`, { agent_type: 'toon-crew:scooby-doo' }],
-  'reviewer (tom) git checkout -- . / reset --hard': ['deny', 'git reset --hard HEAD~3', { agent_type: 'toon-crew:tom' }],
+  'reviewer (scooby-doo) edits a src file via python': ['deny', `python3 -c "open('src/app.ts','w').write('x')"`, { agent_type: 'toon-crew:joe-gardner' }],
+  'reviewer (tom) git checkout -- . / reset --hard': ['deny', 'git reset --hard HEAD~3', { agent_type: 'toon-crew:twenty-two' }],
   'reviewer (nobita) patch/git apply': ['deny', 'git apply /tmp/x.patch', { agent_type: 'toon-crew:nobita' }],
-  'dorami pushes crew-lessons branch to a PRODUCT repo origin': ['deny', 'git push origin crew-lessons/2026-10-23', { agent_type: 'toon-crew:dorami', cwd: project }],
-  'dorami gh pr create via --repo=': ['deny', 'gh pr create --repo=other/repo -t x -b y', { agent_type: 'toon-crew:dorami' }],
+  'dorami pushes crew-lessons branch to a PRODUCT repo origin': ['deny', 'git push origin crew-lessons/2026-10-23', { agent_type: 'toon-crew:miguel-rivera', cwd: project }],
+  'dorami gh pr create via --repo=': ['deny', 'gh pr create --repo=other/repo -t x -b y', { agent_type: 'toon-crew:miguel-rivera' }],
 };
 for (const [name, [want, cmd, extra]] of Object.entries(bypass)) {
   test(`bypass? ${name}`, () => { const r = bash(cmd, extra); assert.ok(want === 'ask' ? (r?.ask || r?.deny) : r?.deny, `allowed: ${JSON.stringify(r)}`); });

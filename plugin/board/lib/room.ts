@@ -27,12 +27,12 @@ export function mainBusy(events: BoardEvent[], now = Date.now()): boolean {
   return busy > end && now - Date.parse(busy) < 10 * 60_000;
 }
 
-export function roomMembers(crew: CrewMember[], roleIds: string[], managerBusy = false, notes: Map<string, RoleNotes> = new Map(), cards: AgentInfo & { id: string }[] = [], managerAt?: string): RoomMember[] {
+export function roomMembers(crew: CrewMember[], roleIds: string[], managerBusy = false, notes: Map<string, RoleNotes> = new Map(), cards: (AgentInfo & { id: string; team?: string; title?: string })[] = [], managerAt?: string): RoomMember[] {
   // Doraemon has no start/stop of his own: he works while the main session is busy, and manages while any of the crew works
   const others = [...new Set(crew.filter((c) => c.status === "working" && c.roleId && c.roleId !== MANAGER && c.agentType !== "agent").map((c) => c.mascot ?? c.agentType))];
   return roleIds.map((id) => {
     const n = notes.get(id), c = cards.find((x) => x.id === id);
-    const extra = { task: n?.task, lastHandback: n?.handback, lastContactAt: n?.contactAt, modelOverride: n?.modelOverride, model: c?.model, effort: c?.effort, color: c?.color, maxTurns: c?.maxTurns, version: c?.version, stage: c?.stage };
+    const extra = { team: c?.team, title: c?.title, task: n?.task, lastHandback: n?.handback, lastContactAt: n?.contactAt, modelOverride: n?.modelOverride, model: c?.model, effort: c?.effort, color: c?.color, maxTurns: c?.maxTurns, version: c?.version, stage: c?.stage };
     if (id === MANAGER && (managerBusy || others.length)) return { id, status: "working" as const, line: managerBusy ? "Working now" : clip("Managing " + others.join(", "), 80), project: managerBusy ? managerAt : crew.find((c) => c.status === "working" && c.roleId !== MANAGER)?.project, ...extra };
     const mine = crew.filter((c) => c.roleId === id && c.agentType !== "agent");
     const busy = mine.find((c) => c.status === "working");

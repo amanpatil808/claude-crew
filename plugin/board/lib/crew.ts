@@ -14,11 +14,11 @@ export const slug = (s: string) => s.toLowerCase().replace(/&/g, " and ").replac
 
 // Keyed by role id, which is the agent file name.
 export function loadRoles(): Map<string, Role> {
-  return new Map(ROSTER.map((r) => [r.id, { id: r.id, mascot: r.mascot, role: r.role }]));
+  return new Map(ROSTER.map((r) => [r.id, { id: r.id, mascot: r.mascot, role: r.title }]));
 }
 
 // Helper copies ("chhota-bheem-2"), plugin-scoped names ("toon-crew:tom") and retired names
-// ("ninja-hattori" counts for bob-the-builder) all map to their current role.
+// ("tom" counts for joe-gardner, "chhota-bheem" for mike-wazowski) all map to their current role.
 export function roleFor(agentType: string | undefined, roles: Map<string, Role>): Role | undefined {
   if (!agentType) return roles.get("doraemon");
   const base = slug(agentType.split(":").pop() ?? agentType).replace(/-\d+$/, "");
@@ -71,7 +71,7 @@ export function readAgentInfo(file: string): AgentInfo {
 }
 
 // Role cards for the Crew Room: just the fields the page draws, in desk order. A role with no agent file still gets a card.
-export interface RoleCard extends AgentInfo { id: string; mascot: string; role: string; order: number }
+export interface RoleCard extends AgentInfo { id: string; mascot: string; name: string; show: string; role: string; team: string; title: string; order: number }
 export function listRoles(agentsDir = AGENTS_DIR): RoleCard[] {
-  return ROSTER.map((r) => ({ ...r, ...(existsSync(join(agentsDir, `${r.id}.md`)) ? readAgentInfo(join(agentsDir, `${r.id}.md`)) : {}) })).sort((a, b) => a.order - b.order);
+  return ROSTER.map((r) => ({ ...(existsSync(join(agentsDir, `${r.id}.md`)) ? readAgentInfo(join(agentsDir, `${r.id}.md`)) : {}), ...r })).sort((a, b) => a.order - b.order);
 }

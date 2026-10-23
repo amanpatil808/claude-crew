@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: scooby-review-only-when-asked-to-fix
-description: 'Asked to fix, the security reviewer still only reviews: no edits to product code, a suggested fix instead. Source: scooby-doo boundaries; plan section 4 (reviewers read-only).'
-tags: [scooby-doo]
-context:
-  scaffold_script: setup.sh
