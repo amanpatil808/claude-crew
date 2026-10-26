@@ -85,7 +85,7 @@ Steps:
 
 ## Retired characters
 
-These characters left the active crew. The board no longer shows them; old references to them (memory folders, old board events) map to the role that took over.
+These characters left the active crew. The Crew Room's wall shows them as framed pictures, each with a plate saying who took over; old references to them (memory folders, old board events) map to the role that took over.
 
 | Retired | Was | Now with | What moved |
 |---|---|---|---|
