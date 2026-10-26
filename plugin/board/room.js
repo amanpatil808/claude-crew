@@ -1,38 +1,92 @@
-// Crew Room board: one page, five sections (Active, Queued, Crew, Recent, Facts), fed from /api/state.
-// Counts and the task lists come only from state.tasks, filtered by the picked project. All text goes in with textContent.
-const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-const hm = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
-const mins = (iso) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000));
-const span = (m) => m < 1 ? "now" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
-const store = {   // storage can be blocked, so every access is guarded
-  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
-  put: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
-};
+// Crew Room tab: the retro board, fed from /api/state (room.* is already shaped and de-noised by the server).
+// All text goes in with textContent. The chosen tab, project and motion setting are remembered per viewer.
+const RSVG = (id) => document.getElementById(id);
+const rel = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const rclock = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
+const rGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const rPut = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
-// ---- Faces: each role's character, keyed by the agent file name. Only the kind is needed; colours live in the CSS. ----
+// The crew by role id (the agent file name): lore room, pixel-art kind and board colour. Colours come from the data when it has a hex.
 const CREW = {
-  doraemon: "cat", "miguel-rivera": "miguel", nobita: "nobita", shinchan: "kid", kevin: "kevin", bob: "bobm",
-  "mike-wazowski": "mike", sulley: "sulley", "ninja-hattori": "ninja", "joe-gardner": "joe", "twenty-two": "ttwo",
-  dekisugi: "dekisugi", olaf: "olaf", shizuka: "girl", stuart: "stuart",
+  doraemon: { kind: "cat", hex: "#1F7FD6" }, "miguel-rivera": { kind: "miguel", hex: "#E8731C" },
+  nobita: { kind: "nobita", hex: "#F5C518" }, shinchan: { kind: "kid", hex: "#D7263D" },
+  kevin: { kind: "kevin", hex: "#F2C12E" }, bob: { kind: "bobm", hex: "#3B5BA9" },
+  "mike-wazowski": { kind: "mike", hex: "#1FA3B8" }, sulley: { kind: "sulley", hex: "#6B3FA0" },
+  "ninja-hattori": { kind: "ninja", hex: "#3B6FD1" },
+  "joe-gardner": { kind: "joe", hex: "#7A4DB8" }, "twenty-two": { kind: "ttwo", hex: "#22A6C4" },
+  dekisugi: { kind: "dekisugi", hex: "#EF7D1A" }, olaf: { kind: "olaf", hex: "#3FB8D8" },
+  shizuka: { kind: "girl", hex: "#E85A9B" }, stuart: { kind: "stuart", hex: "#E0B020" },
 };
-const MGR = "doraemon";   // the lead is the session itself, never a task, so he is not listed in the Crew
+const MGR = "doraemon", SRE = "sulley";
+// Rooms from the shows, in display order. Roles not listed land in "Others".
+const R_ROOMS = [
+  // [key, team name, lore name, members, wall decor, furniture]. Team names come from the data when it has them.
+  ["closet", "Management", "The Closet", ["doraemon", "miguel-rivera"], ["sconce", "clock"], ["shelf", "plant"]],
+  ["nobita", "Frontend Team", "Nobita's Room", ["nobita", "shinchan"], ["sconce", "window", "poster"], ["plant", "sofa"]],
+  ["backend", "Backend Team", "Gru's Lab", ["kevin", "bob"], ["sconce", "board", "vent"], ["shelf", "rack"]],
+  ["scare", "DevOps Team", "The Scare Floor", ["mike-wazowski", "sulley"], ["door", "door", "door", "door"], ["rack", "plant"]],
+  ["dojo", "Security Team", "The Dojo", ["ninja-hattori"], ["sconce", "window"], ["plant", "shelf"]],
+  ["jazz", "QA Team", "The Jazz Club", ["joe-gardner", "twenty-two"], ["poster", "sconce", "poster"], ["sofa", "plant"]],
+  ["snow", "Research Team", "The Snow Study", ["dekisugi", "olaf"], ["window", "clock", "window"], ["shelf"]],
+  ["library", "Documentation Team", "The Library", ["shizuka"], ["books", "sconce", "window"], ["bookcase", "typewriter", "plant"]],
+  ["helpers", "Helpers", "Banana Corner", ["stuart"], ["window", "sconce"], ["shelf", "plant"]],
+];
+// Professional title and team per person: the data wins, this table covers a server that does not send them yet.
+const R_PRO = {
+  doraemon: ["Engineering Manager", "Management"], "miguel-rivera": ["Knowledge Manager", "Management"], nobita: ["UX & Design Lead", "Frontend Team"], shinchan: ["Frontend Developer", "Frontend Team"],
+  kevin: ["Backend Lead", "Backend Team"], bob: ["Backend Developer", "Backend Team"], "mike-wazowski": ["DevOps Engineer", "DevOps Team"], sulley: ["SRE", "DevOps Team"],
+  "ninja-hattori": ["Security Engineer", "Security Team"], "joe-gardner": ["QA Engineer", "QA Team"], "twenty-two": ["Exploratory Tester", "QA Team"],
+  dekisugi: ["Research Lead", "Research Team"], olaf: ["Research Analyst", "Research Team"], shizuka: ["Technical Writer", "Documentation Team"], stuart: ["Code Search Assistant", "Helpers"],
+};
+const rTitleFull = (x) => x.title || R_PRO[x.id]?.[0] || x.role || "";
+// The plate keeps the short form: "SRE (deploys, rollouts...)" shows as "SRE"; the card shows it all.
+const rTitle = (x) => rTitleFull(x).replace(/\s*\(.*$/, "");
+const rTeam = (x) => x.team || R_PRO[x.id]?.[1] || "";
+// Working people carry a gadget: time machine for deploys, 4D pocket for tools, bamboo-copter for everyone else.
+const R_PET = { shinchan: "t-shiro", "ninja-hattori": "t-shishi" };   // companion dogs that walk with their owner
+const R_GADGET = { "mike-wazowski": "timem", sulley: "timem", kevin: "pocket", bob: "pocket", stuart: "pocket" };
+const R_ICON = { working: "⌨", done: "✓", queued: "z" };
+// Retired characters hang as framed pictures; their art is kept here, keyed by id.
+const R_RETIRED_KIND = { dorami: "dorami", scrooge: "duck", shaktimaan: "hero", "bob-the-builder": "builder", "chhota-bheem": "strong", "scooby-doo": "dog", tom: "tomcat", dexter: "dexter", velma: "velma", "chip-and-dale": "pair", suneo: "smug" };
+// Claude's eight colour names, for a role that has a name but no board hex.
+const R_CLAUDE_HEX = { red: "#D7263D", blue: "#1F7FD6", yellow: "#F2C12E", purple: "#6B3FA0", orange: "#EF7D1A", pink: "#E85A9B", cyan: "#1FA3B8", green: "#2E8B57" };
 
 const KINDS = {
   cat: ["head", "face", "eye l", "eye r", "blush l", "blush r", "nose", "whisk", "collar", "bell"],
+  duck: ["head", "hat", "band", "brim", "eye l", "eye r", "blush l", "blush r", "mono", "beak"],
+  hero: ["cape", "body", "emblem", "head", "band", "eye l", "eye r", "blush l", "blush r"],
+  builder: ["body", "head", "hat", "brim", "eye l", "eye r", "blush l", "blush r", "smile"],
+  dorami: ["head", "face", "bow l", "bow r", "knot", "eye l", "eye r", "blush l", "blush r", "nose", "collar"],
   ninja: ["body", "hood", "face", "band", "knot", "eye l", "eye r", "blush l", "blush r"],
+  dexter: ["body", "collar", "head", "hair", "glass l", "glass r", "eye l", "eye r", "smile", "goggle"],
+  velma: ["bob", "body", "neck", "head", "bangs", "glass l", "glass r", "eye l", "eye r", "blush l", "blush r"],
   dekisugi: ["body", "tie", "head", "hair", "part", "eye l", "eye r", "blush l", "blush r", "smile"],
   nobita: ["body", "head", "hair", "glass l", "glass r", "eye l", "eye r", "blush l", "blush r", "smile"],
   kid: ["body", "head", "hair", "brow l", "brow r", "eye l", "eye r", "blush l", "blush r", "grin"],
+  strong: ["body", "arm", "head", "tuft", "eye l", "eye r", "blush l", "blush r", "smile"],
+  dog: ["ear l", "ear r", "head", "spot", "muzzle", "nose", "eye l", "eye r", "collar", "tag"],
+  tomcat: ["ear l", "ear r", "head", "muzzle", "nose", "eye l", "eye r", "blush l", "blush r"],
   girl: ["body", "pig l", "pig r", "tie l", "tie r", "head", "hair", "eye l", "eye r", "blush l", "blush r", "smile"],
+  smug: ["body", "head", "hair", "brow l", "brow r", "eye l", "eye r", "blush l", "blush r", "grin"],
   miguel: ["body", "hood", "head", "hair", "eye l", "eye r", "blush l", "blush r", "smile"],
   kevin: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
   bobm: ["body", "over", "strap", "hair", "eye l", "eye r", "mouth"],
   stuart: ["body", "over", "strap", "hair", "eye c", "mouth"],
   olaf: ["arm l", "arm r", "low", "head", "hair", "eye l", "eye r", "nose", "smile", "btn"],
+  pair: ["one", "two", "nose1", "nose2", "fed", "shirt"],
 };
 
-// ---- Film look (Mike, Sulley, Joe, 22): one smooth inline SVG in the 48x54 .av box (viewBox 60x68).
+// Role id -> crew key. The agent file name is the id; a role the table does not know falls back to its mascot's words.
+let rKeys = {};
+const rKeyOf = (id) => rKeys[id] || (CREW[id] ? id : "");
+function rCrewKey(role) {
+  if (CREW[role.id]) return role.id;
+  const n = String(role.mascot || role.id).toLowerCase();
+  return Object.keys(CREW).find((k) => n.includes(k.split("-")[0])) || "";
+}
+const rKindOf = (id) => CREW[rKeyOf(id)]?.kind || R_RETIRED_KIND[id] || "cat";
+
+// ---- Film look (Mike, Sulley): one smooth inline SVG in the 48x54 .av box (viewBox 60x68 = the slot after the board's x1.25).
 // Markup is a fixed string built here (no data in it); ids carry a counter so every avatar owns its gradients.
 let flN = 0;
 const flDrop = (x, y) => `<path class="fl-drop" d="M${x} ${y} Q${x - 2.6} ${y + 4.2} ${x} ${y + 5.6} Q${x + 2.6} ${y + 4.2} ${x} ${y} Z" fill="#6EC8FF" stroke="#2C83A8" stroke-width=".7"/>`;
@@ -139,179 +193,609 @@ function rFilm(kind) {
   return t.content.firstChild;
 }
 
-// status: "working" (eyes open), "queued" (eyes shut, waiting) or "done" (happy eyes).
-function rAvatar(kind, status) {
-  const a = el("div", "av av-" + kind); a.dataset.s = status;
-  if (FILM[kind]) { a.append(rFilm(kind)); return a; }
-  for (const p of KINDS[kind]) a.append(el("i", p));
+function rAvatarKind(kind, status, seed) {
+  const a = rel("div", "av av-" + kind); a.dataset.s = status; a.style.setProperty("--blink", (seed % 5) * .7 + "s");
+  if (FILM[kind]) { a.append(rFilm(kind)); a.append(rel("i", "foot l"), rel("i", "foot r")); return a; }
+  for (const p of KINDS[kind] || KINDS.cat) a.append(rel("i", p));
+  a.append(rel("i", "foot l"), rel("i", "foot r"));
   return a;
 }
-function face(role, status) {
-  const w = el("span", "face"); w.setAttribute("aria-hidden", "true");
-  w.append(rAvatar(CREW[role] || "cat", status));
+const rAvatar = (id, status, seed) => rAvatarKind(rKindOf(id), status, seed);
+const rMini = (id, status, seed) => { const w = rel("span", "mini"); w.append(rAvatar(id, status, seed)); return w; };
+const rDecor = (kinds) => { const d = rel("div", "decor"); d.setAttribute("aria-hidden", "true"); for (const k of kinds) d.append(rel("i", "d-" + k)); return d; };
+const rProps = (kinds) => { const row = rel("div", "props"); row.setAttribute("aria-hidden", "true"); for (const k of kinds || []) row.append(rel("i", "f-" + k)); return row; };
+
+// ---- Board colour: the data's hex when present, else the table above ----
+const HEX = /^#[0-9a-f]{6}$/i;
+const rColor = (role) => [role.hex, role.boardColor, role.color].find((c) => HEX.test(String(c || ""))) || R_CLAUDE_HEX[String(role.color || "").toLowerCase()] || CREW[rKeyOf(role.id)]?.hex || "#6b7280";
+// Light yellows and oranges get a dark outline so they still read on a light floor.
+const rLight = (hex) => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150; };
+
+// ---- Small touches: own pixel art on or beside each desk, drawn in CSS. Each is [class, number of child pieces, floor?] ----
+const TOUCHES = {
+  doraemon: [["t-dorayaki"]], "miguel-rivera": [["t-guitar", 1, 1], ["t-marigolds", 3]],
+  shizuka: [["t-violin", 0, 1], ["t-teacup", 1]], shinchan: [["t-figure", 2], ["t-shiro", 2, 1]],
+  kevin: [["t-banana", 1]], bob: [["t-tim", 2, 1], ["t-goggles", 1]],
+  "mike-wazowski": [["t-clip", 1]], sulley: [["t-can", 1, 1]],
+  "ninja-hattori": [["t-shuriken", 1], ["t-shishi", 3, 1]],
+  "joe-gardner": [["t-piano", 0, 1]], "twenty-two": [["t-badge", 1]],
+  dekisugi: [["t-books", 3]], olaf: [["t-flake", 2]], stuart: [["t-banana", 1], ["t-uke", 1, 1]],
+};
+// Companion dogs (Shiro, Shishimaru): a fixed inline-SVG string facing right, four legs (a/b/c/d step in pairs), floppy or alert ears, tail.
+const DOGS = {
+  "t-shiro": `<svg viewBox="0 -3 40 31" aria-hidden="true"><path class="o" d="M8 15 Q2 11 4 5" fill="none" stroke-width="4.4"/><path d="M8 15 Q2 11 4 5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <rect class="o lg a" x="9" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg b" x="14.4" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg c" x="23" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/><rect class="o lg d" x="28.4" y="19" width="4.4" height="8" rx="2.2" fill="#fff"/>
+    <ellipse class="o" cx="18" cy="16" rx="12" ry="7.8" fill="#fff"/><circle class="o" cx="29" cy="11.4" r="8.2" fill="#fff"/>
+    <path class="o" d="M22.6 4.6 Q18.4 7.4 20.2 15.4 Q25.6 14.6 26.4 7 Z" fill="#dfe3ee"/><path class="o" d="M33.4 3.8 Q39 5.4 37.6 12.6 Q33 11.6 32.6 5.8 Z" fill="#dfe3ee"/>
+    <circle cx="31.6" cy="10.4" r="1.4" fill="#1b1b24"/><circle cx="36" cy="11.2" r="1.2" fill="#1b1b24"/><ellipse cx="38" cy="13.6" rx="1.7" ry="1.3" fill="#1b1b24"/><path d="M33.2 16 Q35.2 17.6 37.2 16" stroke="#1b1b24" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`,
+  "t-shishi": `<svg viewBox="0 -3 40 31" aria-hidden="true"><path class="o" d="M8 15 Q1 14 3 5" fill="none" stroke-width="4.4"/><path d="M8 15 Q1 14 3 5" fill="none" stroke="#c9955a" stroke-width="2" stroke-linecap="round"/>
+    <rect class="o lg a" x="9" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg b" x="14.4" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg c" x="23" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/><rect class="o lg d" x="28.4" y="19" width="4.4" height="8" rx="2.2" fill="#c9955a"/>
+    <ellipse class="o" cx="18" cy="16" rx="12" ry="7.8" fill="#c9955a"/><ellipse cx="19" cy="19.6" rx="7" ry="3.4" fill="#f3e3c2"/><path class="o" d="M23.4 6 L24 -2 L29.6 3.6 Z" fill="#a8743f"/><path class="o" d="M32 3.6 L36.4 -2 L37.2 5.6 Z" fill="#a8743f"/>
+    <circle class="o" cx="29" cy="11.4" r="8.2" fill="#c9955a"/><ellipse cx="35" cy="14.4" rx="4.6" ry="3.6" fill="#f3e3c2"/>
+    <path class="o" d="M21.8 8.4 Q29 4.8 36.6 8.6 L36.4 11.4 Q29 8.2 21.8 11.2 Z" fill="#3b6fd1" stroke-width="1"/><path class="o" d="M22 9.4 L16.6 7.6 L18.6 11.6 L22 10.8 Z" fill="#3b6fd1" stroke-width="1"/>
+    <circle cx="31.6" cy="12.6" r="1.4" fill="#1b1b24"/><circle cx="36" cy="12.8" r="1.1" fill="#1b1b24"/><ellipse cx="38.2" cy="14.4" rx="1.7" ry="1.3" fill="#1b1b24"/></svg>`,
+};
+function rDog(cls, seat) {
+  const d = rel("span", "tc dog " + cls); d.setAttribute("aria-hidden", "true"); d.innerHTML = DOGS[cls]; return d;
+}
+function rTouches(key) {
+  return (TOUCHES[key] || []).map(([cls, n, floor]) => {
+    if (DOGS[cls]) return rDog(cls, true);
+    const t = rel("i", "tc " + cls + (floor ? " fl" : "")); t.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < (n || 0); i++) t.append(rel("b"));
+    return t;
+  });
+}
+
+const R_MODEL = /opus|sonnet|haiku|fable/;
+// ranOn is the model the run actually used (call > file > env > main); older payloads only have the file model.
+const rModelOf = (x) => (x.ranOn || x.modelOverride || x.model || "").toLowerCase().match(R_MODEL)?.[0];
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+// Chips under the name: [OPUS] [HIGH bars]. Each carries its own word, so nothing depends on colour.
+const R_EFFORT = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+function rChips(x) {
+  const row = rel("div", "chips"), mod = rModelOf(x), eff = String(x.effort || "").toLowerCase();
+  if (mod) row.append(rel("span", "mchip m-" + mod, mod.toUpperCase()));
+  if (x.modelOverride) {               // the call beat the agent file: the one thing worth spotting on a cost check
+    const b = rel("span", "ochip", "override"), asked = x.modelOverride, file = x.fileModel || "inherit";
+    b.title = `asked for ${asked}, file says ${file}`; row.append(b);
+  }
+  if (eff && R_EFFORT[eff]) {          // quiet outlined chip with 1 to 4 bars, so levels compare at a glance
+    const c = rel("span", "echip"), bars = rel("span", "bars"); bars.setAttribute("aria-hidden", "true");
+    for (let i = 1; i <= 4; i++) bars.append(rel("i", i <= R_EFFORT[eff] ? "on" : ""));
+    c.append(bars, document.createTextNode(eff.toUpperCase())); row.append(c);
+  }
+  return row.childElementCount ? row : null;
+}
+const rModelLine = (x) => { const mod = rModelOf(x); return mod ? [cap(mod) + (x.modelOverride ? ` (asked for ${x.modelOverride}, file says ${x.fileModel || "inherit"})` : ""), x.effort && x.effort + " effort", x.maxTurns && "up to " + x.maxTurns + " turns"].filter(Boolean).join(" · ") : "Inherits the lead's model"; };
+const rStageLine = (x) => [x.version, x.stage === "training" && "in training"].filter(Boolean).join(" · ");
+
+// Nobita dozes off after 10 minutes without work; everyone else just sits.
+const NAP_MS = 10 * 60000;
+const rNaps = (key, m) => key === "nobita" && m.status === "done" && !!m.since && Date.now() - Date.parse(m.since) >= NAP_MS;
+
+let rProj = "", rPicked = false;     // "" = all projects
+function rDesk(role, m, i, showTeam) {
+  const waiting = rPending.has(role.id);                       // assigned but Doraemon has not arrived yet: seated, waiting
+  if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
+  const key = rKeyOf(role.id), nap = rNaps(key, m);
+  const s = m.status === "idle" || nap ? "queued" : m.status;
+  const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.style.setProperty("--i", i * 60 + "ms");
+  if (key) desk.dataset.who = key;
+  if (nap) desk.dataset.nap = "1";
+  const hex = rColor(role); desk.style.setProperty("--c", hex); desk.style.setProperty("--c-edge", rLight(hex) ? "#7a5c00" : "var(--wall-ink)");
+  if (m.dim) desk.dataset.dim = "1";      // working, but not on the picked project
+  if (rAway.has(role.id)) desk.classList.add("away");
+  desk.tabIndex = 0; desk.setAttribute("role", "button"); { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle({ ...role, ...m })}${rTeam({ ...role, ...m }) ? ", " + rTeam({ ...role, ...m }) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""} Show details`); }
+  const pace = rel("span", "pace"), scale = rel("span", "scale"); scale.append(rAvatar(role.id, s, i)); pace.append(scale);
+  const stage = rel("div", "stage"); stage.append(pace);
+  if (s === "queued") stage.append(rel("span", "zzz", "z"));
+  if (s === "working") { const g = rel("span", "gadget " + (R_GADGET[role.id] || "copter")); g.setAttribute("aria-hidden", "true"); stage.append(g); }
+  if (s === "done") { for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); } }
+  const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
+  const seat = rel("div", "seat"); seat.append(stage, table, ...rTouches(key));
+  const plate = rel("div", "plate"), nm = rel("div", "plate-name"), st = rel("span", s === "working" ? "st bell" : "st", R_ICON[s]); st.setAttribute("aria-hidden", "true");
+  const sw = rel("i", "swatch"); sw.setAttribute("aria-hidden", "true");
+  nm.append(sw, rel("b", null, role.mascot), st);
+  plate.append(nm); const chips = rChips({ ...role, ...m }); if (chips) plate.append(chips);
+  plate.append(rel("div", "plate-role", rTitle({ ...role, ...m })));
+  if (showTeam && rTeam({ ...role, ...m })) plate.append(rel("div", "pteam", rTeam({ ...role, ...m })));
+  plate.append(rel("div", "plate-task", m.line));
+  if (m.project && m.status === "working") plate.append(rel("div", "ptag", m.project));
+  if (m.ref) plate.append(rel("div", "plate-ref", m.ref));
+  desk.append(seat, plate);
+  if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
+  rWireCard(desk, role.id);
+  rFxPaint(desk, role.id);
+  return desk;
+}
+
+// ---- Projects and tasks: the picker filters both tabs; every count comes from state.tasks for the picked project ----
+const noTasks = { active: [], queued: [], done: [] };
+const tasksOf = (s) => s.tasks || noTasks;
+const inView = (t) => rProj === "" || t.project === rProj;
+const rProjNames = (s) => (s.projects || []).map((p) => typeof p === "string" ? p : p?.name || "").filter(Boolean);
+let rRoles = [];
+const rRoleName = (id) => rRoles.find((x) => x.id === id)?.mascot || id;
+// Pick: ?project=, then the last pick (an old "" meant all projects), then the project in focus; else all.
+function pickInit(s) {
+  const names = rProjNames(s);
+  rRoles = s.room?.roles || [];
+  rKeys = Object.fromEntries(rRoles.map((x) => [x.id, rCrewKey(x)]));
+  if (rPicked && (rProj === "" || names.includes(rProj))) return;
+  const raw = rGet("crewProject", null), stored = raw === "" ? "all" : raw, q = new URLSearchParams(location.search).get("project");
+  const c = [q, stored, s.focus].find((p) => p === "all" || (p && names.includes(p)));
+  rProj = !c || c === "all" ? "" : c; rPicked = true;
+}
+function rRenderProjects(s) {
+  const names = rProjNames(s), T = tasksOf(s), n = (p) => T.active.filter((t) => !p || t.project === p).length;
+  const chip = (p, text) => {
+    const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
+    b.append(rel("span", "pn", text), rel("span", "pc", `${n(p)} active`));
+    b.onclick = () => {
+      if (rProj === p) return;
+      rProj = p; rPut("crewProject", p || "all"); rSig = "";
+      try { const u = new URL(location.href); u.searchParams.set("project", p || "all"); history.replaceState(null, "", u); } catch {}
+      paintAll();
+    };
+    return b;
+  };
+  for (const id of ["r-projects", "l-projects"]) {
+    const box = RSVG(id); box.hidden = !names.length;
+    box.replaceChildren(...(names.length ? [rel("span", "plabel", "PROJECT"), ...names.map((p) => chip(p, p)), chip("", "All projects")] : []));
+  }
+}
+// One row: face, name, P0/P1/P2 chip, time / task text / project.
+const R_PRIO = { P0: "P0: do first", P1: "P1: next", P2: "P2: when free" };
+let rTkSeen = null;
+function rTaskRow(t, kind) {
+  const act = kind === "active", iso = act ? t.startedAt : t.queuedAt, li = rel("li", "tk-row"), body = rel("div", "tk-body"), l1 = rel("div", "tk-l1");
+  l1.append(rel("span", "who", rRoleName(t.role)));
+  if (t.priority) { const c = rel("span", "pri", t.priority); c.dataset.p = t.priority; c.title = R_PRIO[t.priority]; l1.append(c); }
+  const tm = rel("time", null, rSpan(rMins(iso)).replace("under a minute", "now")); tm.dateTime = iso; tm.title = `${act ? "Started" : "Queued"} ${rclock(iso)}`; l1.append(tm);
+  const txt = rel("p", "tk-txt", t.text); txt.title = t.text; body.append(l1, txt);
+  const meta = rel("p", "tk-meta"); if (!rProj) meta.append(rel("span", "proj", t.project)); if (t.ref) meta.append(rel("span", "ref", t.ref));
+  if (meta.childElementCount) body.append(meta);
+  li.append(rMini(t.role, act ? "working" : "queued", 0), body);
+  li.setAttribute("aria-label", `${rRoleName(t.role)}${t.priority ? ", " + t.priority : ""}: ${t.text}. ${act ? "Working for" : "Waiting"} ${rSpan(rMins(iso))}${!rProj ? ". " + t.project : ""}`);
+  if (rTkSeen && !rTkSeen.has(t.id)) li.classList.add("fresh");
+  return li;
+}
+function rRenderTasks(s) {
+  const T = tasksOf(s), act = T.active.filter(inView), que = T.queued.filter(inView);
+  const panel = (title, list, kind, empty) => {
+    const sec = rel("section", "tk"); sec.dataset.k = kind; sec.setAttribute("aria-label", title);
+    const h = rel("h2", null, title); h.append(rel("span", "tk-n", String(list.length))); sec.append(h);
+    const ul = rel(kind === "queued" ? "ol" : "ul", "tk-list"); ul.tabIndex = 0; ul.setAttribute("aria-label", `${title} tasks`);
+    ul.append(...(list.length ? list.map((t) => rTaskRow(t, kind)) : [rel("li", "tk-empty", empty)]));
+    sec.append(ul); return sec;
+  };
+  const label = rProj || "all projects";
+  for (const id of ["l-tasks", "r-tasks"]) RSVG(id).replaceChildren(panel("Active", act, "active", `Nobody is working on ${label} right now.`), panel("Queued", que, "queued", "Nothing queued."));
+  rTkSeen = new Set([...T.active, ...T.queued].map((t) => t.id));
+  document.title = `Crew Room · ${rProj || "All projects"} · ${act.length} active`;
+}
+function renderTasks(s) { rRenderProjects(s); rRenderTasks(s); }
+// Desks follow the tasks: a role with an active task is working (text from the task); a role working for another project is dimmed.
+function rOverlay(s) {
+  const T = tasksOf(s);
+  return s.room.members.map((m) => {
+    if (m.id === MGR) return m;                      // the lead is the session itself, never a task
+    const mine = T.active.filter((t) => t.role === m.id), vis = mine.filter(inView), t = vis[0] || mine[0];
+    if (t) return { ...m, status: "working", line: t.text + (vis.length > 1 ? ` (+${vis.length - 1} more)` : ""), task: t.text, since: t.startedAt, project: t.project, dim: !vis.length };
+    return m.status === "working" ? { ...m, status: "idle", line: "Idle", since: undefined, project: undefined } : m;
+  });
+}
+// Top facts for the picked project: Working and Queued are task counts (the same numbers as the panels); Live and Branch from the server.
+function rFactsFor(s) {
+  const T = tasksOf(s), r = s.room, by = s.factsByProject || r.factsByProject || {}, pn = rProj || s.focus;
+  const f = by[pn] || (pn === s.focus ? r.facts : []) || [], live = f.find((x) => x.label === "Live"), br = f.find((x) => x.label === "Branch");
+  const out = [{ label: "Working", value: String(T.active.filter(inView).length), tone: "run" }, { label: "Queued", value: String(T.queued.filter(inView).length) }];
+  if (live) out.push({ label: rProj ? "Live" : "Live " + pn, value: live.value, tone: live.tone });
+  if (br && rProj) out.push({ label: "Branch", value: br.value });
+  return out;
+}
+
+// ---- Framed pictures: the retired characters, calm and still, each with a brass plate saying where they went ----
+function rRenderGallery(s) {
+  const box = RSVG("r-gallery"), list = s.retired || s.room?.retired || [], roles = s.room?.roles || [];
+  const sig = JSON.stringify([list, roles.map((x) => [x.id, x.mascot])]);
+  if (box.dataset.sig === sig) return; box.dataset.sig = sig;
+  box.hidden = !list.length;
+  if (!list.length) { box.replaceChildren(); return; }
+  const frames = list.map((p) => {
+    const to = roles.find((x) => x.id === p.mergedInto)?.mascot || p.mergedInto || "";
+    const f = rel("figure", "frame"); f.setAttribute("aria-label", `${p.name}${to ? ", now with " + to : ""}`);
+    const pic = rel("div", "pic"), mat = rel("div", "mat"); mat.setAttribute("aria-hidden", "true");
+    mat.append(rAvatarKind(R_RETIRED_KIND[p.id] || "cat", "queued", 1)); pic.append(mat);
+    const plate = rel("figcaption", "fplate"); plate.append(rel("b", null, p.name)); if (to) plate.append(rel("span", null, "Now with " + to));
+    f.append(pic, plate); return f;
+  });
+  const head = rel("div", "g-head"); head.append(rel("b", "sign", "ON THE WALL"));
+  const row = rel("div", "frames"); row.append(...frames);
+  box.replaceChildren(head, row);
+}
+
+let rSig = "", rFeedSeen = null, rState = null;
+function renderRoom(s) {
+  if (!s.room) return;
+  const r = { ...s.room, members: rOverlay(s) }, T = tasksOf(s);
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date())) % 24;
+  RSVG("r-sky").textContent = hour >= 6 && hour < 18 ? "☀️" : "🌙";
+  rRenderGallery(s);
+  // Facts for the picked project.
+  RSVG("r-facts").replaceChildren(...rFactsFor(s).slice(0, 4).map((f) => { const c = rel("span", "count", `${f.label.toUpperCase()}  ${f.value}`); if (f.tone) c.dataset.s = f.tone === "run" ? "working" : f.tone === "ok" ? "done" : "blocked"; return c; }));
+  // Rooms: only rebuilt when something changed, so the pop-in and pacing do not restart every poll.
+  const sig = JSON.stringify([r.roles, rProj, r.members.map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, m.dim, rNaps(rKeyOf(m.id), m)]), T.active.map((t) => [t.id, t.project])]);
+  if (sig !== rSig) {
+    rSig = sig;
+    const retired = new Set(Object.keys(R_RETIRED_KIND));
+    const roles = Object.fromEntries(r.roles.filter((x) => !retired.has(x.id)).map((x) => [x.id, x])), mem = Object.fromEntries(r.members.map((x) => [x.id, x]));
+    const placed = new Set(R_ROOMS.flatMap((r) => r[3]));
+    const teams = R_ROOMS.map(([k, team, lore, ids, decor, furn]) => {
+      const here = ids.filter((id) => roles[id]), names = [...new Set(here.map((id) => rTeam({ ...roles[id], ...mem[id] })).filter(Boolean))];
+      return { k, name: `${names.length ? names.join(" + ") : team} \u00b7 ${lore}`, shared: names.length > 1, decor, furn, ids: here };
+    });
+    const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "Others", decor: ["sconce", "window"], furn: ["plant"], ids: others });
+    let i = 0;
+    const rooms = teams.filter((t) => t.ids.length).map((t) => {
+      const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name);
+      const busy = T.active.filter((x) => t.ids.includes(x.role) && inView(x)).length;
+      const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
+      const sign = rel("b", "sign", t.name); if (busy) sign.dataset.busy = busy;
+      wall.append(sign, rDecor(t.decor));
+      for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared));
+      floor.append(grid, rProps(t.furn)); team.append(wall, floor);
+      return team;
+    });
+    RSVG("r-rooms").replaceChildren(...(rooms.length ? rooms : [rel("p", "empty", "No roles found.")]));
+  }
+  // Feed: real outcomes, plus Doraemon's instructions ("Doraemon -> Shinchan: ..."); new rows slide in.
+  const roleOf = Object.fromEntries(r.roles.map((x) => [x.id, x])), name = (id) => roleOf[id]?.mascot || id;
+  const ids = new Set(r.feed.map((f) => f.id));
+  const talks = (r.talks || []).filter((t) => !ids.has(t.id)).map((t) => ({ id: t.id, ts: t.ts, tone: "talk", role: t.to, from: t.from, to: t.to, say: t.text, text: `${name(t.from)} → ${name(t.to)}: ${t.text}` }));
+  const feed = [...r.feed, ...talks].filter((f) => !rProj || !f.project || f.project === rProj).sort((x, y) => y.ts.localeCompare(x.ts)).slice(0, 25);
+  rFeedSeen = new Set(feed.map((f) => f.id));
+  rState = r; rRefreshCard();
+  rPlanWalks(feed); rPlanCheckins(r);
+}
+
+// ---- Catchphrases and little reactions: short, our own wording, only with Motion on. They survive a desk rebuild. ----
+const rFx = {};
+function rFxSet(id, { cls, say }, ms) {
+  if (!rMotion() || !rKeyOf(id)) return;
+  rFx[id] = { cls, say, until: Date.now() + ms };
+  const d = rDeskEl(id); if (d) rFxPaint(d, id);
+  setTimeout(() => { const d2 = rDeskEl(id); if (d2) rFxPaint(d2, id); }, ms + 50);
+}
+function rFxPaint(desk, id) {
+  const fx = rFx[id]; desk.querySelectorAll(".quip").forEach((q) => q.remove());
+  for (const c of [...desk.classList]) if (c.startsWith("fx-")) desk.classList.remove(c);
+  if (!fx || fx.until < Date.now()) { delete rFx[id]; return; }
+  if (fx.cls) desk.classList.add("fx-" + fx.cls);
+  if (fx.say) { const q = rel("div", "quip", fx.say); const idx = Math.round((parseInt(desk.style.getPropertyValue("--i")) || 0) / 60); q.dataset.side = idx % 2 ? "r" : "l"; desk.append(q); }
+}
+const FX_CRIT = /\bcritical\b/i;
+// Called once for every fresh feed item.
+function rReact(f, age) {
+  if (age > 20000) return;
+  const key = rKeyOf(f.role || ""), text = f.text || "";
+  if (f.tone === "start" && key === "kevin") rFxSet(f.role, { say: "Bello!" }, 3500);
+  if (f.tone === "start" && key === "bob") rFxSet(f.role, { say: "Bello!" }, 3500);
+  if (f.tone === "start" && key === "stuart") rFxSet(f.role, { say: "Banana!" }, 3500);
+  if (f.tone === "done" && key === "ninja-hattori" && FX_CRIT.test(text)) rFxSet(f.role, { say: "Nin nin!" }, 3500);
+  if (f.tone === "done" && key === "olaf") rFxSet(f.role, { say: "Warm hugs!" }, 3500);
+  if (f.tone === "deploy") rFxSet(SRE, { say: "Roar!" }, 3000);        // a green deploy: Sulley roars, softly
+}
+
+
+// Tabs: Live is the default; the pick is remembered per viewer (storage can be blocked, so every access is guarded).
+function setTab(name) {
+  const room = name === "room";
+  document.documentElement.dataset.tab = room ? "room" : "live";
+  $("view-live").hidden = room; $("view-room").hidden = !room;
+  $("tab-live").setAttribute("aria-selected", String(!room)); $("tab-room").setAttribute("aria-selected", String(room));
+  rPut("crewTab", name);
+  if (room && typeof last !== "undefined" && last) { try { renderRoom(last); } catch (e) { console.error(e); } }
+}
+$("tab-live").onclick = () => setTab("live"); $("tab-room").onclick = () => setTab("room");
+document.querySelector(".tabs").addEventListener("keydown", (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { const go = $("tab-room").getAttribute("aria-selected") === "true" ? "live" : "room"; setTab(go); $("tab-" + go).focus(); } });
+setTab(location.hash === "#room" ? "room" : rGet("crewTab", "live") === "room" ? "room" : "live");   // a #room link opens the Crew Room
+
+// ---- Motion: follows the system setting, but the owner can force it on or off with the Motion button (kept per viewer). ----
+const rMotion = () => { const m = document.documentElement.dataset.motion; return m === "on" || (m !== "off" && !matchMedia("(prefers-reduced-motion: reduce)").matches); };
+function rSetMotion(v) {
+  if (v) document.documentElement.dataset.motion = v; else delete document.documentElement.dataset.motion;
+  const b = $("r-motion"); if (b) { b.textContent = rMotion() ? "MOTION ON" : "MOTION OFF"; b.setAttribute("aria-pressed", String(rMotion())); }
+}
+
+// ---- Walks: Doraemon visits people he messages or checks on; finished people walk to him. Everyone else stays seated. ----
+// One size everywhere (60 x 68), feet-anchored, 4 facings, a 4-frame step at 150 ms, steady pace, one rAF loop.
+const rAway = new Set(), rPending = new Set();                 // roles currently out of their seat
+const rWalkQ = []; const rDone = new Set(); const rContact = {}, rChecked = {};
+let rActive = 0, rReports = 0, rLastCheck = 0;
+const REPLAY_MS = 120000;                // on load or when the tab comes back, the last two minutes are replayed once
+const PRIO = { report: 0, task: 1, visit: 2, checkin: 3, errand: 4 };
+const rSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const rBubbleMs = (t) => Math.min(4000, Math.max(2000, 1200 + 40 * (t || "").length));
+const rDeskEl = (id) => document.querySelector(`#r-rooms .desk[data-id="${id}"]`);
+
+function rEnqueue(job) {
+  if (job.kind === "visit") { const q = rWalkQ.find((j) => j.kind === "visit" && j.to === job.to); if (q) { q.say = job.say; return; } }   // several messages to one person: one visit, latest text
+  if (job.kind === "report" && rWalkQ.some((j) => j.kind === "report" && j.role === job.role)) return;
+  rWalkQ.push(job);
+  while (rWalkQ.length > 8) {            // queue cap 8: drop check-ins first, then the oldest visit, never a hand-over
+    let i = rWalkQ.findIndex((j) => j.kind === "checkin"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "errand"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "visit");
+    if (i < 0) break; rWalkQ.splice(i, 1);
+  }
+}
+
+const PAIR_MS = 10000, FRESH_TASK_MS = 20000;
+function rPlanWalks(feed) {
+  if (RSVG("view-room").hidden) return;                      // other tab: keep the items for the replay when this tab opens
+  const near = (f, tone) => feed.find((g) => g.tone === tone && g.role === f.role && Math.abs(Date.parse(g.ts) - Date.parse(f.ts)) <= PAIR_MS);
+  const fresh = feed.filter((f) => !rDone.has(f.id)).reverse();
+  for (const f of fresh) {
+    if (rDone.has(f.id)) continue;
+    rDone.add(f.id);
+    const age = Date.now() - Date.parse(f.ts);
+    rReact(f, age);
+    let job = null;
+    if (f.tone === "start" && f.role || (f.tone === "assign" || f.tone === "talk") && near({ role: f.to || f.role, ts: f.ts }, "start")) {
+      // an assignment and the start of the same member (within 10 s) are one scene: Doraemon brings the task, then the member starts
+      const role = f.tone === "start" ? f.role : f.to || f.role, st = f.tone === "start" ? f : near({ role, ts: f.ts }, "start"), as = f.tone === "start" ? near({ role, ts: f.ts }, "assign") : f;
+      if (st) rDone.add(st.id); if (as) rDone.add(as.id);
+      if (age > FRESH_TASK_MS || role === MGR) continue;
+      const say = (as?.say || as?.text?.replace(/^.*?:\s*/, "") || rState?.members.find((x) => x.id === role)?.task || "New task").slice(0, 70);
+      job = { kind: "task", role: MGR, to: role, say };
+    } else {
+      if (age > REPLAY_MS) continue;
+      if (f.tone === "done" && f.role && f.role !== MGR) {
+        const said = f.text.replace(/^.*?handed back:?\s*/, "").slice(0, 70), item = /\bPR\b|#\d+|commit|\b[0-9a-f]{7}\b/i.test(said) ? "paper" : "folder";
+        rPending.delete(f.role);
+        job = { kind: "report", role: f.role, say: said && said !== f.text ? said : "Done!", item };
+      } else if ((f.tone === "talk" || f.tone === "assign") && (f.to || f.role)) job = { kind: "visit", role: f.from || MGR, to: f.to || f.role, say: (f.say || "").slice(0, 70) };
+      else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(MGR)) job = { kind: "errand", role: MGR, to: SRE, say: f.text.slice(0, 40) };
+    }
+    if (!job) continue;
+    if (!rMotion()) { rStatic(job); continue; }
+    if (job.kind === "task") {
+      rPending.add(job.to); rRefreshDesk(job.to);
+      // Doraemon is busy: after about 6 s the member starts anyway, with the paper on the desk
+      job.timer = setTimeout(() => { const i = rWalkQ.indexOf(job); if (i >= 0) { rWalkQ.splice(i, 1); rWake(job.to, true); } }, 6000);
+    }
+    rEnqueue(job);
+  }
+  rPump();
+}
+function rRefreshDesk(id) {
+  const old = rDeskEl(id), role = rState?.roles.find((x) => x.id === id), m = rState?.members.find((x) => x.id === id); if (!old || !role || !m) return null;
+  const nd = rDesk(role, m, (parseInt(old.style.getPropertyValue("--i")) || 0) / 60); nd.style.animation = "none"; if (old.classList.contains("away")) nd.classList.add("away");
+  old.replaceWith(nd); return nd;
+}
+function rWake(id, paper) {                    // the member starts: bell, laptop, typing
+  rPending.delete(id); const d = rRefreshDesk(id); if (!d) return;
+  d.classList.add("wake"); setTimeout(() => d.classList.remove("wake"), 1400);
+  if (paper) d.querySelector(".table")?.append(rel("i", "pile paper"));
+}
+
+// Check-in: a visit with no words, for someone who has worked 8 min without contact while the manager is around.
+function rPlanCheckins(r) {
+  if (RSVG("view-room").hidden) return;
+  const now = Date.now();
+  if (!r.managerActive || now - rLastCheck < 180000) return;
+  for (const m of r.members) {
+    if (m.id === MGR || m.status !== "working" || !m.since || rAway.has(m.id) || rPending.has(m.id) || rWalkQ.some((j) => j.to === m.id)) continue;
+    const base = Math.max(Date.parse(m.lastContactAt || 0) || 0, Date.parse(m.since) || 0, rContact[m.id] || 0);
+    if (now - base < 480000 || now - (rChecked[m.id] || 0) < 600000) continue;
+    rLastCheck = rChecked[m.id] = now;
+    const job = { kind: "checkin", role: MGR, to: m.id, say: "" };
+    if (rMotion()) rEnqueue(job); else rStatic(job);
+    break;
+  }
+  rPump();
+}
+
+function rPump() {
+  while (rActive < 2) {                                      // at most 2 walkers on screen
+    const ok = (j) => !rAway.has(j.role) && (j.role !== MGR || (rReports === 0 && !rAway.has(j.to)));   // Doraemon: one thing at a time; a member on the way to him goes first
+    const c = rWalkQ.map((j, i) => [j, i]).filter(([j]) => ok(j)).sort((x, y) => PRIO[x[0].kind] - PRIO[y[0].kind] || x[1] - y[1])[0];
+    if (!c) return;
+    const job = rWalkQ.splice(c[1], 1)[0]; rActive++; rAway.add(job.role); if (job.kind === "report") rReports++;
+    (job.kind === "report" ? rReport(job) : job.kind === "task" ? rTask(job) : rVisit(job)).catch(() => {}).finally(() => {
+      rAway.delete(job.role); document.querySelectorAll(`#r-rooms .desk[data-id="${job.role}"]`).forEach((d) => { d.classList.remove("away"); if (job.role === MGR) d.querySelectorAll(".pile").forEach((p) => p.remove()); });
+      if (job.kind === "report") rReports--; rActive--; rPump();
+    });
+  }
+}
+
+// ---- Geometry: where a desk meets the hallway. Points are feet positions, relative to the hall. ----
+const CHAR_W = 60;
+const rGeo = () => { const hall = RSVG("r-hall"); return { hb: hall.getBoundingClientRect(), corr: parseFloat(getComputedStyle(hall).getPropertyValue("--corr")) || 44 }; };
+function rAccess(el, g) {
+  const t = el.closest(".team").getBoundingClientRect(), tb = el.querySelector(".table").getBoundingClientRect();
+  const L = t.left - g.hb.left, R = t.right - g.hb.left, top = t.top - g.hb.top, dx = (L + R) / 2;
+  const tx = tb.left - g.hb.left + tb.width / 2, ty = tb.top - g.hb.top + tb.height;     // feet on the table line
+  const side = R - tx >= tx - L ? 1 : -1, sx = Math.max(L + 34, Math.min(R - 34, tx + side * CHAR_W));   // stand one body width aside, where there is more room
+  const lane = top + 46, cy = top - g.corr / 2;
+  return { room: el.closest(".team"), seat: [tx, ty], stand: [sx, ty], side, sx, lane, dx, cy, out: [[tx, ty], [sx, ty], [sx, lane], [dx, lane], [dx, cy]] };
+}
+const rDedupe = (p) => p.filter((q, i) => !i || Math.hypot(q[0] - p[i - 1][0], q[1] - p[i - 1][1]) > 1);
+const rLen = (p) => p.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);
+// from/to: "seat" or "stand" at each end.
+function rRoute(a, b, spine, from, to) {
+  if (a.room === b.room) {
+    const p = from === "seat" ? [a.seat, a.stand] : [a.stand]; p.push([a.sx, a.lane], [b.sx, a.lane], b.stand); if (to === "seat") p.push(b.seat); return rDedupe(p);
+  }
+  const p = [...(from === "seat" ? a.out : a.out.slice(1))];
+  if (Math.abs(a.cy - b.cy) < 2) p.push([b.dx, b.cy]); else p.push([spine, a.cy], [spine, b.cy], [b.dx, b.cy]);
+  const back = [...b.out].reverse().slice(1); p.push(...(to === "seat" ? back : back.slice(0, -1)));
+  return rDedupe(p);
+}
+
+// ---- The loop: whole-pixel positions, facing from the direction of travel, a foot frame every 15 px of ground ----
+const rMovers = new Set(); let rRaf = 0, rPrev = 0;
+function rPlace(w, x, y) { w.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`; w.style.zIndex = 10 + Math.round(y); }
+function rTick(ts) {
+  const dt = Math.min(64, ts - (rPrev || ts)); rPrev = ts;
+  for (const m of [...rMovers]) {
+    m.t += dt;
+    const left = m.L - m.dist, k = Math.min(1, Math.max(.25, m.t / 120), Math.max(.25, left / (m.speed * .12)));   // ease in and out over 120 ms
+    m.dist = Math.min(m.L, m.dist + (m.speed * k * dt) / 1000);
+    let d = m.dist, i = 0; while (i < m.seg.length - 1 && d > m.seg[i]) { d -= m.seg[i]; i++; }
+    const a = m.pts[i], b = m.pts[i + 1], f = m.seg[i] ? d / m.seg[i] : 1, dx = b[0] - a[0], dy = b[1] - a[1];
+    rPlace(m.w, a[0] + dx * f, a[1] + dy * f);
+    m.w.dataset.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+    if (m.arc) { const p = m.dist / m.L; m.w.style.setProperty("--lift", -Math.round(4 * m.arc * p * (1 - p)) + "px"); m.w.dataset.frame = "s"; }   // in the air: the body rises, the shadow stays on the floor
+    else m.w.dataset.frame = String(Math.floor(m.dist / 15) % 4);
+    if (m.dist >= m.L) { m.w.dataset.frame = "s"; rMovers.delete(m); m.res(); }
+  }
+  rRaf = rMovers.size ? requestAnimationFrame(rTick) : 0; if (!rRaf) rPrev = 0;
+}
+function rMove(w, pts, fly) {
+  pts = rDedupe(pts); if (pts.length < 2) return Promise.resolve();
+  const L = rLen(pts), seg = pts.slice(1).map((q, i) => Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]));
+  rPlace(w, pts[0][0], pts[0][1]);
+  return new Promise((res) => { rMovers.add({ w, pts, seg, L, dist: 0, t: 0, speed: fly ? 150 : L > 700 ? 160 : 100, arc: fly ? Math.min(64, 24 + L / 12) : 0, res }); if (!rRaf) rRaf = requestAnimationFrame(rTick); });   // ~100 px/s, up to 1.6x on long trips
+}
+const rFace = (w, dir) => { w.dataset.dir = dir; w.dataset.frame = "s"; };
+function rWalker(roleId, item, at) {
+  const w = rel("div", "walker"), fig = rel("span", "fig"); w.dataset.dir = "down"; w.dataset.frame = "s";
+  fig.append(rAvatar(roleId, "walk", 1)); w.append(rel("span", "shadow"), fig);
+  const pet = R_PET[rKeyOf(roleId)];            // only Shinchan and Ninja Hattori have a dog that tags along
+  if (pet) fig.append(rDog(pet, false));
+  if (item) w.append(rel("i", "carry " + item));
+  if (rKeyOf(roleId) === MGR && rMotion()) { const d = rel("i", "ding"); d.setAttribute("aria-hidden", "true"); w.append(d); setTimeout(() => d.remove(), 1400); }   // the bell tinkles softly when he stands up
+  RSVG("r-walkers").append(w); rPlace(w, at[0], at[1]);
   return w;
 }
-
-// ---- State ----
-const ALL = "all";
-const PRIORITY_HINT = { P0: "P0: do first", P1: "P1: next", P2: "P2: when free" };
-let S = null, pick = null, seenActive = null, seenRecent = null;
-
-const query = new URLSearchParams(location.search);
-const names = () => S.projects.map((p) => p.name);
-// Default pick: ?project=, then the last pick (an old "" meant all projects), then the project in focus; else all.
-function choose() {
-  const stored = store.get("crewProject");
-  const ok = (p) => p === ALL || names().includes(p);
-  const keep = ok(pick) ? pick : null;
-  return keep || [query.get("project"), stored === "" ? ALL : stored, S.focus].find(ok) || ALL;
-}
-const inView = (x) => pick === ALL || x.project === pick;
-const roleName = (id) => S.room.roles.find((r) => r.id === id)?.mascot || id;
-
-// ---- Rows ----
-const time = (iso, text, label) => { const t = el("time", null, text); t.dateTime = iso; t.title = label; return t; };
-
-// One task row. kind: "active" (time working) or "queued" (time waiting).
-function taskRow(t, kind) {
-  const li = el("li", "row"), who = roleName(t.role), active = kind === "active";
-  const l1 = el("div", "l1"); l1.append(el("span", "who", who));
-  if (t.priority) { const c = el("span", "chip", t.priority); c.dataset.p = t.priority; c.title = PRIORITY_HINT[t.priority]; l1.append(c); }
-  const iso = active ? t.startedAt : t.queuedAt, m = mins(iso);
-  l1.append(time(iso, span(m), `${active ? "Started" : "Queued"} ${hm(iso)} IST`));
-  const txt = el("p", "txt", t.text); txt.title = t.text;
-  li.append(face(t.role, active ? "working" : "queued"), l1, txt);
-  const meta = el("p", "meta");
-  if (pick === ALL) meta.append(el("span", "proj", t.project));
-  if (t.ref) meta.append(el("span", "ref", t.ref));
-  if (t.modelOverride) meta.append(el("span", null, `model override: ${t.modelOverride}`));
-  if (meta.childElementCount) li.append(meta);
-  li.setAttribute("aria-label", `${who}${t.priority ? ", " + t.priority : ""}: ${t.text}. ${active ? "Working for" : "Waiting"} ${span(m)}${pick === ALL ? ". " + t.project : ""}`);
-  if (active && seenActive && !seenActive.has(t.id)) li.classList.add("fresh");
-  return li;
+// A trip: normally along the corridors. Over about 7 s even at 1.6x, the walker puts on a Bamboo-copter,
+// lifts off, flies over the hallway in a gentle arc at full size, lands near the destination and walks the last step.
+async function rTrip(w, a, b, spine, from, to) {
+  const pts = rRoute(a, b, spine, from, to);
+  if (a.room !== b.room && rLen(pts) > 1120) {
+    const p0 = pts[0], p1 = pts[pts.length - 1], land = [p1[0], p1[1] - 44];
+    const hat = rel("i", "copterhat"); w.append(hat); w.classList.add("flying");
+    await rSleep(300);                                        // blade spins up
+    await rMove(w, [p0, land], true);
+    w.style.setProperty("--lift", "0px"); await rSleep(150);
+    hat.remove(); w.classList.remove("flying");
+    await rMove(w, [land, p1]);
+  } else await rMove(w, pts);
 }
 
-// One outcome: a hand-back, a pull request, a CI failure or a deploy.
-function recentRow(f) {
-  const li = el("li", "row"), l1 = el("div", "l1");
-  let who, mark;
-  // Roles show their face; PRs, CI and deploys a short mark. Only a failure gets a chip: the text already says the rest.
-  if (f.role) { who = roleName(f.role); mark = face(f.role, "done"); }
-  else {
-    const deploy = f.tone === "deploy" || /^deploy/i.test(f.text), pr = f.tone === "pr";
-    const [glyph, word] = pr ? ["PR", "Pull request"] : deploy ? ["▲", "Deploy"] : ["CI", "CI"];
-    who = word; mark = el("span", "glyph", glyph); mark.setAttribute("aria-hidden", "true");
-    if (!pr) mark.dataset.t = f.tone === "bad" ? "bad" : "ok";
-  }
-  l1.append(el("span", "who", who));
-  if (f.tone === "done") l1.append(el("span", "verb", "handed back"));
-  if (f.tone === "bad") l1.append(el("span", "chip fail", "failed"));
-  l1.append(time(f.ts, hm(f.ts), `${hm(f.ts)} IST`));
-  // A hand-back's text starts with "<Name> handed back"; the line above already says it.
-  const txt = el("p", "txt", f.say || f.text);
-  li.append(mark, l1, txt);
-  if (pick === ALL && f.project) { const meta = el("p", "meta"); meta.append(el("span", "proj", f.project)); li.append(meta); }
-  if (seenRecent && !seenRecent.has(f.id)) li.classList.add("fresh");
-  return li;
+// ---- Bubbles: at most two lines, kept inside the hall, only the speaker shows one ----
+function rSay(w, text) {
+  if (!text) return;
+  const g = rGeo(), b = rel("div", "bubble"); b.style.maxWidth = Math.min(180, g.hb.width - 16) + "px"; b.append(rel("span", null, text)); w.append(b);
+  const wb = w.getBoundingClientRect(), bw = b.offsetWidth, ideal = wb.left + wb.width / 2 - bw / 2, left = Math.max(g.hb.left + 8, Math.min(g.hb.right - 8 - bw, ideal));
+  b.style.marginLeft = left - ideal + "px"; b.style.setProperty("--tail", bw / 2 - (left - ideal) + "px");
 }
+const rUnsay = async (w) => { const b = w.querySelector(".bubble"); if (!b) return; b.classList.add("out"); await rSleep(500); b.remove(); };
 
-// ---- Sections ----
-function renderPicker() {
-  const active = (n) => S.tasks.active.filter((t) => n === ALL || t.project === n).length;
-  const chip = (n, label) => {
-    const li = el("li"), b = el("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(pick === n));
-    b.append(el("span", "pn", label), el("span", "pc", `${active(n)} active`));
-    b.onclick = () => {
-      if (pick === n) return;
-      pick = n; store.put("crewProject", n);
-      const u = new URL(location.href); u.searchParams.set("project", n); history.replaceState(null, "", u);
-      render();
-    };
-    li.append(b); return li;
-  };
-  $("picker").replaceChildren(...names().map((n) => chip(n, n)), chip(ALL, "All projects"));
-}
-
-// Crew: roles with active or queued work in view, one entry per project and role. Source: tasks only, never room.members.
-function renderCrew(act, que) {
-  const people = new Map();
-  for (const t of [...act, ...que]) {
-    const k = `${t.project}|${t.role}`, p = people.get(k) || { role: t.role, project: t.project, working: null, queued: 0 };
-    if (t.state === "active") p.working = p.working || t; else p.queued++;
-    people.set(k, p);
-  }
-  const list = [...people.values()].sort((a, b) => (b.working ? 1 : 0) - (a.working ? 1 : 0) || roleName(a.role).localeCompare(roleName(b.role)));
-  const working = list.filter((p) => p.working).length;
-  $("n-crew").textContent = list.length ? `${working} working` : "";
-  $("crew").replaceChildren(...list.map((p) => {
-    const li = el("li", "person"); li.dataset.s = p.working ? "working" : "free";
-    const nm = el("b", null, roleName(p.role)); if (pick === ALL) nm.append(el("span", "pj", p.project));
-    li.append(face(p.role, p.working ? "working" : "queued"), nm, el("span", null, p.working ? `Working · ${span(mins(p.working.startedAt))}` : `Free · ${p.queued} queued`));
-    return li;
-  }));
-  const retired = new Set((S.room.retired || []).map((r) => r.id));
-  const roster = S.room.roles.map((r) => r.id).filter((id) => id !== MGR && !retired.has(id));
-  const busy = new Set(list.map((p) => p.role)), free = roster.filter((id) => !busy.has(id)).length;
-  $("crew-more").hidden = !roster.length;
-  $("crew-more").textContent = busy.size ? `${free} others free, nothing queued for them.` : `All ${roster.length} crew are free.`;
-}
-
-// Facts per project: Live (version, outcome, since) and Branch. Uses factsByProject when the server sends it,
-// and falls back to the focus project's room.facts, plus the project's deploy snapshot for the time.
-function factsOf(n) {
-  const by = (S.factsByProject || S.room.factsByProject || {})[n] || (n === S.focus ? S.room.facts : []) || [];
-  const get = (label) => by.find((f) => f.label === label), dep = S.snapshots?.[n]?.deploy, live = get("Live");
-  return {
-    live: live ? { version: live.value, ok: live.tone === "ok", at: dep?.at } : dep?.version ? { version: dep.version, ok: dep.status === "ok", at: dep.at } : null,
-    branch: get("Branch")?.value || "",
-  };
-}
-function renderFacts() {
-  const liveBits = (f) => f.live
-    ? [el("span", "v", f.live.version), el("span", `chip ${f.live.ok ? "live" : "fail"}`, f.live.ok ? "ok" : "failed"), ...(f.live.at ? [el("span", "when", `since ${hm(f.live.at)}`)] : [])]
-    : [el("span", "when", "Not checked for this project")];
-  const rows = [];
-  for (const n of pick === ALL ? names() : [pick]) {
-    const f = factsOf(n);
-    if (pick === ALL) { const dd = el("dd"); dd.append(...liveBits(f), el("span", "ref-b", f.branch || "branch unknown")); rows.push(el("dt", "pdt", n), dd); continue; }
-    const live = el("dd"), br = el("dd"); live.append(...liveBits(f)); br.append(el("span", "v", f.branch || "unknown"));
-    rows.push(el("dt", null, "Live"), live, el("dt", null, "Branch"), br);
-  }
-  $("facts").replaceChildren(...rows);
-  $("facts-hint").textContent = pick === ALL ? "live version · branch" : "";
-}
-
-function render() {
-  pick = choose();
-  renderPicker();
-  const label = pick === ALL ? "all projects" : pick;
-  const act = S.tasks.active.filter(inView), que = S.tasks.queued.filter(inView);
-  $("n-active").textContent = act.length; $("n-queued").textContent = que.length;
-  $("hint-active").hidden = !act.length; $("hint-queued").hidden = !que.length;
-  const empty = (text) => el("li", "empty", text);
-  $("active").replaceChildren(...(act.length ? act.map((t) => taskRow(t, "active")) : [empty(`Nobody is working on ${label} right now.`)]));
-  $("queued").replaceChildren(...(que.length ? que.map((t) => taskRow(t, "queued")) : [empty("Nothing queued.")]));
-  renderCrew(act, que);
-  // Recent: outcomes only. Starts and assigns are left out because Active already shows them.
-  const rec = S.room.feed.filter((f) => ["done", "pr", "deploy", "bad"].includes(f.tone) && (!f.project || inView(f))).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
-  $("recent").replaceChildren(...(rec.length ? rec.map(recentRow) : [empty("No hand-backs, PRs or deploys yet.")]));
-  renderFacts();
-  seenActive = new Set(S.tasks.active.map((t) => t.id)); seenRecent = new Set(S.room.feed.map((f) => f.id));
-  document.title = `Crew Room · ${pick === ALL ? "All projects" : pick} · ${act.length} active`;
-}
-
-// ---- Polling: every 4 s. When the server stops answering, the last data stays and the status turns amber. ----
-let lastOk = "";
-function setStatus(live) {
-  $("status").dataset.s = live ? "live" : "stale";
-  $("status-t").textContent = live ? `Live · ${hm(lastOk)} IST` : lastOk ? `Not answering · last ${hm(lastOk)}` : "Not answering";
-}
-async function tick() {
+// ---- Scenes ----
+async function rVisit(job) {                  // Doraemon (or anyone) walks to a person, says his piece, walks home
+  const g = rGeo(), home = rDeskEl(job.role), target = rDeskEl(job.to); if (!home || !target || home === target) return;
+  home.classList.add("away");
+  const a = rAccess(home, g), b = rAccess(target, g), spine = g.corr / 2, w = rWalker(job.role, null, a.seat);
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    S = await r.json(); lastOk = S.now;
-    render(); setStatus(true);
-  } catch (e) { console.error(e); setStatus(false); }
+    await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
+    rSay(w, job.kind === "checkin" ? "📋 Checking in" : job.say);
+    await rSleep(job.kind === "checkin" ? 1500 : rBubbleMs(job.say)); await rUnsay(w);
+    await rTrip(w, b, a, spine, "stand", "seat");
+  } finally { w.remove(); }
+  rContact[job.to] = Date.now();
 }
-(function loop() { tick().finally(() => setTimeout(loop, 4000)); })();
+async function rTask(job) {                   // Doraemon brings the task paper; the member starts only after the hand-over
+  clearTimeout(job.timer);
+  const g = rGeo(), home = rDeskEl(MGR), target = rDeskEl(job.to);
+  if (!home || !target || home === target) { rWake(job.to); return; }
+  home.classList.add("away");
+  const a = rAccess(home, g), b = rAccess(target, g), spine = g.corr / 2, w = rWalker(MGR, "paper", a.seat);
+  try {
+    await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
+    const c = w.querySelector(".carry"); if (c) { c.style.setProperty("--hx", -b.side * 44 + "px"); c.classList.add("give"); }
+    await rSleep(600); c?.remove(); (rDeskEl(job.to)?.querySelector(".table"))?.append(rel("i", "pile paper"));   // the paper lands on their desk
+    rSay(w, job.say); await rSleep(Math.min(3000, Math.max(2000, rBubbleMs(job.say))));
+    rWake(job.to, true); await rUnsay(w);
+    await rTrip(w, b, a, spine, "stand", "seat");
+  } finally { w.remove(); }
+  rContact[job.to] = Date.now();
+}
+async function rReport(job) {                 // a finished member hands the result to Doraemon
+  const g = rGeo(), home = rDeskEl(job.role), mgr = rDeskEl(MGR); if (!home || !mgr || home === mgr) return;
+  home.classList.add("away");
+  const a = rAccess(home, g), b = rAccess(mgr, g), spine = g.corr / 2, w = rWalker(job.role, job.item, a.seat);
+  try {
+    await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
+    for (let t = 0; rAway.has(MGR) && t < 6000; t += 200) await rSleep(200);   // he is out on a visit: wait up to 6 s
+    if (!rAway.has(MGR)) {
+      rSay(w, job.say);
+      const c = w.querySelector(".carry"); if (c) { c.style.setProperty("--hx", (b.side > 0 ? -16 : 16) + "px"); c.classList.add("give"); }
+      await rSleep(600); c?.remove();
+      const av = mgr.querySelector(".av"); if (av) { av.classList.add("hop"); setTimeout(() => av.classList.remove("hop"), 700); }
+      await rSleep(Math.max(0, rBubbleMs(job.say) - 600)); await rUnsay(w);
+    } else { w.querySelector(".carry")?.remove(); mgr.querySelector(".table")?.append(rel("i", "pile " + job.item)); }   // left on his desk until he sits down
+    await rTrip(w, b, a, spine, "stand", "seat");
+  } finally { w.remove(); }
+}
+
+// ---- Reduced motion / Motion off: the same information with no movement ----
+function rStatic(job) {
+  const tick = (el, cls, ms = 4000) => { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); };
+  if (job.kind === "report") {
+    const d = rDeskEl(job.role), m = rDeskEl(MGR); if (!d) return;
+    tick(d, "ring"); if (m) tick(m, "ring");
+    const n = rel("div", "plate-note", "→ Doraemon"); d.querySelector(".plate")?.append(n); setTimeout(() => n.remove(), 4000);
+    rStaticBubble(d, job.say);
+  } else if (job.kind === "task") {
+    const d = rDeskEl(job.to); if (!d) return;
+    const pin = rMini(MGR, "working", 0); pin.classList.add("pin"); const ico = rel("i", "papericon"); ico.setAttribute("aria-hidden", "true");
+    d.querySelector(".plate")?.append(pin, ico); setTimeout(() => { pin.remove(); ico.remove(); }, 4000); rStaticBubble(d, job.say);
+  } else {
+    const d = rDeskEl(job.to); if (!d) return;
+    const pin = rMini(MGR, "working", 0); pin.classList.add("pin"); d.querySelector(".plate")?.append(pin); setTimeout(() => pin.remove(), 4000);
+    rStaticBubble(d, job.kind === "checkin" ? "📋 Checking in" : job.say);
+  }
+}
+function rStaticBubble(desk, text) { if (!text) return; const b = rel("div", "sbubble"); b.append(rel("span", null, text)); desk.append(b); setTimeout(() => b.remove(), 4000); }
+
+// ---- Card: hover, focus or tap a character or plate. Esc or a click elsewhere closes it. ----
+let rCardId = null, rPinned = null;
+const rMins = (iso) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000));
+const rSpan = (m) => m < 1 ? "under a minute" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+function rCardEl() { let c = $("r-card"); if (!c) { c = rel("div", "rcard"); c.id = "r-card"; c.hidden = true; c.setAttribute("role", "status"); RSVG("view-room").append(c); } return c; }
+function rHideCard() { rCardId = rPinned = null; rCardEl().hidden = true; }
+function rRefreshCard() { if (rCardId && rDeskEl(rCardId)) rShowCard(rCardId); else if (rCardId) rHideCard(); }
+function rShowCard(id) {
+  const role = rState?.roles.find((x) => x.id === id), m = rState?.members.find((x) => x.id === id), desk = rDeskEl(id); if (!role || !m || !desk) return;
+  rCardId = id;
+  const c = rCardEl(), s = m.status === "idle" ? "queued" : m.status;
+  const hand = m.lastHandback && typeof m.lastHandback === "object" ? m.lastHandback.text : m.lastHandback;   // may be ""
+  const state = s === "working" ? (m.since ? `Working for ${rSpan(rMins(m.since))}` : "Working now") : s === "done" ? (m.since ? `Done ${rSpan(rMins(m.since))} ago` : "Done") : "Idle";
+  const head = rel("div", "rc-head"), who = rel("div", "rc-who");
+  who.append(rel("b", null, role.mascot), rel("span", null, [rTitleFull({ ...role, ...m }), rTeam({ ...role, ...m })].filter(Boolean).join(" \u00b7 ")));
+  head.append(rMini(id, s, 0), who);
+  const x = { ...role, ...m }, rows = [head, rel("div", "rc-state", state), rel("p", "rc-task", m.task || m.line), rel("p", "rc-model", rModelLine(x))];
+  if (hand && hand !== m.line) rows.push(rel("p", "rc-hand", "Last hand-back: " + hand));
+  else if (s === "done" && m.line) rows.push(rel("p", "rc-hand", "Handed back: " + m.line));
+  if (m.ref) rows.push(rel("p", "rc-ref", m.ref));
+  c.replaceChildren(...rows); c.hidden = false;
+  const b = desk.getBoundingClientRect(), w = c.offsetWidth, h = c.offsetHeight;
+  c.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left + b.width / 2 - w / 2)) + "px";
+  c.style.top = (b.top - h - 8 >= 52 ? b.top - h - 8 : Math.min(innerHeight - h - 8, b.bottom + 8)) + "px";
+}
+function rWireCard(desk, id) {
+  desk.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") rShowCard(id); });
+  desk.addEventListener("pointerleave", () => { if (rPinned !== id) rHideCard(); });
+  desk.addEventListener("focus", () => rShowCard(id));
+  desk.addEventListener("blur", () => { if (rPinned !== id) rHideCard(); });
+  desk.addEventListener("click", (e) => { e.stopPropagation(); if (rPinned === id) rHideCard(); else { rPinned = id; rShowCard(id); } });
+  desk.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); desk.click(); } });
+}
+addEventListener("keydown", (e) => { if (e.key === "Escape") rHideCard(); });
+addEventListener("click", () => rHideCard());
+addEventListener("scroll", () => rHideCard(), { passive: true });
+
+$("r-motion").onclick = () => { const on = rMotion(); rPut("crewMotion", on ? "off" : "on"); rSetMotion(on ? "off" : "on"); if (on) { RSVG("r-walkers").replaceChildren(); } };
+rSetMotion((() => { try { const v = localStorage.getItem("crewMotion"); return v === "on" || v === "off" ? v : ""; } catch { return ""; } })());
