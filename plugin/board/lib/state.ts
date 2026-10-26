@@ -19,7 +19,7 @@ export function projectList(events: BoardEvent[], registry: Project[], working: 
 export function buildState(now = Date.now()) {
   const events = readEvents(), roleMap = loadRoles(), crew = crewFrom(events, roleMap), roles = listRoles();
   const registry = readRegistry();
-  const tasks = deriveTasks(events, roleMap);
+  const tasks = deriveTasks(events, roleMap, now);   // the wall clock, so a quiet live board goes stale
   // "working" is the project's active tasks (an assign makes one, the agent's stop ends it).
   const projects = projectList(events, registry, activeByProject(tasks));
   // Focus: the project that produced the newest event (else the first registered one). Top-level ci/prs/commits/deploy
