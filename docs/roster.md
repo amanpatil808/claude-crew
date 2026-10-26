@@ -38,7 +38,7 @@ The `(v0.4)` at the end of each agent description is the prompt version. It is s
 | `shizuka` | Shizuka (Doraemon) | Technical Writer, Documentation: docs, release notes, launch copy, drafts, proofreading | sonnet · high · 60 | pink |
 | `stuart` | Stuart (Minions) | Code Search Assistant, Helpers: quick read-only lookups answered with path:line (the default for lookups) | haiku · low · 15 | yellow |
 
-Green is never used: the board keeps it for "done". Room-mates never share a colour; seating lives in the board.
+No agent has green as its colour: the board uses green for "ok" (the Live status dot, a deploy that worked, a live version).
 
 ### Escalation per call
 The manager keeps cheap defaults and passes `model: opus` for one run when it matters:
@@ -55,7 +55,7 @@ The manager keeps cheap defaults and passes `model: opus` for one run when it ma
 - **Knowledge Manager pushes**: miguel-rivera may push only `crew-lessons/*` branches to amanpatil808/claude-crew and open pull requests there; never main, never a merge.
 - **Merging**: only the DevOps Team (mike-wazowski, sulley) may merge pull requests, and only after the owner approves that specific PR; the guard asks the owner to confirm each merge. Approving a pull request (`gh pr review --approve`) is also DevOps only, with the owner's confirmation. DevOps rights need the exact plugin names `toon-crew:mike-wazowski` and `toon-crew:sulley`; a project agent with the same bare name gets none. Everyone else is refused, including doraemon and miguel-rivera. `--admin` and `--auto` merges are refused for everyone. The owner can always merge himself: his own `!` commands and GitHub's website are not checked by the guard.
 - **Spawning**: only doraemon (the main session) starts crew agents. dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, with the prefix, for narrow questions. The guard refuses every other crew role, and bare names. Agents outside the crew are not limited.
-- **Models**: Doraemon passes no `model` when spawning, except the escalations above. A per-call model beats the agent file, and the board shows an "override" badge when the call's model differs from the file's.
+- **Models**: Doraemon passes no `model` when spawning, except the escalations above. A per-call model beats the agent file, and the board shows `model override: <name>` on the task's row when the call's model differs from the file's.
 
 ## Memory folders
 
@@ -83,9 +83,9 @@ Steps:
 3. Watch the two re-used ids: old `dekisugi/` and `ninja-hattori/` folders hold lessons from their old jobs (SRE and routes), so they go to sulley and bob, not to the new research lead and security engineer.
 4. Check each merged file stays under 200 lines and holds no secrets, then remove the old folders in the same PR.
 
-## Framed pictures: retired characters
+## Retired characters
 
-These characters left the active crew. They hang as framed pictures on the Crew Room wall ("Now with …"), and old references to them map to the role that took over.
+These characters left the active crew. The board no longer shows them; old references to them (memory folders, old board events) map to the role that took over.
 
 | Retired | Was | Now with | What moved |
 |---|---|---|---|
