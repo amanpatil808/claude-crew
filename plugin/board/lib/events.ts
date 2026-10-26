@@ -6,7 +6,8 @@ import { EVENTS_FILE } from "./paths.ts";
 import { appendPrivate } from "./private-fs.ts";
 import { redactDeep } from "./redact.ts";
 
-export type EventKind = "agent-start" | "agent-stop" | "commit" | "pr" | "turn-end" | "session-start" | "session-end" | "ci" | "deploy" | "main-busy" | "assign";
+export type EventKind = "agent-start" | "agent-stop" | "commit" | "pr" | "turn-end" | "session-start" | "session-end" | "ci" | "deploy" | "main-busy" | "assign"
+  | "task-queue" | "task-start" | "task-done" | "task-drop";   // board v2 tasks, see lib/tasks.ts
 
 export interface BoardEvent {
   id: string;          // also the board's feed doc_id, so it uses only doc_id-safe characters
@@ -25,6 +26,9 @@ export interface BoardEvent {
   effectiveModel?: string;  // assign: the model it runs on: call > file > CLAUDE_CODE_SUBAGENT_MODEL > "main"
   ref?: string;        // commit SHA, PR URL, CI run id or deploy version, for dedupe and links
   ok?: boolean;        // CI/deploy outcome
+  role?: string;       // task-queue: the role id the work is queued for
+  priority?: "P0" | "P1" | "P2";   // task-queue
+  taskId?: string;     // task-start/done/drop: which task ("t-<ms>-<hex>"; a queued or assign task's id is its event id with "t" for "e")
 }
 
 export function newId(at: Date): string {
@@ -32,8 +36,8 @@ export function newId(at: Date): string {
 }
 
 export function appendEvent(e: Omit<BoardEvent, "id" | "ts">, at = new Date()): BoardEvent {
-  // id and ts are ours and skip redaction (a 13-digit id could pass for a card number).
-  const event: BoardEvent = { ...redactDeep(e), id: newId(at), ts: at.toISOString() };
+  // id, ts and taskId are ours and skip redaction (a 13-digit id could pass for a card number).
+  const event: BoardEvent = { ...redactDeep(e), ...(e.taskId ? { taskId: e.taskId } : {}), id: newId(at), ts: at.toISOString() };
   appendPrivate(EVENTS_FILE, JSON.stringify(event) + "\n");
   return event;
 }

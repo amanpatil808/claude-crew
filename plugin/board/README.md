@@ -10,7 +10,7 @@ CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/boa
 
 This is the exact command a `/toon-crew:board` skill should run (in the skill text, `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` are filled in). It prints `{"pid":..,"port":..}`; open `http://127.0.0.1:<port>`. The port is the first free one from 8811 (`BOARD_PORT=8830` starts the search there).
 
-Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `board.sh test`.
+Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `board.sh task ...` (below), `board.sh test`.
 
 ## Where things live
 
@@ -43,7 +43,25 @@ Every event carries `project` (the registry name for `CLAUDE_PROJECT_DIR`, else 
 
 ## `/api/state` (additions for the screen)
 
-`projects[]` (`{ path, name, firstSeen?, lastSeen?, working, polled }`), `focus` (project of the newest event), `snapshots` (per project name: `ci`, `prs`, `commits`, `deploy`, `errors`, `polledAt`, `problems`), top-level `ci/prs/commits/deploy/errors/polledAt/problems` (the focus project's), `room.members[].project`, `room.roles[].color`, `room.retired[]` (`{ id, name, show, mergedInto }`).
+`projects[]` (`{ path, name, firstSeen?, lastSeen?, working, polled }`; `working` is the project's number of active tasks), `focus` (project of the newest event), `snapshots` (per project name: `ci`, `prs`, `commits`, `deploy`, `errors`, `polledAt`, `problems`), top-level `ci/prs/commits/deploy/errors/polledAt/problems` (the focus project's), `room.members[].project`, `room.roles[].color`, `room.retired[]` (`{ id, name, show, mergedInto }`).
+
+## Tasks
+
+Tasks are derived from the event log (kinds `task-queue`, `task-start`, `task-done`, `task-drop`, plus `assign` and `agent-stop`); nothing else is stored. The manager queues work with:
+
+```bash
+board.sh task add --role <id> [--priority P0|P1|P2] [--ref <branch|PR>] "<text>"
+board.sh task start <id>          # queued -> active
+board.sh task done <id> [--ref <branch|PR>]
+board.sh task drop <id>           # hidden from the board
+board.sh task list [--all] [--json]
+```
+
+- `add` prints `queued t-<ms>-<hex>`. The role must be a roster id (an unknown one is refused and the ids are listed). The text is redacted, then clipped to 120 characters.
+- The project is the registry name for `CLAUDE_PROJECT_DIR`, else the current folder. `list` shows that project; `--all` shows every project.
+- An `assign` to role R in project P makes the oldest queued task for (P, R) active; with none queued, the assign itself becomes an active task (its text, no priority). An `agent-stop` of role R in project P finishes the oldest active task for (P, R).
+- `/api/state` gets `tasks: { active, queued, done }` across all projects: `active` oldest first, `queued` by priority (P0, P1, P2, none) then oldest, `done` the last 10 newest first. A task is `{ id, project, role, priority?, text, state, queuedAt?, startedAt?, doneAt?, ref? }`. The page filters by project. An active task may carry `modelOverride` (the assign's `model`, only when it differs from the agent file's). Task rules: an assign with `toId` (a SendMessage resume) never makes a task, it re-opens that role's latest done task in the same project if it finished within 30 minutes, else nothing; an assign within 5 s after the same role's stop in the same project, with no agent-start between, is ignored (a foreground Agent call reports after the stop).
+- `room.feed[]` items carry `project` (from the event, absent when the event had none). `/api/state.factsByProject` is `{ [projectName]: RoomFact[] }` for every registered project: `Live` (from that project's deploy snapshot) and `Branch` (from its path), e.g. `{ "shop": [{ "label": "Live", "value": "v1.4.0", "tone": "ok" }, { "label": "Branch", "value": "feat/cart" }] }`. The top-level `room.facts` (the focus project, with `Working`) is unchanged.
 
 ## Test
 

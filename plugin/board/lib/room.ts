@@ -10,7 +10,7 @@ export interface RoomMember extends AgentInfo { id: string; project?: string; st
 // What the hover card shows beyond the status line: the latest assignment and the latest hand-back summary per role.
 export interface RoleNotes { task?: string; taskAt?: string; handback?: string; handbackAt?: string; contactAt?: string; asked?: string; declaredModel?: string; effectiveModel?: string }
 // `say` is the short line a character speaks on the board; `from` is the speaker's role when it is not `role` itself.
-export interface RoomFeedItem { id: string; ts: string; tone: "start" | "done" | "pr" | "deploy" | "bad" | "assign"; text: string; role?: string; from?: string; say?: string }
+export interface RoomFeedItem { id: string; ts: string; project?: string; tone: "start" | "done" | "pr" | "deploy" | "bad" | "assign"; text: string; role?: string; from?: string; say?: string }
 export interface RoomFact { label: string; value: string; tone?: "ok" | "bad" | "run" }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
@@ -93,23 +93,24 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFe
   const out: RoomFeedItem[] = [];
   const started = new Set<string>();   // repeated starts of the same agent say nothing new
   const types = typesById(events);
+  const push = (e: BoardEvent, item: Omit<RoomFeedItem, "id" | "ts" | "project">) => out.push({ id: e.id, ts: e.ts, ...(e.project ? { project: e.project } : {}), ...item });
   for (const e of events) {
     // A stop without its own type (resumed agents) takes the type from the agent's earlier start.
     const type = e.agentType && e.agentType !== "agent" ? e.agentType : e.agentId ? types.get(e.agentId) : undefined;
     const r = type ? roleFor(type, roles) : undefined, who = r?.mascot;
     if (e.kind === "assign") {
       const to = e.to ? roleFor(e.to, roles) : undefined, from = e.from ? roleFor(e.from, roles) : undefined;
-      if (to && from) out.push({ id: e.id, ts: e.ts, tone: "assign", role: to.id, from: from.id, say: e.text, text: `${from.mascot} → ${to.mascot}: ${e.text}` });
+      if (to && from) push(e, { tone: "assign", role: to.id, from: from.id, say: e.text, text: `${from.mascot} → ${to.mascot}: ${e.text}` });
     } else if (e.kind === "agent-start" && who && e.agentId && !started.has(e.agentId)) {
       started.add(e.agentId);
-      out.push({ id: e.id, ts: e.ts, tone: "start", role: r?.id, text: `${who} started` });
+      push(e, { tone: "start", role: r?.id, text: `${who} started` });
     } else if (e.kind === "agent-stop" && who) {
       if (e.agentId) started.delete(e.agentId);
       const s = summary(e.text);
-      out.push({ id: e.id, ts: e.ts, tone: "done", role: r?.id, say: s ? clip(s, 70) : "Done!", text: `${who} handed back${s ? ": " + clip(s, 70) : ""}` });
-    } else if (e.kind === "pr") out.push({ id: e.id, ts: e.ts, tone: "pr", text: e.text });
-    else if (e.kind === "deploy") out.push({ id: e.id, ts: e.ts, tone: e.ok === false ? "bad" : "deploy", text: clip(e.text.replace(/^Deploy ok ([^\s:]+).*/, "Deployed $1 ok"), 70) });
-    else if (e.kind === "ci" && e.ok === false) out.push({ id: e.id, ts: e.ts, tone: "bad", text: clip(e.text, 70) });
+      push(e, { tone: "done", role: r?.id, say: s ? clip(s, 70) : "Done!", text: `${who} handed back${s ? ": " + clip(s, 70) : ""}` });
+    } else if (e.kind === "pr") push(e, { tone: "pr", text: e.text });
+    else if (e.kind === "deploy") push(e, { tone: e.ok === false ? "bad" : "deploy", text: clip(e.text.replace(/^Deploy ok ([^\s:]+).*/, "Deployed $1 ok"), 70) });
+    else if (e.kind === "ci" && e.ok === false) push(e, { tone: "bad", text: clip(e.text, 70) });
   }
   return out.slice(-25).reverse();
 }
@@ -117,6 +118,15 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFe
 function currentBranch(projectDir?: string): string {
   if (!projectDir) return "";
   try { return readFileSync(join(projectDir, ".git", "HEAD"), "utf8").trim().replace(/^ref: refs\/heads\//, ""); } catch { return ""; }
+}
+
+// One project's Live version and Branch, from its own deploy snapshot and path (no "Working": that needs the focus).
+export function projectFacts(deploy?: { status?: string; version?: string } | null, projectDir?: string): RoomFact[] {
+  const facts: RoomFact[] = [];
+  if (deploy?.version) facts.push({ label: "Live", value: deploy.version, tone: deploy.status === "ok" ? "ok" : "bad" });
+  const b = currentBranch(projectDir);
+  if (b) facts.push({ label: "Branch", value: b });
+  return facts;
 }
 
 // Facts are about the project in focus: its live version and its checked-out branch.
