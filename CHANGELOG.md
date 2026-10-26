@@ -2,6 +2,16 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.0 - unreleased
+
+Board v2.
+
+- Board: one simple page. A project picker at the top (other projects are greyed) and five lists: Active, Queued, Crew, Recent and Facts. The pixel room and the Live tab are retired.
+- Tasks: `board.sh task add|start|done|drop|list` queues work per role and project. An assign makes the oldest queued task for that role active; the role's hand-back finishes it. A resume (SendMessage) re-opens the latest done task if it finished within 30 minutes.
+- New skill `toon-crew:task`: runs `board.sh task ...` for Doraemon, who now queues each planned piece with it.
+- Per-project feed and facts: each feed item carries its project, and `/api/state.factsByProject` gives Live and Branch for every registered project.
+- Docs: `docs/how-it-works.md` (the flow, roles, memory, several projects, tasks, using the board); README points to it.
+
 ## 0.2.2 - unreleased
 
 - Guard: the memory email check no longer flags package specs (`mermaid@11.4.1`, `@types/node@20.1.0`, prereleases), IPs or `git@host:path` remotes; a domain must end in a letters-only TLD. Real emails (`someone@gmail.com`, `a.b+c@company.co.in`) are still refused.
