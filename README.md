@@ -67,7 +67,7 @@ Only Doraemon commits, and only Doraemon (the main session) starts crew agents; 
 
 ## How it works
 
-You ask Doraemon. He plans the work in waves with P0/P1/P2 priorities, briefs the crew, checks every hand-back, commits and opens a pull request. Only after you approve it does Mike Wazowski (or Sulley, for a production rollout) merge. [docs/how-it-works.md](docs/how-it-works.md) has the diagrams: the flow, the roles, where memory and the board live, how several projects stay separate, and the planned board v2 task lists.
+You ask Doraemon. He plans the work in waves with P0/P1/P2 priorities, briefs the crew, checks every hand-back, commits and opens a pull request. Only after you approve it does Mike Wazowski (or Sulley, for a production rollout) merge. [docs/how-it-works.md](docs/how-it-works.md) has the diagrams: the flow, the roles, where memory and the board live, how several projects stay separate, and the board's project picker and task lists.
 
 ## Guards
 
@@ -101,7 +101,7 @@ It looks through quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`/`;`/`|` cha
 
 Hooks send SubagentStart, SubagentStop, PostToolUse (Bash, Agent, SendMessage), Stop, SessionStart and SessionEnd to `board/hook.ts`. They are async, so they never slow a session (Claude Code doesn't enforce a timeout on async hooks, so they don't set one).
 
-For each spawn the board records the model the agent file declares and the model the run really uses (per-call model, then the file, then `CLAUDE_CODE_SUBAGENT_MODEL`, then the main model). When the call asked for a different model than the file, the desk shows an "override" badge.
+For each spawn the board records the model the agent file declares and the model the run really uses (per-call model, then the file, then `CLAUDE_CODE_SUBAGENT_MODEL`, then the main model). When the call asked for a different model than the file, the Active row on the board shows "model override: <model>".
 
 ## Project registry
 

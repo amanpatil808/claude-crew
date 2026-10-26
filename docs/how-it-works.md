@@ -9,7 +9,7 @@ Words used here:
 - **Worktree**: a separate copy of the repo on disk, so a builder cannot disturb your working folder.
 - **Board**: the local status page. It shows who is doing what.
 
-Sections 4, 5 and 6 describe **board v2**: the project picker, the Active and Queued lists and `board.sh task`. It is built (the contract is `docs/planning/board-v2-contract.md`), but it needs a plugin version that includes pull request #6. `plugin.json` still says 0.2.2 and the changelog has no board v2 entry yet. To check your install, run `board.sh task list`: an older plugin prints a usage line and exits with an error instead of a list.
+Sections 4, 5 and 6 describe **board v2**: the project picker, the Active and Queued lists and `board.sh task`. It is built (the contract is `docs/planning/board-v2-contract.md`), but it needs plugin version 0.3.0 or later. To check your install, run `board.sh task list`: an older plugin prints a usage line and exits with an error instead of a list.
 
 ## 1. The flow
 
@@ -222,7 +222,7 @@ It prints `queued t-<number>-<hex>`. Here `board.sh` stands for `bash "${CLAUDE_
 
 Two things to know:
 - Tasks are optional. A role started with nothing queued still shows under Active, so the board works without anyone running `task add`.
-- Today nothing in Doraemon's prompt tells him to run `task add` (his rule is only "queue the task" when the right role is busy, `plugin/agents/doraemon.md:24`). If you want a queue, ask him to use it, or add the tasks yourself.
+- Doraemon queues each planned piece with the `toon-crew:task` skill, which runs `board.sh task ...` for him (`plugin/agents/doraemon.md:17`, `plugin/skills/task/SKILL.md`). You can still add tasks yourself with `board.sh task add`.
 
 Sources: `plugin/skills/board/SKILL.md` (the skill, `disable-model-invocation: true`), `plugin/board/board.sh:20-35`, `plugin/board/README.md` ("Start it", "Tasks"), `plugin/board/page.html:22-31` (section order), `plugin/board/room.js:176-192` (task rows), `room.js:236-257` (Crew), `room.js:195-216` and `room.js:296` (Recent: tones, 8 rows), `room.js:269-282` (Facts), `plugin/board/lib/room.ts:110` (hand-back cut to 70), `room.js:303-308` (4 s and status).
 
