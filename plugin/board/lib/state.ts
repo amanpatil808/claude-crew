@@ -1,7 +1,7 @@
 // Builds the one JSON document /api/state serves, so it can be tested without a server.
 import { readEvents, type BoardEvent } from "./events.ts";
 import { crewFrom, listRoles, loadRoles } from "./crew.ts";
-import { managerActive, managerProject, mainBusy, roomFacts, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
+import { managerActive, managerProject, mainBusy, projectFacts, roomFacts, type RoomFact, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
 import { emptySnapshot, loadSnapshot, type Snapshot } from "./pollers.ts";
 import { readRegistry, type Project } from "./projects.ts";
 import { RETIRED } from "./roster.ts";
@@ -32,6 +32,9 @@ export function buildState(now = Date.now()) {
     const row = projects.find((x) => x.name === p.name);
     if (row) row.polled = !!(snap.polledAt.github || snap.polledAt.box);
   }
+  // Every registered project's own Live version and Branch, so the page can show the project it is looking at.
+  const factsByProject: Record<string, RoomFact[]> = {};
+  for (const p of registry) factsByProject[p.name] = projectFacts(snapshots[p.name]?.deploy, p.path);
   const snap = (focus && snapshots[focus]) || emptySnapshot();
   const focusPath = registry.find((p) => p.name === focus)?.path;
   const members = roomMembers(crew, roles.map((r) => r.id), mainBusy(events, now), roleNotes(events, roleMap), roles, managerProject(events));
@@ -40,6 +43,6 @@ export function buildState(now = Date.now()) {
     feed: roomFeed(events, roleMap), talks: roomTalks(events, roleMap, now),
     managerActive: managerActive(events, now), facts: roomFacts(members, snap.deploy, focusPath),
   };
-  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: events.slice(-300).reverse(), room, snapshots, ...snap };
+  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: events.slice(-300).reverse(), room, factsByProject, snapshots, ...snap };
 }
 
