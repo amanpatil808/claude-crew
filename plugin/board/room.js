@@ -275,17 +275,18 @@ const NAP_MS = 10 * 60000;
 const rNaps = (key, m) => key === "nobita" && m.status === "done" && !!m.since && Date.now() - Date.parse(m.since) >= NAP_MS;
 
 let rProj = "", rPicked = false;     // "" = all projects
-function rDesk(role, m, i, showTeam) {
-  const waiting = rPending.has(role.id);                       // assigned but Doraemon has not arrived yet: seated, waiting
+// A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
+const rK = (id, p) => id + "@" + (p || "");
+function rDesk(role, m, i, showTeam, proj = "") {
+  const waiting = rPending.has(rK(role.id, proj));                      // assigned but Doraemon has not arrived yet: seated, waiting
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
   const key = rKeyOf(role.id), nap = rNaps(key, m);
   const s = m.status === "idle" || nap ? "queued" : m.status;
-  const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.style.setProperty("--i", i * 60 + "ms");
+  const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.dataset.p = proj; desk.dataset.k = rK(role.id, proj); desk.style.setProperty("--i", i * 60 + "ms");
   if (key) desk.dataset.who = key;
   if (nap) desk.dataset.nap = "1";
   const hex = rColor(role); desk.style.setProperty("--c", hex); desk.style.setProperty("--c-edge", rLight(hex) ? "#7a5c00" : "var(--wall-ink)");
-  if (m.dim) desk.dataset.dim = "1";      // working, but not on the picked project
-  if (rAway.has(role.id)) desk.classList.add("away");
+  if (rAway.has(rK(role.id, proj))) desk.classList.add("away");
   desk.tabIndex = 0; desk.setAttribute("role", "button"); { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle({ ...role, ...m })}${rTeam({ ...role, ...m }) ? ", " + rTeam({ ...role, ...m }) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""} Show details`); }
   const pace = rel("span", "pace"), scale = rel("span", "scale"); scale.append(rAvatar(role.id, s, i)); pace.append(scale);
   const stage = rel("div", "stage"); stage.append(pace);
@@ -301,12 +302,12 @@ function rDesk(role, m, i, showTeam) {
   plate.append(rel("div", "plate-role", rTitle({ ...role, ...m })));
   if (showTeam && rTeam({ ...role, ...m })) plate.append(rel("div", "pteam", rTeam({ ...role, ...m })));
   plate.append(rel("div", "plate-task", m.line));
-  if (m.project && m.status === "working") plate.append(rel("div", "ptag", m.project));
+  if (!proj && m.project && m.status === "working") plate.append(rel("div", "ptag", m.project));
   if (m.ref) plate.append(rel("div", "plate-ref", m.ref));
   desk.append(seat, plate);
   if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
-  rWireCard(desk, role.id);
-  rFxPaint(desk, role.id);
+  rWireCard(desk, role.id, proj);
+  rFxPaint(desk, rK(role.id, proj));
   return desk;
 }
 
@@ -376,15 +377,32 @@ function rRenderTasks(s) {
   document.title = `Crew Room · ${rProj || "All projects"} · ${act.length} active`;
 }
 function renderTasks(s) { rRenderProjects(s); rRenderTasks(s); }
-// Desks follow the tasks: a role with an active task is working (text from the task); a role working for another project is dimmed.
-function rOverlay(s) {
-  const T = tasksOf(s);
-  return s.room.members.map((m) => {
-    if (m.id === MGR) return m;                      // the lead is the session itself, never a task
-    const mine = T.active.filter((t) => t.role === m.id), vis = mine.filter(inView), t = vis[0] || mine[0];
-    if (t) return { ...m, status: "working", line: t.text + (vis.length > 1 ? ` (+${vis.length - 1} more)` : ""), task: t.text, since: t.startedAt, project: t.project, dim: !vis.length };
+// Each project has its own crew: a room shows only that project's people. Source: state.rooms[p].members when the server sends it,
+// else room.members filtered by project. Desks follow the tasks of that project (a role with an active task there is working).
+const inProj = (t, p) => !p || t.project === p;
+function rMembersFor(s, p) {
+  const T = tasksOf(s), rm = p && s.rooms && s.rooms[p], mine = T.active.filter((t) => inProj(t, p));
+  return (rm?.members || s.room.members).map((m) => {
+    if (m.id === MGR) {                              // the lead is the session itself, never a task
+      if (rm || !p) return m;
+      if (m.status === "working" && m.project === p) return m;
+      return mine.length ? { ...m, status: "working", line: `Managing ${mine.length} task${mine.length > 1 ? "s" : ""}`, project: p } : { ...m, status: m.status === "working" ? "idle" : m.status, line: m.status === "working" ? "Idle" : m.line, project: undefined };
+    }
+    const own = mine.filter((x) => x.role === m.id), t = own[0];
+    if (t) return { ...m, status: "working", line: t.text + (own.length > 1 ? ` (+${own.length - 1} more)` : ""), task: t.text, since: t.startedAt, project: t.project };
     return m.status === "working" ? { ...m, status: "idle", line: "Idle", since: undefined, project: undefined } : m;
   });
+}
+const rOpen = {};                                    // project -> the viewer's expand / collapse choice in All projects
+// The rooms on screen: the picked project's, or every project's, busiest first. A project with nothing active starts collapsed.
+function rGroupsOf(s) {
+  const names = rProjNames(s), T = tasksOf(s);
+  if (!names.length) return [{ p: "", head: false, open: true, w: 0, q: 0 }];
+  const stat = (p) => ({ p, head: !rProj, w: T.active.filter((t) => t.project === p).length, q: T.queued.filter((t) => t.project === p).length, mb: !!(s.rooms && s.rooms[p]?.managerBusy) });
+  const list = (rProj ? [rProj] : names).map(stat).map((g, i) => ({ ...g, i }));
+  list.sort((a, b) => (b.w + (b.mb ? 1 : 0) - a.w - (a.mb ? 1 : 0)) || b.q - a.q || a.i - b.i);
+  for (const g of list) g.open = !g.head || (g.p in rOpen ? rOpen[g.p] : g.w > 0 || g.mb);
+  return list;
 }
 // Top facts for the picked project: Working and Queued are task counts (the same numbers as the panels); Live and Branch from the server.
 function rFactsFor(s) {
@@ -416,39 +434,60 @@ function rRenderGallery(s) {
   box.replaceChildren(head, row);
 }
 
-let rSig = "", rFeedSeen = null, rState = null;
+let rSig = "", rFeedSeen = null, rState = null, rShown = [];   // rShown: projects whose room is on screen
+const rMemOf = (id, p) => rState?.byProj?.[p || ""]?.find((x) => x.id === id) || rState?.members.find((x) => x.id === id);
 function renderRoom(s) {
   if (!s.room) return;
-  const r = { ...s.room, members: rOverlay(s) }, T = tasksOf(s);
+  const groups = rGroupsOf(s), byProj = Object.fromEntries(groups.map((g) => [g.p, rMembersFor(s, g.p)]));
+  const r = { ...s.room, members: byProj[groups[0].p], byProj, groups, mgrOn: Object.fromEntries(groups.map((g) => [g.p, g.p && s.rooms?.[g.p] ? !!s.rooms[g.p].managerActive : !!s.room.managerActive])) }, T = tasksOf(s);
+  rShown = groups.filter((g) => g.open).map((g) => g.p);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date())) % 24;
   RSVG("r-sky").textContent = hour >= 6 && hour < 18 ? "☀️" : "🌙";
   rRenderGallery(s);
   // Facts for the picked project.
   RSVG("r-facts").replaceChildren(...rFactsFor(s).slice(0, 4).map((f) => { const c = rel("span", "count", `${f.label.toUpperCase()}  ${f.value}`); if (f.tone) c.dataset.s = f.tone === "run" ? "working" : f.tone === "ok" ? "done" : "blocked"; return c; }));
   // Rooms: only rebuilt when something changed, so the pop-in and pacing do not restart every poll.
-  const sig = JSON.stringify([r.roles, rProj, r.members.map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, m.dim, rNaps(rKeyOf(m.id), m)]), T.active.map((t) => [t.id, t.project])]);
+  const sig = JSON.stringify([r.roles, rProj, groups.map((g) => [g.p, g.head, g.open, g.w, g.q]), groups.map((g) => byProj[g.p].map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])), T.active.map((t) => [t.id, t.project])]);
   if (sig !== rSig) {
     rSig = sig;
     const retired = new Set(Object.keys(R_RETIRED_KIND));
-    const roles = Object.fromEntries(r.roles.filter((x) => !retired.has(x.id)).map((x) => [x.id, x])), mem = Object.fromEntries(r.members.map((x) => [x.id, x]));
+    const roles = Object.fromEntries(r.roles.filter((x) => !retired.has(x.id)).map((x) => [x.id, x]));
     const placed = new Set(R_ROOMS.flatMap((r) => r[3]));
-    const teams = R_ROOMS.map(([k, team, lore, ids, decor, furn]) => {
-      const here = ids.filter((id) => roles[id]), names = [...new Set(here.map((id) => rTeam({ ...roles[id], ...mem[id] })).filter(Boolean))];
-      return { k, name: `${names.length ? names.join(" + ") : team} \u00b7 ${lore}`, shared: names.length > 1, decor, furn, ids: here };
-    });
-    const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "Others", decor: ["sconce", "window"], furn: ["plant"], ids: others });
     let i = 0;
-    const rooms = teams.filter((t) => t.ids.length).map((t) => {
-      const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name);
-      const busy = T.active.filter((x) => t.ids.includes(x.role) && inView(x)).length;
-      const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
-      const sign = rel("b", "sign", t.name); if (busy) sign.dataset.busy = busy;
-      wall.append(sign, rDecor(t.decor));
-      for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared));
-      floor.append(grid, rProps(t.furn)); team.append(wall, floor);
-      return team;
+    // One hall of team rooms for one project: desks, statuses and plates come from that project's members only.
+    const hallOf = (g) => {
+      const mem = Object.fromEntries(byProj[g.p].map((x) => [x.id, x]));
+      const teams = R_ROOMS.map(([k, team, lore, ids, decor, furn]) => {
+        const here = ids.filter((id) => roles[id]), names = [...new Set(here.map((id) => rTeam({ ...roles[id], ...mem[id] })).filter(Boolean))];
+        return { k, name: `${names.length ? names.join(" + ") : team} \u00b7 ${lore}`, shared: names.length > 1, decor, furn, ids: here };
+      });
+      const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "Others", decor: ["sconce", "window"], furn: ["plant"], ids: others });
+      const rooms = teams.filter((t) => t.ids.length).map((t) => {
+        const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name);
+        const busy = T.active.filter((x) => t.ids.includes(x.role) && inProj(x, g.p)).length;
+        const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
+        const sign = rel("b", "sign", t.name); if (busy) sign.dataset.busy = busy;
+        wall.append(sign, rDecor(t.decor));
+        for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared, g.p));
+        floor.append(grid, rProps(t.furn)); team.append(wall, floor);
+        return team;
+      });
+      const box = rel("div", "rooms"); box.append(...rooms); return box;
+    };
+    const parts = groups.map((g) => {
+      const sec = rel("section", "pgroup"); sec.dataset.project = g.p; sec.dataset.open = String(g.open);
+      if (g.head) {
+        const h = rel("button", "pg-head"); h.type = "button"; h.setAttribute("aria-expanded", String(g.open));
+        const chev = rel("span", "pg-chev", g.open ? "\u25be" : "\u25b8"); chev.setAttribute("aria-hidden", "true");
+        h.append(chev, rel("b", "pg-name", g.p), rel("span", "pg-n", `${g.w} working \u00b7 ${g.q} queued`));
+        h.setAttribute("aria-label", `${g.p}: ${g.w} working, ${g.q} queued. ${g.open ? "Collapse" : "Expand"}`);
+        h.onclick = () => { rOpen[g.p] = !g.open; rSig = ""; if (last) renderRoom(last); };
+        sec.append(h);
+      }
+      if (g.open) sec.append(hallOf(g));
+      return sec;
     });
-    RSVG("r-rooms").replaceChildren(...(rooms.length ? rooms : [rel("p", "empty", "No roles found.")]));
+    RSVG("r-rooms").replaceChildren(...(roles && Object.keys(roles).length ? parts : [rel("p", "empty", "No roles found.")]));
   }
   // Feed: real outcomes, plus Doraemon's instructions ("Doraemon -> Shinchan: ..."); new rows slide in.
   const roleOf = Object.fromEntries(r.roles.map((x) => [x.id, x])), name = (id) => roleOf[id]?.mascot || id;
@@ -462,11 +501,12 @@ function renderRoom(s) {
 
 // ---- Catchphrases and little reactions: short, our own wording, only with Motion on. They survive a desk rebuild. ----
 const rFx = {};
-function rFxSet(id, { cls, say }, ms) {
+const rP = (f) => (f && f.project) || rProj || rShown[0] || "";    // the project room an event belongs to
+function rFxSet(id, { cls, say }, ms, p = "") {
   if (!rMotion() || !rKeyOf(id)) return;
-  rFx[id] = { cls, say, until: Date.now() + ms };
-  const d = rDeskEl(id); if (d) rFxPaint(d, id);
-  setTimeout(() => { const d2 = rDeskEl(id); if (d2) rFxPaint(d2, id); }, ms + 50);
+  const k = rK(id, p); rFx[k] = { cls, say, until: Date.now() + ms };
+  const d = rDeskEl(id, p); if (d) rFxPaint(d, k);
+  setTimeout(() => { const d2 = rDeskEl(id, p); if (d2) rFxPaint(d2, k); }, ms + 50);
 }
 function rFxPaint(desk, id) {
   const fx = rFx[id]; desk.querySelectorAll(".quip").forEach((q) => q.remove());
@@ -479,13 +519,13 @@ const FX_CRIT = /\bcritical\b/i;
 // Called once for every fresh feed item.
 function rReact(f, age) {
   if (age > 20000) return;
-  const key = rKeyOf(f.role || ""), text = f.text || "";
-  if (f.tone === "start" && key === "kevin") rFxSet(f.role, { say: "Bello!" }, 3500);
-  if (f.tone === "start" && key === "bob") rFxSet(f.role, { say: "Bello!" }, 3500);
-  if (f.tone === "start" && key === "stuart") rFxSet(f.role, { say: "Banana!" }, 3500);
-  if (f.tone === "done" && key === "ninja-hattori" && FX_CRIT.test(text)) rFxSet(f.role, { say: "Nin nin!" }, 3500);
-  if (f.tone === "done" && key === "olaf") rFxSet(f.role, { say: "Warm hugs!" }, 3500);
-  if (f.tone === "deploy") rFxSet(SRE, { say: "Roar!" }, 3000);        // a green deploy: Sulley roars, softly
+  const key = rKeyOf(f.role || ""), text = f.text || "", p = rP(f);
+  if (f.tone === "start" && key === "kevin") rFxSet(f.role, { say: "Bello!" }, 3500, p);
+  if (f.tone === "start" && key === "bob") rFxSet(f.role, { say: "Bello!" }, 3500, p);
+  if (f.tone === "start" && key === "stuart") rFxSet(f.role, { say: "Banana!" }, 3500, p);
+  if (f.tone === "done" && key === "ninja-hattori" && FX_CRIT.test(text)) rFxSet(f.role, { say: "Nin nin!" }, 3500, p);
+  if (f.tone === "done" && key === "olaf") rFxSet(f.role, { say: "Warm hugs!" }, 3500, p);
+  if (f.tone === "deploy") rFxSet(SRE, { say: "Roar!" }, 3000, p);       // a green deploy: Sulley roars, softly
 }
 
 
@@ -513,16 +553,16 @@ function rSetMotion(v) {
 // One size everywhere (60 x 68), feet-anchored, 4 facings, a 4-frame step at 150 ms, steady pace, one rAF loop.
 const rAway = new Set(), rPending = new Set();                 // roles currently out of their seat
 const rWalkQ = []; const rDone = new Set(); const rContact = {}, rChecked = {};
-let rActive = 0, rReports = 0, rLastCheck = 0;
+let rActive = 0, rLastCheck = 0; const rReports = {};            // rReports: hand-overs under way, per project
 const REPLAY_MS = 120000;                // on load or when the tab comes back, the last two minutes are replayed once
 const PRIO = { report: 0, task: 1, visit: 2, checkin: 3, errand: 4 };
 const rSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rBubbleMs = (t) => Math.min(4000, Math.max(2000, 1200 + 40 * (t || "").length));
-const rDeskEl = (id) => document.querySelector(`#r-rooms .desk[data-id="${id}"]`);
+const rDeskEl = (id, p = "") => { const all = [...document.querySelectorAll("#r-rooms .desk")].filter((d) => d.dataset.id === id); return all.find((d) => d.dataset.p === p) || (p ? null : all[0]) || null; };
 
 function rEnqueue(job) {
-  if (job.kind === "visit") { const q = rWalkQ.find((j) => j.kind === "visit" && j.to === job.to); if (q) { q.say = job.say; return; } }   // several messages to one person: one visit, latest text
-  if (job.kind === "report" && rWalkQ.some((j) => j.kind === "report" && j.role === job.role)) return;
+  if (job.kind === "visit") { const q = rWalkQ.find((j) => j.kind === "visit" && j.to === job.to && j.proj === job.proj); if (q) { q.say = job.say; return; } }   // several messages to one person: one visit, latest text
+  if (job.kind === "report" && rWalkQ.some((j) => j.kind === "report" && j.role === job.role && j.proj === job.proj)) return;
   rWalkQ.push(job);
   while (rWalkQ.length > 8) {            // queue cap 8: drop check-ins first, then the oldest visit, never a hand-over
     let i = rWalkQ.findIndex((j) => j.kind === "checkin"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "errand"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "visit");
@@ -546,35 +586,36 @@ function rPlanWalks(feed) {
       const role = f.tone === "start" ? f.role : f.to || f.role, st = f.tone === "start" ? f : near({ role, ts: f.ts }, "start"), as = f.tone === "start" ? near({ role, ts: f.ts }, "assign") : f;
       if (st) rDone.add(st.id); if (as) rDone.add(as.id);
       if (age > FRESH_TASK_MS || role === MGR) continue;
-      const say = (as?.say || as?.text?.replace(/^.*?:\s*/, "") || rState?.members.find((x) => x.id === role)?.task || "New task").slice(0, 70);
+      const say = (as?.say || as?.text?.replace(/^.*?:\s*/, "") || rMemOf(role, rP(f))?.task || "New task").slice(0, 70);
       job = { kind: "task", role: MGR, to: role, say };
     } else {
       if (age > REPLAY_MS) continue;
       if (f.tone === "done" && f.role && f.role !== MGR) {
         const said = f.text.replace(/^.*?handed back:?\s*/, "").slice(0, 70), item = /\bPR\b|#\d+|commit|\b[0-9a-f]{7}\b/i.test(said) ? "paper" : "folder";
-        rPending.delete(f.role);
+        rPending.delete(rK(f.role, rP(f)));
         job = { kind: "report", role: f.role, say: said && said !== f.text ? said : "Done!", item };
       } else if ((f.tone === "talk" || f.tone === "assign") && (f.to || f.role)) job = { kind: "visit", role: f.from || MGR, to: f.to || f.role, say: (f.say || "").slice(0, 70) };
-      else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(MGR)) job = { kind: "errand", role: MGR, to: SRE, say: f.text.slice(0, 40) };
+      else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(rK(MGR, rP(f)))) job = { kind: "errand", role: MGR, to: SRE, say: f.text.slice(0, 40) };
     }
     if (!job) continue;
+    job.proj = rP(f);                                         // the walk happens inside that project's room
     if (!rMotion()) { rStatic(job); continue; }
     if (job.kind === "task") {
-      rPending.add(job.to); rRefreshDesk(job.to);
+      rPending.add(rK(job.to, job.proj)); rRefreshDesk(job.to, job.proj);
       // Doraemon is busy: after about 6 s the member starts anyway, with the paper on the desk
-      job.timer = setTimeout(() => { const i = rWalkQ.indexOf(job); if (i >= 0) { rWalkQ.splice(i, 1); rWake(job.to, true); } }, 6000);
+      job.timer = setTimeout(() => { const i = rWalkQ.indexOf(job); if (i >= 0) { rWalkQ.splice(i, 1); rWake(job.to, job.proj, true); } }, 6000);
     }
     rEnqueue(job);
   }
   rPump();
 }
-function rRefreshDesk(id) {
-  const old = rDeskEl(id), role = rState?.roles.find((x) => x.id === id), m = rState?.members.find((x) => x.id === id); if (!old || !role || !m) return null;
-  const nd = rDesk(role, m, (parseInt(old.style.getPropertyValue("--i")) || 0) / 60); nd.style.animation = "none"; if (old.classList.contains("away")) nd.classList.add("away");
+function rRefreshDesk(id, p = "") {
+  const old = rDeskEl(id, p), role = rState?.roles.find((x) => x.id === id), m = rMemOf(id, p); if (!old || !role || !m) return null;
+  const nd = rDesk(role, m, (parseInt(old.style.getPropertyValue("--i")) || 0) / 60, undefined, p);nd.style.animation = "none"; if (old.classList.contains("away")) nd.classList.add("away");
   old.replaceWith(nd); return nd;
 }
-function rWake(id, paper) {                    // the member starts: bell, laptop, typing
-  rPending.delete(id); const d = rRefreshDesk(id); if (!d) return;
+function rWake(id, p, paper) {                    // the member starts: bell, laptop, typing
+  rPending.delete(rK(id, p)); const d = rRefreshDesk(id, p); if (!d) return;
   d.classList.add("wake"); setTimeout(() => d.classList.remove("wake"), 1400);
   if (paper) d.querySelector(".table")?.append(rel("i", "pile paper"));
 }
@@ -583,28 +624,32 @@ function rWake(id, paper) {                    // the member starts: bell, lapto
 function rPlanCheckins(r) {
   if (RSVG("view-room").hidden) return;
   const now = Date.now();
-  if (!r.managerActive || now - rLastCheck < 180000) return;
-  for (const m of r.members) {
-    if (m.id === MGR || m.status !== "working" || !m.since || rAway.has(m.id) || rPending.has(m.id) || rWalkQ.some((j) => j.to === m.id)) continue;
-    const base = Math.max(Date.parse(m.lastContactAt || 0) || 0, Date.parse(m.since) || 0, rContact[m.id] || 0);
-    if (now - base < 480000 || now - (rChecked[m.id] || 0) < 600000) continue;
-    rLastCheck = rChecked[m.id] = now;
-    const job = { kind: "checkin", role: MGR, to: m.id, say: "" };
-    if (rMotion()) rEnqueue(job); else rStatic(job);
-    break;
+  if (now - rLastCheck < 180000) return;
+  scan: for (const p of rShown) {
+    if (!r.mgrOn[p]) continue;
+    for (const m of r.byProj[p] || []) {
+      const k = rK(m.id, p);
+      if (m.id === MGR || m.status !== "working" || !m.since || rAway.has(k) || rPending.has(k) || rWalkQ.some((j) => j.to === m.id && j.proj === p)) continue;
+      const base = Math.max(Date.parse(m.lastContactAt || 0) || 0, Date.parse(m.since) || 0, rContact[k] || 0);
+      if (now - base < 480000 || now - (rChecked[k] || 0) < 600000) continue;
+      rLastCheck = rChecked[k] = now;
+      const job = { kind: "checkin", role: MGR, to: m.id, say: "", proj: p };
+      if (rMotion()) rEnqueue(job); else rStatic(job);
+      break scan;
+    }
   }
   rPump();
 }
 
 function rPump() {
-  while (rActive < 2) {                                      // at most 2 walkers on screen
-    const ok = (j) => !rAway.has(j.role) && (j.role !== MGR || (rReports === 0 && !rAway.has(j.to)));   // Doraemon: one thing at a time; a member on the way to him goes first
+  while (rActive < (rShown.length > 1 ? 3 : 2)) {            // at most 2 walkers on screen (3 when several project rooms are open)
+    const ok = (j) => !rAway.has(rK(j.role, j.proj)) && (j.role !== MGR || ((rReports[j.proj] || 0) === 0 && !rAway.has(rK(j.to, j.proj))));   // Doraemon: one thing at a time per project; a member on the way to him goes first
     const c = rWalkQ.map((j, i) => [j, i]).filter(([j]) => ok(j)).sort((x, y) => PRIO[x[0].kind] - PRIO[y[0].kind] || x[1] - y[1])[0];
     if (!c) return;
-    const job = rWalkQ.splice(c[1], 1)[0]; rActive++; rAway.add(job.role); if (job.kind === "report") rReports++;
+    const job = rWalkQ.splice(c[1], 1)[0], jk = rK(job.role, job.proj); rActive++; rAway.add(jk); if (job.kind === "report") rReports[job.proj] = (rReports[job.proj] || 0) + 1;
     (job.kind === "report" ? rReport(job) : job.kind === "task" ? rTask(job) : rVisit(job)).catch(() => {}).finally(() => {
-      rAway.delete(job.role); document.querySelectorAll(`#r-rooms .desk[data-id="${job.role}"]`).forEach((d) => { d.classList.remove("away"); if (job.role === MGR) d.querySelectorAll(".pile").forEach((p) => p.remove()); });
-      if (job.kind === "report") rReports--; rActive--; rPump();
+      rAway.delete(jk); document.querySelectorAll("#r-rooms .desk").forEach((d) => { if (d.dataset.k !== jk) return; d.classList.remove("away"); if (job.role === MGR) d.querySelectorAll(".pile").forEach((p) => p.remove()); });
+      if (job.kind === "report") rReports[job.proj]--; rActive--; rPump();
     });
   }
 }
@@ -695,7 +740,7 @@ const rUnsay = async (w) => { const b = w.querySelector(".bubble"); if (!b) retu
 
 // ---- Scenes ----
 async function rVisit(job) {                  // Doraemon (or anyone) walks to a person, says his piece, walks home
-  const g = rGeo(), home = rDeskEl(job.role), target = rDeskEl(job.to); if (!home || !target || home === target) return;
+  const g = rGeo(), home = rDeskEl(job.role, job.proj), target = rDeskEl(job.to, job.proj); if (!home || !target || home === target) return;
   home.classList.add("away");
   const a = rAccess(home, g), b = rAccess(target, g), spine = g.corr / 2, w = rWalker(job.role, null, a.seat);
   try {
@@ -704,32 +749,32 @@ async function rVisit(job) {                  // Doraemon (or anyone) walks to a
     await rSleep(job.kind === "checkin" ? 1500 : rBubbleMs(job.say)); await rUnsay(w);
     await rTrip(w, b, a, spine, "stand", "seat");
   } finally { w.remove(); }
-  rContact[job.to] = Date.now();
+  rContact[rK(job.to, job.proj)] = Date.now();
 }
 async function rTask(job) {                   // Doraemon brings the task paper; the member starts only after the hand-over
   clearTimeout(job.timer);
-  const g = rGeo(), home = rDeskEl(MGR), target = rDeskEl(job.to);
-  if (!home || !target || home === target) { rWake(job.to); return; }
+  const g = rGeo(), home = rDeskEl(MGR, job.proj), target = rDeskEl(job.to, job.proj);
+  if (!home || !target || home === target) { rWake(job.to, job.proj); return; }
   home.classList.add("away");
   const a = rAccess(home, g), b = rAccess(target, g), spine = g.corr / 2, w = rWalker(MGR, "paper", a.seat);
   try {
     await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
     const c = w.querySelector(".carry"); if (c) { c.style.setProperty("--hx", -b.side * 44 + "px"); c.classList.add("give"); }
-    await rSleep(600); c?.remove(); (rDeskEl(job.to)?.querySelector(".table"))?.append(rel("i", "pile paper"));   // the paper lands on their desk
+    await rSleep(600); c?.remove(); (rDeskEl(job.to, job.proj)?.querySelector(".table"))?.append(rel("i", "pile paper"));   // the paper lands on their desk
     rSay(w, job.say); await rSleep(Math.min(3000, Math.max(2000, rBubbleMs(job.say))));
-    rWake(job.to, true); await rUnsay(w);
+    rWake(job.to, job.proj, true); await rUnsay(w);
     await rTrip(w, b, a, spine, "stand", "seat");
   } finally { w.remove(); }
-  rContact[job.to] = Date.now();
+  rContact[rK(job.to, job.proj)] = Date.now();
 }
 async function rReport(job) {                 // a finished member hands the result to Doraemon
-  const g = rGeo(), home = rDeskEl(job.role), mgr = rDeskEl(MGR); if (!home || !mgr || home === mgr) return;
+  const g = rGeo(), home = rDeskEl(job.role, job.proj), mgr = rDeskEl(MGR, job.proj), mk = rK(MGR, job.proj); if (!home || !mgr || home === mgr) return;
   home.classList.add("away");
   const a = rAccess(home, g), b = rAccess(mgr, g), spine = g.corr / 2, w = rWalker(job.role, job.item, a.seat);
   try {
     await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
-    for (let t = 0; rAway.has(MGR) && t < 6000; t += 200) await rSleep(200);   // he is out on a visit: wait up to 6 s
-    if (!rAway.has(MGR)) {
+    for (let t = 0; rAway.has(mk) && t < 6000; t += 200) await rSleep(200);   // he is out on a visit: wait up to 6 s
+    if (!rAway.has(mk)) {
       rSay(w, job.say);
       const c = w.querySelector(".carry"); if (c) { c.style.setProperty("--hx", (b.side > 0 ? -16 : 16) + "px"); c.classList.add("give"); }
       await rSleep(600); c?.remove();
@@ -744,16 +789,16 @@ async function rReport(job) {                 // a finished member hands the res
 function rStatic(job) {
   const tick = (el, cls, ms = 4000) => { el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); };
   if (job.kind === "report") {
-    const d = rDeskEl(job.role), m = rDeskEl(MGR); if (!d) return;
+    const d = rDeskEl(job.role, job.proj), m = rDeskEl(MGR, job.proj); if (!d) return;
     tick(d, "ring"); if (m) tick(m, "ring");
     const n = rel("div", "plate-note", "→ Doraemon"); d.querySelector(".plate")?.append(n); setTimeout(() => n.remove(), 4000);
     rStaticBubble(d, job.say);
   } else if (job.kind === "task") {
-    const d = rDeskEl(job.to); if (!d) return;
+    const d = rDeskEl(job.to, job.proj); if (!d) return;
     const pin = rMini(MGR, "working", 0); pin.classList.add("pin"); const ico = rel("i", "papericon"); ico.setAttribute("aria-hidden", "true");
     d.querySelector(".plate")?.append(pin, ico); setTimeout(() => { pin.remove(); ico.remove(); }, 4000); rStaticBubble(d, job.say);
   } else {
-    const d = rDeskEl(job.to); if (!d) return;
+    const d = rDeskEl(job.to, job.proj); if (!d) return;
     const pin = rMini(MGR, "working", 0); pin.classList.add("pin"); d.querySelector(".plate")?.append(pin); setTimeout(() => pin.remove(), 4000);
     rStaticBubble(d, job.kind === "checkin" ? "📋 Checking in" : job.say);
   }
@@ -766,10 +811,10 @@ const rMins = (iso) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 6
 const rSpan = (m) => m < 1 ? "under a minute" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 function rCardEl() { let c = $("r-card"); if (!c) { c = rel("div", "rcard"); c.id = "r-card"; c.hidden = true; c.setAttribute("role", "status"); RSVG("view-room").append(c); } return c; }
 function rHideCard() { rCardId = rPinned = null; rCardEl().hidden = true; }
-function rRefreshCard() { if (rCardId && rDeskEl(rCardId)) rShowCard(rCardId); else if (rCardId) rHideCard(); }
-function rShowCard(id) {
-  const role = rState?.roles.find((x) => x.id === id), m = rState?.members.find((x) => x.id === id), desk = rDeskEl(id); if (!role || !m || !desk) return;
-  rCardId = id;
+function rRefreshCard() { if (!rCardId) return; const at = rCardId.indexOf("@"), id = rCardId.slice(0, at), p = rCardId.slice(at + 1); if (rDeskEl(id, p)) rShowCard(id, p); else rHideCard(); }
+function rShowCard(id, p = "") {
+  const role = rState?.roles.find((x) => x.id === id), m = rMemOf(id, p), desk = rDeskEl(id, p); if (!role || !m || !desk) return;
+  rCardId = rK(id, p);
   const c = rCardEl(), s = m.status === "idle" ? "queued" : m.status;
   const hand = m.lastHandback && typeof m.lastHandback === "object" ? m.lastHandback.text : m.lastHandback;   // may be ""
   const state = s === "working" ? (m.since ? `Working for ${rSpan(rMins(m.since))}` : "Working now") : s === "done" ? (m.since ? `Done ${rSpan(rMins(m.since))} ago` : "Done") : "Idle";
@@ -779,18 +824,20 @@ function rShowCard(id) {
   const x = { ...role, ...m }, rows = [head, rel("div", "rc-state", state), rel("p", "rc-task", m.task || m.line), rel("p", "rc-model", rModelLine(x))];
   if (hand && hand !== m.line) rows.push(rel("p", "rc-hand", "Last hand-back: " + hand));
   else if (s === "done" && m.line) rows.push(rel("p", "rc-hand", "Handed back: " + m.line));
+  if (p) rows.push(rel("p", "rc-ref", "Project: " + p));
   if (m.ref) rows.push(rel("p", "rc-ref", m.ref));
   c.replaceChildren(...rows); c.hidden = false;
   const b = desk.getBoundingClientRect(), w = c.offsetWidth, h = c.offsetHeight;
   c.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left + b.width / 2 - w / 2)) + "px";
   c.style.top = (b.top - h - 8 >= 52 ? b.top - h - 8 : Math.min(innerHeight - h - 8, b.bottom + 8)) + "px";
 }
-function rWireCard(desk, id) {
-  desk.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") rShowCard(id); });
-  desk.addEventListener("pointerleave", () => { if (rPinned !== id) rHideCard(); });
-  desk.addEventListener("focus", () => rShowCard(id));
-  desk.addEventListener("blur", () => { if (rPinned !== id) rHideCard(); });
-  desk.addEventListener("click", (e) => { e.stopPropagation(); if (rPinned === id) rHideCard(); else { rPinned = id; rShowCard(id); } });
+function rWireCard(desk, id, p = "") {
+  const k = rK(id, p);
+  desk.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") rShowCard(id, p); });
+  desk.addEventListener("pointerleave", () => { if (rPinned !== k) rHideCard(); });
+  desk.addEventListener("focus", () => rShowCard(id, p));
+  desk.addEventListener("blur", () => { if (rPinned !== k) rHideCard(); });
+  desk.addEventListener("click", (e) => { e.stopPropagation(); if (rPinned === k) rHideCard(); else { rPinned = k; rShowCard(id, p); } });
   desk.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); desk.click(); } });
 }
 addEventListener("keydown", (e) => { if (e.key === "Escape") rHideCard(); });
