@@ -2,6 +2,10 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.1 - unreleased
+
+- Board tasks: a task is bound to the agent that started it and that agent's stop finishes it, so one missed stop no longer leaves the newest task Active forever; a task with no activity (its own or its agent's) for 6 hours shows as done (stale).
+
 ## 0.3.0 - unreleased
 
 Board v2.
