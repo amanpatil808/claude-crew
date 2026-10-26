@@ -1,7 +1,7 @@
 // Builds the one JSON document /api/state serves, so it can be tested without a server.
 import { readEvents, type BoardEvent } from "./events.ts";
 import { crewFrom, listRoles, loadRoles } from "./crew.ts";
-import { managerActive, managerProject, mainBusy, projectFacts, roomFacts, type RoomFact, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
+import { buildRooms, managerActive, managerProject, mainBusy, projectFacts, roomFacts, type RoomFact, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
 import { emptySnapshot, loadSnapshot, type Snapshot } from "./pollers.ts";
 import { readRegistry, type Project } from "./projects.ts";
 import { RETIRED } from "./roster.ts";
@@ -43,6 +43,7 @@ export function buildState(now = Date.now()) {
     feed: roomFeed(events, roleMap), talks: roomTalks(events, roleMap, now),
     managerActive: managerActive(events, now), facts: roomFacts(members, snap.deploy, focusPath),
   };
-  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: events.slice(-300).reverse(), room, factsByProject, snapshots, ...snap };
+  const rooms = buildRooms(events, registry, roleMap, roles, now);
+  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: events.slice(-300).reverse(), room, rooms, factsByProject, snapshots, ...snap };
 }
 
