@@ -2,6 +2,12 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.1 - unreleased
+
+- Board: the animated Crew Room is back with Active/Queued and the picker. The page has two tabs, Live and Crew Room. The Crew Room has the pixel office with walking characters, speech bubbles, hover cards, the wall of framed former crew and a Motion button; the Live tab is the plain text view. Both tabs share the project picker and the Active and Queued panels.
+<!-- TODO(verify): add Bob's bullet here (the brief says to keep it, but this checkout has no 0.3.1 entry yet) -->
+- Docs: `docs/how-it-works.md` opens with one numbered flow diagram of the whole crew, from your request to the release, with the board's feed alongside.
+
 ## 0.3.0 - unreleased
 
 Board v2.

@@ -67,7 +67,7 @@ Only Doraemon commits, and only Doraemon (the main session) starts crew agents; 
 
 ## How it works
 
-You ask Doraemon. He plans the work in waves with P0/P1/P2 priorities, briefs the crew, checks every hand-back, commits and opens a pull request. Only after you approve it does Mike Wazowski (or Sulley, for a production rollout) merge. [docs/how-it-works.md](docs/how-it-works.md) has the diagrams: the flow, the roles, where memory and the board live, how several projects stay separate, and the board's project picker and task lists.
+You ask Doraemon. He plans the work in waves with P0/P1/P2 priorities, briefs the crew, checks every hand-back, commits and opens a pull request. Only after you approve it does Mike Wazowski (or Sulley, for a production rollout) merge. [docs/how-it-works.md](docs/how-it-works.md) has the diagrams: the flow, the roles, where memory and the board live, how several projects stay separate, and the board's tabs, project picker and task lists.
 
 ## Guards
 
@@ -98,6 +98,8 @@ It either asks you to confirm (Claude Code's own approval prompt, `permissionDec
 It looks through quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`/`;`/`|` chains, subshells, env/sudo/xargs/`env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings and pipes into a shell, `find -exec`, and inline `python/node/perl -c/-e` code. It blocks shell functions and aliases that mention these programs, and programs named by a variable. Limits: it cannot see inside a script file (`python build.py`), or what a tool does by itself. Other limits: a script written and run in the same command is blocked, and `projects.mjs set` from the shell asks. Miguel Rivera's push also requires `origin` to be the crew repo.
 
 ## Crew Room board
+
+The board is one local page with two tabs. **Crew Room** is the animated office: a desk per crew member, characters who walk and speak when work is handed out or handed back, a hover card per desk, a wall of framed former crew and a Motion button. **Live** is the plain text view with the log, deploys, CI and app errors. Both tabs share the project picker and the Active and Queued panels. [docs/how-it-works.md](docs/how-it-works.md) (section 6) explains each part.
 
 Hooks send SubagentStart, SubagentStop, PostToolUse (Bash, Agent, SendMessage), Stop, SessionStart and SessionEnd to `board/hook.ts`. They are async, so they never slow a session (Claude Code doesn't enforce a timeout on async hooks, so they don't set one).
 
