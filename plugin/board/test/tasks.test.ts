@@ -13,7 +13,8 @@ let clock = Date.parse("2026-10-26T10:00:00Z");
 const tick = () => new Date((clock += 1000));
 const log = (e: Omit<BoardEvent, "id" | "ts">) => appendEvent(e, tick());
 const assign = (to: string, project: string, text = "do the thing") => log({ kind: "assign", from: "doraemon", to: `toon-crew:${to}`, text, project });
-const stop = (type: string, project: string) => log({ kind: "agent-stop", agentId: `a-${type}`, agentType: `toon-crew:${type}`, text: `${type} finished`, project });
+// A stop is followed by a quiet 10 s, so the next assign is a new job, not a foreground call reporting late.
+const stop = (type: string, project: string) => { const e = log({ kind: "agent-stop", agentId: `a-${type}`, agentType: `toon-crew:${type}`, text: `${type} finished`, project }); clock += 10_000; return e; };
 // The CLI stamps events with the real clock; keep its tasks apart from the fixed one by using these envs.
 const cli = (project: string, ...argv: string[]) => run(argv, { CLAUDE_PROJECT_DIR: `/work/${project}` });
 const idOf = (out: string) => out.trim().split(" ")[1];
@@ -146,6 +147,61 @@ test("an unknown role, priority or empty text is refused with a clear error and 
   assert.match(cli("shop", "add", "--role").out, /needs a value/);
   assert.equal(cli("shop", "frobnicate").code, 2);
   assert.equal(buildState().events.length, before);
+});
+
+const at = (ms: number) => new Date(Date.parse("2026-10-26T12:00:00Z") + ms);
+const ev = (ms: number, e: Omit<BoardEvent, "id" | "ts">) => appendEvent(e, at(ms));
+const bobStop = (ms: number, project = "shop") => ev(ms, { kind: "agent-stop", agentId: "a-bob", agentType: "toon-crew:bob", text: "bob finished", project });
+const bobAssign = (ms: number, extra: Partial<BoardEvent> = {}, project = "shop") => ev(ms, { kind: "assign", from: "doraemon", to: "toon-crew:bob", text: "job", project, ...extra });
+
+test("an assign right after the same role's stop (no start between) is ignored; a start or 5 s makes it real", () => {
+  bobAssign(0); bobStop(2000);
+  bobAssign(3000);                       // a foreground Agent call reporting late
+  assert.equal(state().active.length, 0);
+  assert.equal(state().done.length, 1);
+  ev(3500, { kind: "agent-start", agentId: "a-bob", agentType: "toon-crew:bob", text: "bob started", project: "shop" });
+  bobAssign(4000);                       // a start came in between: a new job
+  assert.equal(state().active.length, 1);
+  bobStop(5000); bobAssign(5000 + 5001);   // more than 5 s later
+  assert.equal(state().active.length, 1);
+  bobStop(20_000); bobAssign(21_000, {}, "blog");   // another project's assign is not affected
+  assert.deepEqual(state().active.map((x) => x.project), ["blog"]);
+});
+
+test("an assign with toId re-opens the role's latest done task within 30 minutes, else does nothing", () => {
+  bobAssign(0); bobStop(60_000);
+  const first = state().done[0].id;
+  bobAssign(10 * 60_000, { toId: "a-bob", text: "keep going" });
+  let t = state();
+  assert.deepEqual(t.active.map((x) => [x.id, x.text, x.state]), [[first, "job", "active"]]);
+  assert.equal(t.done.length, 0);
+  assert.equal(t.active[0].doneAt, undefined);
+  bobStop(11 * 60_000);
+  bobAssign(11 * 60_000 + 31 * 60_000, { toId: "a-bob" });   // 31 min after it finished
+  t = state();
+  assert.equal(t.active.length, 0);
+  assert.deepEqual(t.done.map((x) => x.id), [first]);
+  bobAssign(100 * 60_000, { toId: "a-bob" }, "blog");        // nothing finished in that project
+  assert.equal(state().active.length, 0);
+});
+
+test("a resume never takes a queued task or makes a new one", () => {
+  const q = idOf(cli("shop", "add", "--role", "bob", "waiting").out);
+  bobAssign(0, { toId: "a-bob" });
+  const t = state();
+  assert.equal(t.active.length, 0);
+  assert.deepEqual(t.queued.map((x) => x.id), [q]);
+});
+
+test("modelOverride is set only when the assign's model differs from the agent file's", () => {
+  bobAssign(0, { model: "opus", declaredModel: "sonnet", effectiveModel: "opus" });
+  assert.equal(state().active[0].modelOverride, "opus");
+  bobStop(1000);
+  bobAssign(20_000, { model: "sonnet", declaredModel: "sonnet" });
+  bobAssign(21_000, { text: "no model" });
+  const t = state().active;
+  assert.equal(t.length, 2);
+  assert.ok(t.every((x) => x.modelOverride === undefined));
 });
 
 test("the event log stays owner-only", () => {
