@@ -45,6 +45,19 @@ Every event carries `project` (the registry name for `CLAUDE_PROJECT_DIR`, else 
 
 `projects[]` (`{ path, name, firstSeen?, lastSeen?, working, polled }`; `working` is the project's number of active tasks), `focus` (project of the newest event), `snapshots` (per project name: `ci`, `prs`, `commits`, `deploy`, `errors`, `polledAt`, `problems`), top-level `ci/prs/commits/deploy/errors/polledAt/problems` (the focus project's), `room.members[].project`, `room.roles[].color`, `room.retired[]` (`{ id, name, show, mergedInto }`).
 
+`rooms` is `{ [projectName]: { members, managerBusy, managerActive } }`: each project has its own crew, built from that project's events only (same fields as `room.members`; `project` is always set). A role is `working` when the project has an active task for it or one of its agents runs there, else `done`/`idle`. Doraemon's `managerBusy`/`managerActive` come from that project's own heartbeat and turn-end events. Included: every registered project and every project with an event in the last 7 days. `room` (one merged room) stays for compatibility.
+
+Example (made-up):
+
+```json
+"rooms": { "shop": { "managerBusy": true, "managerActive": true, "members": [
+  { "id": "doraemon", "status": "working", "line": "Working now", "project": "shop" },
+  { "id": "bob", "status": "working", "line": "add cart route", "project": "shop" },
+  { "id": "kevin", "status": "idle", "line": "Idle", "project": "shop" } ] },
+  "blog": { "managerBusy": false, "managerActive": false, "members": [
+  { "id": "bob", "status": "done", "line": "Fixed feed", "project": "blog" } ] } }
+```
+
 ## Tasks
 
 Tasks are derived from the event log (kinds `task-queue`, `task-start`, `task-done`, `task-drop`, plus `assign` and `agent-stop`); nothing else is stored. The manager queues work with:

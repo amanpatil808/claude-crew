@@ -2,6 +2,10 @@
 
 All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.2 - unreleased
+
+- Board: every project has its own crew room. Picking a project shows only its crew; "All projects" stacks one room per project, busiest first, so two Doraemons (or two Bobs) can work at once. Nothing is dimmed any more. `/api/state.rooms` gives each project its members and manager state.
+
 ## 0.3.1 - unreleased
 
 - Board: the animated Crew Room is back with Active/Queued and the picker. The page has two tabs, Live and Crew Room. The Crew Room has the pixel office with walking characters, speech bubbles, hover cards, the wall of framed former crew and a Motion button; the Live tab is the plain text view. Both tabs share the project picker and the Active and Queued panels.

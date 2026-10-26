@@ -713,7 +713,17 @@ html[data-tab="room"] {
 #view-room .plug { font: 400 var(--px-s)/1 var(--pixel); color: var(--muted); letter-spacing: .02em; }
 #view-room .ptag { align-self: center; max-width: 100%; margin-top: 2px; padding: 0 6px; border: 1px solid var(--plate-ink); border-radius: var(--r-chip); font: 700 var(--t-xs)/1.45 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #view-room .ptag::before { content: "\25B8\00a0"; }
-#view-room .desk[data-dim] .seat { opacity: .5; filter: saturate(.5); }
+/* Every project has its own crew room; All projects stacks them, each under a plaque with the project's counts. */
+#view-room .rgroups { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
+#view-room .pgroup { min-width: 0; }
+#view-room .pg-head { display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 44px; margin: 0 0 var(--corr, 44px); padding: 6px 12px; text-align: left; cursor: pointer; font: 700 var(--t-s)/1.3 var(--font); color: var(--plate-ink); background: var(--plate); border: var(--bw) solid var(--wall-ink); border-radius: var(--r-chip); box-shadow: var(--sh); }
+#view-room .pgroup[data-open="false"] .pg-head { margin-bottom: 0; }
+#view-room .pg-head:hover { background: var(--plate-hi); }
+#view-room .pg-head:focus-visible { outline: 2px dashed var(--wall-ink); outline-offset: 2px; }
+#view-room .pg-chev { flex: none; width: 16px; text-align: center; }
+#view-room .pg-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-m, 16px); }
+#view-room .pg-n { margin-left: auto; flex: none; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--plate-soft); }
+#view-room .pgroup[data-open="false"] .pg-n { font-weight: 600; }
 
 /* colour swatch on the plate and the chair, from the board colour */
 #view-room .swatch { flex: none; width: 12px; height: 12px; border: var(--bw) solid var(--c-edge, var(--wall-ink)); border-radius: 2px; background: var(--c, var(--idle)); }
@@ -973,10 +983,10 @@ html[data-tab="room"] { --k-ink: var(--ink); --k-muted: var(--muted); --k-edge: 
 .pstrip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
 .pstrip[hidden] { display: none; }
 .plabel { font: 400 13px/1.4 var(--k-pixel); letter-spacing: .04em; color: var(--k-muted); margin-right: 4px; }
-.pchip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 0 12px; font: 700 14px/1.2 var(--font, ui-sans-serif, system-ui, sans-serif); color: var(--k-muted); background: transparent; border: var(--k-bw) dashed var(--k-muted); border-radius: 6px; cursor: pointer; }
+.pchip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 0 12px; font: 700 14px/1.2 var(--font, ui-sans-serif, system-ui, sans-serif); color: var(--k-ink); background: var(--k-panel); border: var(--k-bw) solid var(--k-line); border-radius: 6px; cursor: pointer; }
 .pchip .pn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pchip .pc { flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.pchip:hover { color: var(--k-ink); border-style: solid; }
+.pchip:hover { border-color: var(--k-edge); }
 .pchip[aria-pressed="true"] { color: var(--k-ink); background: var(--k-panel); border: var(--k-bw) solid var(--k-edge); box-shadow: 3px 3px 0 var(--k-shade); cursor: default; }
 .pchip[aria-pressed="true"] .pn { font-weight: 800; }
 .pchip:focus-visible, .tk-list:focus-visible { outline: var(--k-bw) dashed var(--k-accent); outline-offset: 2px; }
