@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BoardEvent } from "./events.ts";
 import { isOverride } from "./model.ts";
-import { roleFor, typesById, type AgentInfo, type CrewMember, type Role } from "./crew.ts";
+import { crewFrom, roleFor, typesById, type AgentInfo, type CrewMember, type Role, type RoleCard } from "./crew.ts";
+import { deriveTasks } from "./tasks.ts";
 
 export interface RoomMember extends AgentInfo { id: string; project?: string; status: "working" | "done" | "idle"; line: string; ref?: string; since?: string; task?: string; lastHandback?: string; lastContactAt?: string; modelOverride?: string; ranOn?: string; fileModel?: string }
 // What the hover card shows beyond the status line: the latest assignment and the latest hand-back summary per role.
@@ -113,6 +114,27 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFe
     else if (e.kind === "ci" && e.ok === false) push(e, { tone: "bad", text: clip(e.text, 70) });
   }
   return out.slice(-25).reverse();
+}
+
+// One project's own crew: the same members/notes logic, fed with that project's events only.
+export interface ProjectRoom { members: RoomMember[]; managerBusy: boolean; managerActive: boolean }
+export const ROOM_WINDOW_MS = 7 * 24 * 3_600_000;
+
+export function roomFor(project: string, events: BoardEvent[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now()): ProjectRoom {
+  const mine = events.filter((e) => e.project === project), busy = mainBusy(mine, now);
+  const active = deriveTasks(mine, roles, now).active;   // tasks are the source of truth for "working"
+  const members = roomMembers(crewFrom(mine, roles), cards.map((r) => r.id), busy, roleNotes(mine, roles), cards, project).map((m) => {
+    const t = active.find((x) => x.role === m.id);
+    return { ...m, project, ...(t && m.status !== "working" ? { status: "working" as const, line: t.text, since: t.startedAt, ref: t.ref ?? m.ref } : {}) };
+  });
+  return { members, managerBusy: busy, managerActive: managerActive(mine, now) };
+}
+
+// A room for every registered project and every project with an event in the last 7 days.
+export function buildRooms(events: BoardEvent[], registry: { name: string }[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now()): Record<string, ProjectRoom> {
+  const names = new Set(registry.map((p) => p.name));
+  for (const e of events) if (e.project && now - Date.parse(e.ts) <= ROOM_WINDOW_MS) names.add(e.project);
+  return Object.fromEntries([...names].map((n) => [n, roomFor(n, events, roles, cards, now)]));
 }
 
 function currentBranch(projectDir?: string): string {
