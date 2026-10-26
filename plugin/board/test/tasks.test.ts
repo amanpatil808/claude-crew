@@ -3,7 +3,7 @@ import "./env.ts";
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { rmSync, statSync } from "node:fs";
-import { appendEvent, type BoardEvent } from "../lib/events.ts";
+import { appendEvent, readEvents, type BoardEvent } from "../lib/events.ts";
 import { EVENTS_FILE } from "../lib/paths.ts";
 import { buildState } from "../lib/state.ts";
 import { deriveTasks } from "../lib/tasks.ts";
@@ -18,7 +18,9 @@ const stop = (type: string, project: string) => { const e = log({ kind: "agent-s
 // The CLI stamps events with the real clock; keep its tasks apart from the fixed one by using these envs.
 const cli = (project: string, ...argv: string[]) => run(argv, { CLAUDE_PROJECT_DIR: `/work/${project}` });
 const idOf = (out: string) => out.trim().split(" ")[1];
-const state = () => deriveTasks(buildState().events.slice().reverse());
+// buildState uses the wall clock for staleness; these fixtures sit at fixed past times, so state is read "as of" the newest event.
+const bs = (now = Math.max(0, ...readEvents().map((e) => Date.parse(e.ts)))) => buildState(now);
+const state = () => deriveTasks(bs().events.slice().reverse());
 
 beforeEach(() => rmSync(EVENTS_FILE, { force: true }));
 
@@ -27,25 +29,25 @@ test("queue, assign promotes it, the agent's stop finishes it", () => {
   assert.equal(q.code, 0);
   const id = idOf(q.out);
   assert.match(id, /^t-\d+-[0-9a-f]{6}$/);
-  let t = buildState().tasks;
+  let t = bs().tasks;
   assert.deepEqual(t.queued.map((x) => [x.id, x.state, x.role, x.priority, x.project, x.text, x.ref]), [[id, "queued", "bob", "P1", "shop", "Build the thing", "feat/x"]]);
   assert.equal(t.active.length, 0);
 
   assign("bob", "shop", "Build the thing now");
-  t = buildState().tasks;
+  t = bs().tasks;
   assert.equal(t.queued.length, 0);
   assert.equal(t.active.length, 1);
   assert.equal(t.active[0].id, id);          // the queued task itself, with its own text
   assert.equal(t.active[0].text, "Build the thing");
   assert.ok(t.active[0].startedAt);
-  assert.equal(buildState().projects.find((p) => p.name === "shop")?.working, 1);
+  assert.equal(bs().projects.find((p) => p.name === "shop")?.working, 1);
 
   stop("bob", "shop");
-  t = buildState().tasks;
+  t = bs().tasks;
   assert.equal(t.active.length, 0);
   assert.deepEqual(t.done.map((x) => [x.id, x.state]), [[id, "done"]]);
   assert.ok(t.done[0].doneAt);
-  assert.equal(buildState().projects.find((p) => p.name === "shop")?.working, 0);
+  assert.equal(bs().projects.find((p) => p.name === "shop")?.working, 0);
 });
 
 test("an assign with nothing queued becomes an active task; a stop of another role changes nothing", () => {
@@ -117,7 +119,7 @@ test("two projects stay separate", () => {
   t = state();
   assert.deepEqual(t.done.map((x) => x.id), [blog]);
   assert.deepEqual(t.queued.map((x) => x.id), [shop]);
-  const working = Object.fromEntries(buildState().projects.map((p) => [p.name, p.working]));
+  const working = Object.fromEntries(bs().projects.map((p) => [p.name, p.working]));
   assert.equal(working.blog, 0);
   // list shows the current project by default, all with --all
   assert.deepEqual(JSON.parse(cli("shop", "list", "--json").out).queued.map((x: { id: string }) => x.id), [shop]);
@@ -129,15 +131,15 @@ test("task text is redacted and clipped to 120 characters", () => {
   const token = "ghp_" + "a1B2c3D4e5".repeat(4);
   const r = cli("shop", "add", "--role", "bob", `deploy with ${token} and a long tail ${"x".repeat(200)}`);
   assert.equal(r.code, 0);
-  const t = buildState().tasks.queued[0];
+  const t = bs().tasks.queued[0];
   assert.ok(!t.text.includes(token) && !t.text.includes("ghp_"));
   assert.match(t.text, /\[token\]/);
   assert.ok(t.text.length <= 120);
-  assert.ok(!JSON.stringify(buildState()).includes(token));
+  assert.ok(!JSON.stringify(bs()).includes(token));
 });
 
 test("an unknown role, priority or empty text is refused with a clear error and writes nothing", () => {
-  const before = buildState().events.length;
+  const before = bs().events.length;
   const bad = cli("shop", "add", "--role", "mickey", "x");
   assert.equal(bad.code, 2);
   assert.match(bad.out, /unknown role "mickey".*doraemon.*bob/);
@@ -146,7 +148,7 @@ test("an unknown role, priority or empty text is refused with a clear error and 
   assert.match(cli("shop", "add", "x").out, /--role is required/);
   assert.match(cli("shop", "add", "--role").out, /needs a value/);
   assert.equal(cli("shop", "frobnicate").code, 2);
-  assert.equal(buildState().events.length, before);
+  assert.equal(bs().events.length, before);
 });
 
 const at = (ms: number) => new Date(Date.parse("2026-10-26T12:00:00Z") + ms);
@@ -202,6 +204,78 @@ test("modelOverride is set only when the assign's model differs from the agent f
   const t = state().active;
   assert.equal(t.length, 2);
   assert.ok(t.every((x) => x.modelOverride === undefined));
+});
+
+// One full round for an agent: assign, start, stop (the stop can be left out to model a missed hook).
+const round = (ms: number, agentId: string, role = "bob", opts: { stop?: boolean; project?: string } = {}) => {
+  const project = opts.project ?? "shop", type = `toon-crew:${role}`;
+  ev(ms, { kind: "assign", from: "doraemon", to: type, text: `job ${agentId}`, project });
+  ev(ms + 1000, { kind: "agent-start", agentId, agentType: type, text: "started", project });
+  if (opts.stop !== false) ev(ms + 20_000, { kind: "agent-stop", agentId, agentType: type, text: "finished", project });
+};
+const MIN = 60_000;
+
+test("a missed stop does not make every later stop close the wrong (older) task", () => {
+  round(0, "a-old", "bob", { stop: false });          // the stop never arrived
+  round(10 * MIN, "a-two");
+  round(20 * MIN, "a-three");
+  const t = state();
+  assert.deepEqual(t.active.map((x) => x.text), ["job a-old"]);       // only the one whose stop was missed
+  assert.deepEqual(t.done.map((x) => x.text), ["job a-three", "job a-two"]);
+});
+
+test("a stop finishes the task bound to its own agent, whatever order tasks started in", () => {
+  ev(0, { kind: "assign", from: "doraemon", to: "toon-crew:bob", text: "first", project: "shop" });
+  ev(1000, { kind: "agent-start", agentId: "a-1", agentType: "toon-crew:bob", text: "s", project: "shop" });
+  ev(2000, { kind: "assign", from: "doraemon", to: "toon-crew:bob", text: "second", project: "shop" });
+  ev(3000, { kind: "agent-start", agentId: "a-2", agentType: "toon-crew:bob", text: "s", project: "shop" });
+  ev(4000, { kind: "agent-stop", agentId: "a-2", agentType: "toon-crew:bob", text: "f", project: "shop" });
+  assert.deepEqual(state().active.map((x) => x.text), ["first"]);
+  ev(5000, { kind: "agent-stop", agentId: "a-2", agentType: "toon-crew:bob", text: "f again", project: "shop" });   // a repeat stop closes nothing else
+  assert.deepEqual(state().active.map((x) => x.text), ["first"]);
+  ev(6000, { kind: "agent-stop", agentId: "a-1", agentType: "toon-crew:bob", text: "f", project: "shop" });
+  assert.equal(state().active.length, 0);
+});
+
+test("a resume re-opens the task bound to that agent, and its next stop finishes it again", () => {
+  round(0, "a-one");
+  round(2 * MIN, "a-two");
+  bobAssign(3 * MIN, { toId: "a-one" });                // resume the older agent: its own task comes back, not a-two's
+  assert.deepEqual(state().active.map((x) => x.text), ["job a-one"]);
+  ev(4 * MIN, { kind: "agent-stop", agentId: "a-one", agentType: "toon-crew:bob", text: "f", project: "shop" });
+  assert.equal(state().active.length, 0);
+});
+
+test("a resume of an agent that is still running re-opens nothing", () => {
+  round(0, "a-done");
+  ev(2 * MIN, { kind: "assign", from: "doraemon", to: "toon-crew:bob", text: "running", project: "shop" });
+  ev(2 * MIN + 1000, { kind: "agent-start", agentId: "a-live", agentType: "toon-crew:bob", text: "s", project: "shop" });
+  bobAssign(3 * MIN, { toId: "a-live" });
+  assert.deepEqual(state().active.map((x) => x.text), ["running"]);
+  assert.deepEqual(state().done.map((x) => x.text), ["job a-done"]);
+});
+
+test("an unbound task, or a bound one whose agent is silent, is shown as done (stale) after 6 hours", () => {
+  ev(0, { kind: "assign", from: "doraemon", to: "toon-crew:kevin", text: "lost", project: "shop" });   // no start, no stop
+  round(1 * MIN, "a-bob", "bob", { stop: false });                                                      // bound, stop missed
+  round(2 * MIN, "a-mike", "mike-wazowski", { stop: false });
+  ev(5 * 60 * MIN, { kind: "agent-start", agentId: "a-x", agentType: "toon-crew:sulley", text: "s", project: "blog" });
+  assert.deepEqual(state().active.map((x) => x.role).sort(), ["bob", "kevin", "mike-wazowski"]);
+  ev(5 * 60 * MIN + 30 * MIN, { kind: "pr", agentId: "a-mike", agentType: "toon-crew:mike-wazowski", text: "pr", project: "shop" });   // any event of the agent is activity
+  ev(6 * 60 * MIN + 10 * MIN, { kind: "agent-start", agentId: "a-y", agentType: "toon-crew:sulley", text: "s", project: "blog" });
+  const t = state();
+  assert.deepEqual(t.active.map((x) => x.role), ["mike-wazowski"]);
+  assert.deepEqual(t.done.map((x) => [x.role, x.stale]).sort(), [["bob", true], ["kevin", true]]);
+  const bob = t.done.find((x) => x.role === "bob");
+  assert.equal(bob?.doneAt, new Date(at(1 * MIN + 1000).getTime() + 6 * 3_600_000).toISOString());   // last agent event + 6 h
+});
+
+test("buildState judges staleness by the wall clock it is given", () => {
+  ev(0, { kind: "assign", from: "doraemon", to: "toon-crew:kevin", text: "lost", project: "shop" });
+  const t0 = at(0).getTime();
+  assert.equal(buildState(t0 + 5 * 3_600_000).tasks.active.length, 1);
+  assert.equal(buildState(t0 + 7 * 3_600_000).tasks.active.length, 0);
+  assert.equal(buildState(t0 + 7 * 3_600_000).projects.find((p) => p.name === "shop")?.working, 0);
 });
 
 test("the event log stays owner-only", () => {
