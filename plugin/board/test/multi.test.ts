@@ -108,6 +108,7 @@ test("the roster has 15 roles and the retired list points at real roles", () => 
 test("/api/state: projects, per-member project, retired, snapshots", () => {
   writeFileSync(REGISTRY_FILE, JSON.stringify(registry));
   const at = new Date(Date.now() - 60_000);
+  appendEvent({ project: "Acme Shop", kind: "assign", from: "doraemon", to: "toon-crew:shinchan", text: "build the page" }, at);   // "working" counts active tasks, which an assign makes
   appendEvent({ project: "Acme Shop", kind: "agent-start", agentId: "s1", agentType: "toon-crew:shinchan", text: "shinchan started" }, at);
   appendEvent({ project: "Blog", kind: "agent-start", agentId: "d1", agentType: "dekisugi", text: "dekisugi started" }, at);
   appendEvent({ project: "Blog", kind: "agent-stop", agentId: "d1", agentType: "dekisugi", text: "dekisugi finished: shipped" }, new Date(at.getTime() + 1000));

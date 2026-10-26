@@ -1,5 +1,5 @@
 #!/bin/bash
-# Crew Room board control: start | stop | status | export | test.
+# Crew Room board control: start | stop | status | export | task | test.
 # The server (with its pollers) runs detached so it outlives the session that started it.
 # Log and state go to $CLAUDE_PLUGIN_DATA, or ~/.toon-crew when started by hand; override with BOARD_LOG_DIR.
 set -euo pipefail
@@ -29,6 +29,7 @@ case "${1:-status}" in
   status)
     if pid=$(running_pid); then echo "running: $(cat "$SERVER_JSON")"; else echo "not running"; fi ;;
   export) shift; "${NODE[@]}" "$HERE/export.ts" "$@" ;;
+  task) shift; "${NODE[@]}" "$HERE/task.ts" "$@" ;;
   test) BOARD_LOG_DIR="$(mktemp -d)" "${NODE[@]}" --test "$HERE"/test/*.test.ts ;;
-  *) echo "usage: $0 start|stop|status|export [--dry]|test"; exit 2 ;;
+  *) echo "usage: $0 start|stop|status|export [--dry]|task add|start|done|drop|list|test"; exit 2 ;;
 esac
