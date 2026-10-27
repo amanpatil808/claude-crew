@@ -64,6 +64,14 @@
           { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input",
+        "hooks": [
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true }
+        ]
+      }
     ]
   }
 }

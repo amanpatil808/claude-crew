@@ -122,3 +122,26 @@ test("members carry role info, last contact and model override; manager activity
   assert.equal(managerActive([ev({ kind: "main-busy", ts: at(300) })], now), false);
   assert.equal(managerActive([], now), false);
 });
+
+test("namespaced hand-backs show their summary, not the text after the plugin prefix", () => {
+  const roles = loadRoles();
+  const events = [
+    ev({ agentId: "k", agentType: "toon-crew:kevin", text: "toon-crew:kevin started" }),
+    ev({ agentId: "k", agentType: "toon-crew:kevin", kind: "agent-stop", text: "toon-crew:kevin finished: orders table and migration 0042" }),
+    ev({ agentId: "b", agentType: "toon-crew:bob", text: "toon-crew:bob started" }),
+    ev({ agentId: "b", agentType: "toon-crew:bob", kind: "agent-stop", text: "toon-crew:bob finished: " }),
+  ];
+  const feed = roomFeed(events, roles).reverse();
+  assert.deepEqual(feed.map((f) => f.text), ["Kevin started", "Kevin handed back: orders table and migration 0042", "Bob started", "Bob handed back"]);
+  assert.equal(feed[1].say, "orders table and migration 0042");
+  assert.equal(feed[3].say, "Done!");
+  const kevin = roomMembers(crewFrom(events, roles), ["kevin", "bob"]).find((m) => m.id === "kevin");
+  assert.equal(kevin?.line, "orders table and migration 0042");
+  assert.equal(roleNotes(events, roles).get("kevin")?.handback, "orders table and migration 0042");
+});
+
+test("a stop with a colon in the summary keeps all of it", () => {
+  const roles = loadRoles();
+  const feed = roomFeed([ev({ agentId: "k", agentType: "toon-crew:kevin", kind: "agent-stop", text: "toon-crew:kevin finished: Fixed it: two files, 3:1 ratio" })], roles);
+  assert.equal(feed[0].text, "Kevin handed back: Fixed it: two files, 3:1 ratio");
+});

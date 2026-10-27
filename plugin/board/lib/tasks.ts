@@ -32,7 +32,7 @@ const isPriority = (p: unknown): p is Priority => PRIORITIES.includes(p as Prior
 interface Entry { task: BoardTask; seq: number; agent?: string; seen?: string }   // agent: the agent id its start/stop events are matched on
 const byTime = (key: "queuedAt" | "startedAt" | "doneAt") => (a: Entry, b: Entry) => (a.task[key] ?? "").localeCompare(b.task[key] ?? "") || a.seq - b.seq;
 
-function all(events: BoardEvent[], roles: Map<string, Role>, now?: number): Entry[] {
+function all(events: BoardEvent[], roles: Map<string, Role>, now?: number, onBind?: (agentId: string, taskId: string) => void): Entry[] {
   const types = typesById(events), tasks = new Map<string, Entry>();
   let seq = 0;
   const lastStop = new Map<string, string>();   // project+role -> its stop time, cleared by that role's next start
@@ -43,7 +43,9 @@ function all(events: BoardEvent[], roles: Map<string, Role>, now?: number): Entr
   const oldest = (project: string, role: string, state: TaskState, unbound = false) => mine(project, role, state, unbound)[0];
   for (const e of events) {
     const project = e.project ?? "";
-    const aid = e.agentId ?? e.toId;   // any event of an agent counts as activity for its bound tasks
+    // Any event of an agent counts as activity for its bound tasks, except a usage event: a late usage
+    // event (the Stop sweep re-reads a lagging subagent file) is bookkeeping, not the agent doing anything.
+    const aid = e.kind === "usage" ? undefined : e.agentId ?? e.toId;
     if (aid) for (const x of tasks.values()) if (x.agent === aid) x.seen = e.ts;
     if (e.kind === "task-queue" && e.role && roles.has(e.role)) {
       const id = taskIdOf(e.id);
@@ -58,7 +60,7 @@ function all(events: BoardEvent[], roles: Map<string, Role>, now?: number): Entr
         // An agent that already owns a task never takes another one by role (it may still be running its own).
         const owns = [...tasks.values()].some((x) => x.agent === e.toId);
         const last = owns ? newest(recent.filter((x) => x.agent === e.toId)) : rr ? newest(recent.filter((x) => x.task.role === rr.id && !x.agent)) : undefined;
-        if (last) { last.agent = e.toId; last.task.state = "active"; last.task.startedAt = e.ts; delete last.task.doneAt; delete last.task.modelOverride; }
+        if (last) { last.agent = e.toId; last.task.state = "active"; last.task.startedAt = e.ts; delete last.task.doneAt; delete last.task.modelOverride; onBind?.(e.toId, last.task.id); }
         continue;
       }
       const role = e.to ? roleFor(e.to, roles) : undefined;
@@ -75,7 +77,8 @@ function all(events: BoardEvent[], roles: Map<string, Role>, now?: number): Entr
       // The newest unbound task is the one just assigned; an older unbound one is a leftover and must not take this agent.
       const taken = e.agentId && [...tasks.values()].some((x) => x.agent === e.agentId && x.task.state === "active");
       const fresh = role && e.agentId && !taken ? mine(project, role.id, "active", true).pop() : undefined;
-      if (fresh) { fresh.agent = e.agentId; fresh.seen = e.ts; }
+      const agentId = e.agentId;   // a local, so the type guard below narrows it without a `!`
+      if (fresh && typeof agentId === "string") { fresh.agent = agentId; fresh.seen = e.ts; onBind?.(agentId, fresh.task.id); }
     } else if (e.kind === "agent-stop") {
       const type = e.agentType && e.agentType !== "agent" ? e.agentType : e.agentId ? types.get(e.agentId) : undefined;
       const role = type ? roleFor(type, roles) : undefined;
@@ -117,6 +120,27 @@ export function deriveTasks(events: BoardEvent[], roles: Map<string, Role> = loa
 // Any task, whatever its state (the CLI needs to find a dropped or older done one by id).
 export const findTask = (events: BoardEvent[], id: string, roles: Map<string, Role> = loadRoles()): BoardTask | undefined =>
   all(events, roles).find((x) => x.task.id === id)?.task;
+
+// Agent id -> the task it was bound to last, for the cost ledger: a resumed agent re-bound to another task
+// counts toward that one only, so no usage is counted twice. Dropped tasks keep their binding.
+export function taskOfAgent(events: BoardEvent[], roles: Map<string, Role> = loadRoles()): Map<string, string> {
+  const out = new Map<string, string>();
+  all(events, roles, undefined, (agentId, taskId) => out.set(agentId, taskId));
+  return out;
+}
+
+export const COST_DONE_MS = 7 * 86_400_000;
+
+// taskOfAgent for /api/state's cost.tasks: only bindings to a task the board still has a reason to show (active,
+// queued, or done in the last COST_DONE_MS), so the page is not sent every task ever recorded. An agent whose
+// last task is older or dropped counts toward no task (never toward an earlier one).
+export function costTaskOf(events: BoardEvent[], roles: Map<string, Role>, now: number): Map<string, string> {
+  const bound = new Map<string, string>();
+  const keep = new Set(all(events, roles, now, (agentId, taskId) => bound.set(agentId, taskId))
+    .filter(({ task: t }) => t.state === "active" || t.state === "queued" || (t.state === "done" && now - Date.parse(t.doneAt ?? "") <= COST_DONE_MS))
+    .map((x) => x.task.id));
+  return new Map([...bound].filter(([, taskId]) => keep.has(taskId)));
+}
 
 // Active tasks per project: what the project chip shows as "working".
 export function activeByProject(tasks: TaskLists): Map<string, number> {

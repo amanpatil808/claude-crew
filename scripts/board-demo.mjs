@@ -25,6 +25,21 @@ const ev = (min, e) => {
 let agentNo = 0;
 const aid = () => `a${String(++agentNo).padStart(4, '0')}demo${agentNo.toString(16)}`;
 
+// Usage rows use the board's neutral keys: n calls, in/out tokens, cw5m/cw1h cache writes, cr cache reads, ws/wf web search/fetch.
+const MODEL = { opus: 'claude-opus-4-7', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-4-5' };
+const row = (model, n, out, cw5m, cw1h, cr, ws = 0, wf = 0) => ({ model, speed: 'standard', long: false, n, in: n * 2, out, cw5m, cw1h, cr, ws, wf });
+const SIZE = { dekisugi: ['opus', 1.2], kevin: ['sonnet', 1], 'ninja-hattori': ['sonnet', 0.6], shizuka: ['haiku', 0.8], 'joe-gardner': ['haiku', 0.7], bob: ['sonnet', 1.1], 'mike-wazowski': ['sonnet', 0.5], olaf: ['sonnet', 0.9], nobita: ['opus', 1], shinchan: ['sonnet', 1.3], stuart: ['haiku', 0.2] };
+// Cumulative usage for one agent run; `final` is true once it has stopped, like the SubagentStop snapshot.
+const usage = (project, min, { agentId, agentType, role, final }) => {
+  const [m, k] = SIZE[role] ?? ['sonnet', 1], search = role === 'dekisugi';
+  ev(min, { project, kind: 'usage', sid: project === SHOP ? 'demo0001' : 'demo0002', agentId, agentType, text: 'Usage update', scope: 'agent', final, partial: false,
+    rows: [row(MODEL[m], Math.round(24 * k), Math.round(13000 * k), Math.round(59000 * k), 0, Math.round(1_040_000 * k), search ? 3 : 0, search ? 5 : 0)] });
+};
+// The manager's own session usage, one row per model it used.
+const mainUsage = (project, min, sid) => ev(min, { project, kind: 'usage', sid, text: 'Usage update', scope: 'main', final: false, partial: false,
+  rows: [row(MODEL.opus, 190, 140_000, 0, 396_000, 40_700_000), row(MODEL.haiku, 12, 2_400, 18_000, 0, 150_000)] });
+let bobId;
+
 // A task: optionally queued, assigned by Doraemon, picked up by an agent; stopped when `doneMin` is given.
 function job(project, role, text, { queueMin, startMin, doneMin, priority, handback, ref }) {
   const type = `toon-crew:${role}`;
@@ -33,7 +48,12 @@ function job(project, role, text, { queueMin, startMin, doneMin, priority, handb
   const id = aid();
   ev(startMin, { project, kind: 'assign', from: 'doraemon', to: type, text, sid: 'demo0001' });
   ev(startMin - 0.1, { project, kind: 'agent-start', agentId: id, agentType: type, text: `${type} started`, sid: 'demo0001' });
-  if (doneMin != null) ev(doneMin, { project, kind: 'agent-stop', agentId: id, agentType: type, text: `${type} finished: ${handback}`, sid: 'demo0001' });
+  const who = { agentId: id, agentType: type, role };
+  if (doneMin != null) {
+    ev(doneMin, { project, kind: 'agent-stop', agentId: id, agentType: type, text: `${type} finished: ${handback}`, sid: 'demo0001' });
+    usage(project, doneMin - 0.05, { ...who, final: true });
+  } else usage(project, 1, { ...who, final: false });   // still running: a snapshot from the last minute
+  if (role === 'bob') bobId = id;
 }
 const queued = (project, role, priority, text, min) => job(project, role, text, { queueMin: min, priority });
 
@@ -54,6 +74,9 @@ queued(SHOP, 'sulley', 'P1', 'Plan a blue-green rollout for orders-service', 40)
 queued(SHOP, 'twenty-two', 'P2', 'Explore carts with zero-quantity items', 38);
 queued(SHOP, 'shizuka', 'P2', 'Add a changelog entry for v2.9', 35);
 queued(SHOP, 'kevin', 'P1', 'Design the refund API', 30);
+// Bob stopped at a permission prompt about 3 minutes ago.
+ev(3, { project: SHOP, kind: 'needs-you', sid: 'demo0001', agentId: bobId, agentType: 'toon-crew:bob', need: 'permission', text: 'Waiting for your permission' });
+mainUsage(SHOP, 2, 'demo0001');
 ev(0.2, { project: SHOP, kind: 'main-busy', text: 'Manager at work', sid: 'demo0001' });
 
 // ---- recipe-app: a frontend project, quieter ----
@@ -66,6 +89,9 @@ job(RECIPE, 'stuart', 'Find every use of the old Card component', { startMin: 15
 queued(RECIPE, 'joe-gardner', 'P1', 'Visual regression pass on recipe cards', 20);
 queued(RECIPE, 'kevin', 'P2', 'Add a favourites endpoint', 18);
 ev(1.5, { project: RECIPE, kind: 'main-busy', text: 'Manager at work', sid: 'demo0002' });
+mainUsage(RECIPE, 1.2, 'demo0002');
+// The manager's turn ended and he waits for the owner's reply (an idle item).
+ev(0.8, { project: RECIPE, kind: 'needs-you', sid: 'demo0002', need: 'idle', text: 'Waiting for your reply' });
 
 events.sort((a, b) => a.ts.localeCompare(b.ts));
 // The newest event belongs to shop-api, so the page opens on it by default (focus = newest event's project).
@@ -74,8 +100,10 @@ const [ls] = events.splice(lastShop, 1);
 ls.ts = new Date(now - 5_000).toISOString();
 events.push(ls);
 
+// board: true is the owner's polling approval: a real board only has PR snapshots (and "PR ready" items) for such a
+// project. The /work paths have no project.md, so the board's pollers still run nothing for it.
 const registry = [
-  { path: '/work/shop-api', name: SHOP, firstSeen: iso(60 * 24 * 12), lastSeen: iso(0.2) },
+  { path: '/work/shop-api', name: SHOP, firstSeen: iso(60 * 24 * 12), lastSeen: iso(0.2), board: true },
   { path: '/work/recipe-app', name: RECIPE, firstSeen: iso(60 * 24 * 5), lastSeen: iso(1.5) },
 ];
 
@@ -94,9 +122,9 @@ const snapshots = {
       run(8798, 'CI', 'main', 'Bump pg driver to 8.12', 'failure', 480),
     ],
     prs: [
-      { number: 43, title: 'Rate limit the checkout route', state: 'OPEN', author: 'bob-demo', branch: 'feat/checkout-rate-limit', updatedAt: iso(15), url: 'https://github.com/acme-shop/shop-api/pull/43', draft: true },
-      { number: 42, title: 'Orders v2: idempotent POST /v2/orders', state: 'OPEN', author: 'kevin-demo', branch: 'feat/orders-v2', updatedAt: iso(70), url: 'https://github.com/acme-shop/shop-api/pull/42', draft: false },
-      { number: 41, title: 'Bump pg driver to 8.12', state: 'MERGED', author: 'bob-demo', branch: 'chore/pg-8-12', updatedAt: iso(420), url: 'https://github.com/acme-shop/shop-api/pull/41', draft: false },
+      { number: 43, title: 'Rate limit the checkout route', state: 'OPEN', author: 'bob-demo', branch: 'feat/checkout-rate-limit', updatedAt: iso(15), url: 'https://github.com/acme-shop/shop-api/pull/43', draft: true, checks: 'pending', review: '', mergeable: 'MERGEABLE' },
+      { number: 42, title: 'Orders v2: idempotent POST /v2/orders', state: 'OPEN', author: 'kevin-demo', branch: 'feat/orders-v2', updatedAt: iso(70), url: 'https://github.com/acme-shop/shop-api/pull/42', draft: false, checks: 'pass', review: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE' },
+      { number: 41, title: 'Bump pg driver to 8.12', state: 'MERGED', author: 'bob-demo', branch: 'chore/pg-8-12', updatedAt: iso(420), url: 'https://github.com/acme-shop/shop-api/pull/41', draft: false, checks: 'pass', review: 'APPROVED', mergeable: 'UNKNOWN' },
     ],
     commits: { 'feat/orders-v2': [
       commitRow('3be7f20', 'Doraemon', 80, 'Add POST /v2/orders with idempotency keys'),
