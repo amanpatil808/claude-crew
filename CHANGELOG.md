@@ -2,6 +2,24 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.6 - 28 Oct 2026
+
+Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.
+
+### Fixed
+
+- Agents stopped by the user (interrupt or TaskStop) no longer stay "working": the board checks each agent's own transcript and drops it after about 12 quiet minutes. Phantom twins and the inflated crew meter are gone.
+- Twins and the ×n badge only show on working desks; idle desks have no copies.
+- The bamboo copter is Doraemon's alone; other working desks show a small prop from their own film.
+- Turning Animation off cancels queued trips and pending copy-light reveals.
+- A role the server reports as working never shows Resting.
+
+### Changed
+
+- Doraemon flies at a calmer pace (about 2.5 s) and never vanishes: he flies the whole route, and stays at his desk with Animation off.
+- The copy light waits at most 1.2 s for Doraemon, so the ×n badge appears sooner.
+- "Lost contact" no longer says "45+ min".
+
 ## 0.3.5 - 28 Oct 2026
 
 Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.
