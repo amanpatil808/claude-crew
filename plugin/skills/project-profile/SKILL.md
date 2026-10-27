@@ -67,8 +67,8 @@ Check these and list each as ok or a recommendation for the owner. Don't edit se
 - Builders run in git worktrees. `.claude/settings.json` should set `"worktree": {"baseRef": "head"}`, or their worktrees start from the default branch instead of the working branch.
 - `.worktreeinclude` lists the gitignored files builders need (for example `.env`); `.claude/worktrees/` is in `.gitignore`.
 - `env.CLAUDE_CODE_SUBAGENT_MODEL` is `sonnet` (optional). It only covers agents without a `model` of their own, such as general-purpose, so they don't run on the main model; it doesn't change crew agents, which all set one. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` should not be set.
-- Doraemon as the main agent is opt-in per project: `"agent": "toon-crew:doraemon"` in the project's settings.
-- `.claude/agent-memory/` is checked in (project memory is meant to be shared). Plugin agents use `toon-crew-<name>/` folders there; old `<name>/` folders from project-level agents need copying across (see `docs/roster.md` in the claude-crew repo).
+- Doraemon is the main agent by default wherever the plugin is enabled (`plugin/settings.json` sets `"agent": "toon-crew:doraemon"`). The user's own `agent` setting wins, so there is nothing to add per project.
+- `.claude/agent-memory/` is checked in (project memory is meant to be shared). Plugin agents use `toon-crew-<name>/` folders there; old `<name>/` folders from project-level agents need copying across (see `docs/how-it-works.md` in the claude-crew repo).
 
 ## 6. Report
 ```

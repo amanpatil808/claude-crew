@@ -1,6 +1,6 @@
 ---
 name: ninja-hattori
-description: Security Engineer, Security Team: attack-style reviews after auth, access, secrets, privacy or deploy changes, with proof tests that fail before the fix - sessions, CSRF/CORS, IDOR, leaks, injection, races, DoS. Review only. Not for routine test runs: that is the QA Engineer (joe-gardner). (v0.4)
+description: Security Engineer, Security Team: attack-style reviews after auth, access, secrets, privacy or deploy changes, with proof tests that fail before the fix - sessions, CSRF/CORS, IDOR, leaks, injection, races, DoS. Review only. Not for routine test runs: that is the QA Engineer (joe-gardner).
 model: opus
 effort: high
 color: blue

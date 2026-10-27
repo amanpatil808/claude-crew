@@ -170,9 +170,8 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 - [crew] Bind-mounting the build context in a proof Dockerfile copies secrets into the build cache; prune them afterwards. Why: secrets persist in the cache.
 - [crew] In a group-writable hand-off folder without a sticky bit, any file the owner writes can be pre-planted as a link. Why: the other side follows it.
 - [crew] A path allow-list built on normpath plus a one-time link check is beaten by containers writing into bind mounts; require read-only binds and realpath. Why: the check runs once.
-- [crew] Compare share rounding across tabs: per-share rounding and a percent formatter can disagree (37 vs 38). Why: the same fact must show the same number.
-- [crew] Check what a "usual" or "repeat" calc admits (group, app, minimum count) against the design intent; ranking by money lets pricey one-offs win. Why: milk bought five times should lead.
-- [crew] "Read only the gap" windows: check that each source can stop at its end date; a silent page cap marks an unread gap as covered. Why: coverage then lies.
+- [crew] Show the same fact with the same number on every screen: per-item rounding and a percent formatter can disagree (37 vs 38). Why: the same fact must show the same number.
+- [crew] Windowed reads: check that each source can stop at its end date; a silent page cap marks an unread range as covered. Why: coverage then lies.
 - [crew] Cooldowns stored as a run-after time die in queue merges; check every enqueue path against the earliest run time. Why: merges keep the earlier time. (seen 2: scooby-doo, shaktimaan)
 - [crew] When a fix moves work from syncs to backfills, list every path that skips the backfill (paused, dropped after max attempts). Why: the gap stays open silently.
 - [crew] To test a PR commit without touching the repo, export that commit into a work folder and copy the node_modules from an earlier copy. Why: keeps the checkout clean.
@@ -297,10 +296,8 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 - [crew] Fee and market numbers conflict across sources; note the definition and mark unverified figures. Why: definitions differ.
 - [crew] Look for peer-reviewed or research-group sources before saying none exist. Why: they often exist.
 - [crew] Survey evidence: use journal abstract pages, reviews, or summaries when a PDF or a publisher blocks fetches. Why: those sources are blocked here.
-- [crew] India delivery surveys: the press releases from large self-selected panels are the usable sources; major consultancies gave no consumer numbers. Why: most reports are paywalled.
-- [crew] Measured evidence beats opinion: fee salience and own-past comparison have the strongest studies; an exact "money left" figure can raise spending. Why: the effect can reverse.
-- [crew] Payment splits: no leading app shows one; every app splits by category, so it is open space. Why: the gap is real.
-- [crew] For split charts on a phone, a waffle plus direct labels beats bars or donuts; always design the "not shown" state too. Why: the unknown share must show.
+- [crew] Measured evidence beats opinion. Why: an effect that sounds right can reverse in a study.
+- [crew] Design the "not shown" state of every chart too. Why: the unknown share must show.
 - [crew] Check CSP limits on any idea (CSSOM styles allowed, no inline style attributes; vibration is Android-only). Why: an idea may be blocked on other platforms.
 
 ---
@@ -308,7 +305,7 @@ Shared with dekisugi (the DevOps pair; 19 lessons seen 2 times, merged):
 ## Counts
 
 - Raw bullets read: 300 (the chip-and-dale placeholder not counted).
-- Bullets written: 278 (crew 222, project 56). The 22 difference are raw bullets folded into another bullet as duplicates or dropped as obsolete.
+- Bullets written: 275 (crew 219, project 56). The 25 difference are raw bullets folded into another bullet as duplicates or dropped as obsolete, plus 3 removed on 2026-10-27 because they were product-domain findings from one app.
 - Duplicates merged: 19 DevOps lessons shared by chhota-bheem and dekisugi (one copy, seen 2), plus cross-role repeats folded into one line with (seen n).
 
 ---
@@ -345,5 +342,5 @@ Owner-set rules (promote on the owner's word):
 ## Files touched by this harvest
 
 - `docs/lessons/2026-10-23-crew-lessons.md` (this file)
-- `plugin/skills/crew-lessons/SKILL.md` (weekly procedure)
+- `plugin/skills/crew-lessons/SKILL.md` (lessons-pass procedure)
 - No memory files were changed; the 17 sources were read only.
