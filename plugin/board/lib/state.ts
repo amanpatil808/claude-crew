@@ -5,13 +5,14 @@ import { buildRooms, managerActive, managerProject, mainBusy, projectFacts, room
 import { emptySnapshot, loadSnapshot, type Snapshot } from "./pollers.ts";
 import { readRegistry, type Project } from "./projects.ts";
 import { RETIRED } from "./roster.ts";
-import { activeByProject, deriveTasks, taskOfAgent } from "./tasks.ts";
+import { activeByProject, costTaskOf, deriveTasks } from "./tasks.ts";
 import { deriveNeeds } from "./needs.ts";
+import { getOwn, putOwn } from "./records.ts";
 // Types only (erased at run time), so this line never makes cost.ts required.
 import type { CostOptions, CostState } from "./cost.ts";
 
 // lib/cost.ts buildCost(events, now, opts): the cost ledger. Optional, so the board works without it.
-// `taskOf` maps an agent id to the one task its usage counts toward (see taskOfAgent).
+// `taskOf` maps an agent id to the one task its usage counts toward (see costTaskOf: only tasks still shown).
 export type BuildCost = (events: readonly BoardEvent[], now: number, opts?: CostOptions) => CostState;
 
 export async function loadBuildCost(): Promise<BuildCost | null> {
@@ -27,7 +28,7 @@ const buildCost = await loadBuildCost();
 // `cost` is null until lib/cost.ts exists; a throwing ledger gives null too, never a dead /api/state.
 export function costOf(events: BoardEvent[], roles: Map<string, Role>, now: number, fn: BuildCost | null = buildCost): CostState | null {
   if (!fn) return null;
-  try { return fn(events, now, { roles, taskOf: taskOfAgent(events, roles) }) ?? null; } catch { return null; }
+  try { return fn(events, now, { roles, taskOf: costTaskOf(events, roles, now) }) ?? null; } catch { return null; }
 }
 
 export interface ProjectSummary extends Project { working: number; polled: boolean }
@@ -48,17 +49,18 @@ export function buildState(now = Date.now()) {
   // Focus: the project that produced the newest event (else the first registered one). Top-level ci/prs/commits/deploy
   // describe it; `snapshots` has every project's own.
   const focus = [...events].reverse().find((e) => e.project)?.project ?? registry[0]?.name;
+  // Keyed by project name, which is any folder's name: putOwn / getOwn, so "__proto__" is an ordinary key.
   const snapshots: Record<string, Snapshot> = {};
   for (const p of registry) {
     const snap = loadSnapshot(p);
-    snapshots[p.name] = snap;
+    putOwn(snapshots, p.name, snap);
     const row = projects.find((x) => x.name === p.name);
     if (row) row.polled = !!(snap.polledAt.github || snap.polledAt.box);
   }
   // Every registered project's own Live version and Branch, so the page can show the project it is looking at.
   const factsByProject: Record<string, RoomFact[]> = {};
-  for (const p of registry) factsByProject[p.name] = projectFacts(snapshots[p.name]?.deploy, p.path);
-  const snap = (focus && snapshots[focus]) || emptySnapshot();
+  for (const p of registry) putOwn(factsByProject, p.name, projectFacts(getOwn(snapshots, p.name)?.deploy, p.path));
+  const snap = (focus && getOwn(snapshots, focus)) || emptySnapshot();
   const focusPath = registry.find((p) => p.name === focus)?.path;
   const members = roomMembers(crew, roles.map((r) => r.id), mainBusy(events, now), roleNotes(events, roleMap), roles, managerProject(events));
   const room = {

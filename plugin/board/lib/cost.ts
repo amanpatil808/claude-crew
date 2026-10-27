@@ -2,15 +2,18 @@
 // Today / 7 days windows. Pure: the clock, the roles and the task binding come in as arguments.
 // Each usage event is cumulative for one transcript, so only the newest per (sid, agent) counts, and a window's
 // share is that newest total minus the newest total from before the window opened.
-import type { BoardEvent, UsageRow } from "./events.ts";
+import { MODEL_ID, type BoardEvent, type UsageRow } from "./events.ts";
 import { loadRoles, roleFor, type Role } from "./crew.ts";
 import { priceRows, pricesInfo } from "./prices.ts";
+import { putOwn } from "./records.ts";
 
 export interface Usage { n: number; in: number; out: number; cw5m: number; cw1h: number; cr: number; ws: number; wf: number }
 export interface Priced { usage: Usage; usd: number | null; unpriced: string[] }
+// partial: at least one run in it was a capped read, so the real numbers may be higher.
 export interface RoomCost extends Priced { partial: boolean }
-export interface AgentCost extends Priced { role: string; main?: true; runs?: number }
-export interface CostSlice { rooms: Record<string, RoomCost>; agents: Record<string, AgentCost[]>; tasks: Record<string, Priced> }
+export interface TaskCost extends Priced { partial: boolean }
+export interface AgentCost extends Priced { role: string; main?: true; runs?: number; partial: boolean }
+export interface CostSlice { rooms: Record<string, RoomCost>; agents: Record<string, AgentCost[]>; tasks: Record<string, TaskCost> }
 export interface CostWindow extends CostSlice { from: string }
 export interface CostState extends CostSlice {
   basis: "estimate"; currency: "USD";
@@ -46,7 +49,7 @@ function parseRows(x: unknown): UsageRow[] {
     const r = raw as Record<string, unknown>;
     if (typeof r.model !== "string" || !r.model) continue;
     out.push({
-      model: r.model, speed: r.speed === "fast" ? "fast" : "standard", long: r.long === true,
+      model: MODEL_ID.test(r.model) ? r.model : "unknown", speed: r.speed === "fast" ? "fast" : "standard", long: r.long === true,
       n: count(r.n), in: count(r.in), out: count(r.out), cw5m: count(r.cw5m), cw1h: count(r.cw1h), cr: count(r.cr), ws: count(r.ws), wf: count(r.wf),
     });
   }
@@ -69,8 +72,23 @@ function snapshots(events: readonly BoardEvent[], now: number): Map<string, Snap
     list.push({ ms, ts: e.ts, project: e.project ?? "", agentId: agent, agentType: e.agentType, partial: e.partial === true, rows: parseRows(e.rows) });
     byKey.set(key, list);
   }
-  for (const list of byKey.values()) list.sort((a, b) => a.ms - b.ms);   // stable: equal times keep log order
+  for (const list of byKey.values()) {
+    list.sort((a, b) => a.ms - b.ms);   // stable: equal times keep log order
+    // A capped read summed only the start of the file: it never lowers what the read before it counted.
+    for (let i = 1; i < list.length; i++) if (list[i].partial) list[i] = { ...list[i], rows: atLeast(list[i].rows, list[i - 1].rows) };
+  }
   return byKey;
+}
+
+// Per row and per field, the larger of the two; a row only `prev` has is kept.
+function atLeast(rows: UsageRow[], prev: UsageRow[]): UsageRow[] {
+  const m = new Map(rows.map((r) => [rowKey(r), { ...r }]));
+  for (const p of prev) {
+    const r = m.get(rowKey(p));
+    if (!r) m.set(rowKey(p), { ...p });
+    else for (const f of FIELDS) r[f] = Math.max(r[f], p[f]);
+  }
+  return [...m.values()];
 }
 
 const lastBefore = (list: Snap[], ms: number) => { let hit: Snap | undefined; for (const s of list) if (s.ms < ms) hit = s; return hit; };
@@ -121,19 +139,21 @@ function group(list: Run[], key: (r: Run) => string | undefined): Map<string, Ru
 }
 
 const rowsOf = (rs: Run[]) => rs.flatMap((r) => r.rows);
+const partialOf = (rs: Run[]) => rs.some((r) => r.partial);
 
+// Keys are project names and task ids from the log: putOwn, so one named "__proto__" is an ordinary key.
 function rollup(list: Run[], roleOf: (r: Run) => string, taskOf: ReadonlyMap<string, string>): CostSlice {
-  const rooms: Record<string, RoomCost> = {}, agents: Record<string, AgentCost[]> = {}, tasks: Record<string, Priced> = {};
+  const rooms: Record<string, RoomCost> = {}, agents: Record<string, AgentCost[]> = {}, tasks: Record<string, TaskCost> = {};
   for (const [project, inRoom] of group(list, (r) => r.project)) {
-    rooms[project] = { ...priced(rowsOf(inRoom)), partial: inRoom.some((r) => r.partial) };
+    putOwn(rooms, project, { ...priced(rowsOf(inRoom)), partial: partialOf(inRoom) });
     const main = inRoom.filter((r) => !r.agentId);
-    const rows: AgentCost[] = main.length ? [{ role: MANAGER, main: true, ...priced(rowsOf(main)) }] : [];
-    for (const [role, rs] of group(inRoom.filter((r) => r.agentId), roleOf)) rows.push({ role, runs: rs.length, ...priced(rowsOf(rs)) });
+    const rows: AgentCost[] = main.length ? [{ role: MANAGER, main: true, ...priced(rowsOf(main)), partial: partialOf(main) }] : [];
+    for (const [role, rs] of group(inRoom.filter((r) => r.agentId), roleOf)) rows.push({ role, runs: rs.length, ...priced(rowsOf(rs)), partial: partialOf(rs) });
     // The manager first, then the most expensive; unpriced rows last.
     rows.sort((a, b) => Number(!!b.main) - Number(!!a.main) || (b.usd ?? -1) - (a.usd ?? -1) || a.role.localeCompare(b.role));
-    agents[project] = rows;
+    putOwn(agents, project, rows);
   }
-  for (const [task, rs] of group(list, (r) => (r.agentId ? taskOf.get(r.agentId) : undefined))) tasks[task] = priced(rowsOf(rs));
+  for (const [task, rs] of group(list, (r) => (r.agentId ? taskOf.get(r.agentId) : undefined))) putOwn(tasks, task, { ...priced(rowsOf(rs)), partial: partialOf(rs) });
   return { rooms, agents, tasks };
 }
 

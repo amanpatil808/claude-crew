@@ -3,6 +3,7 @@
 import type { BoardEvent, Need } from "./events.ts";
 import { roleFor, typesById, type Role } from "./crew.ts";
 import type { Pr } from "./sources.ts";
+import { getOwn } from "./records.ts";
 
 export type NeedKind = Need | "pr";
 export interface NeedItem {
@@ -54,7 +55,18 @@ export function eventNeeds(events: BoardEvent[], roles: Map<string, Role>, now: 
   return out;
 }
 
-const PR_URL = /^https:\/\/[A-Za-z0-9.-]+\/[^\s?#]+\/pull\/\d+$/;
+const PR_PATH = /^\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/pull\/([1-9]\d{0,9})$/;
+
+// The page's link: exactly https://github.com/<owner>/<repo>/pull/<this PR's number>, else none. The URL is parsed,
+// and must print back unchanged, so no port, credentials, query, hash, dot segments or escapes can ride along.
+export function prRef(url: unknown, number: number): string | undefined {
+  if (typeof url !== "string") return undefined;
+  let u: URL;
+  try { u = new URL(url); } catch { return undefined; }
+  if (u.protocol !== "https:" || u.hostname !== "github.com" || u.port || u.username || u.password || u.search || u.hash || u.href !== url) return undefined;
+  const m = PR_PATH.exec(u.pathname);
+  return m && Number(m[1]) === number ? url : undefined;
+}
 
 // A PR waits on the owner when it is open, not a draft, its checks all passed and no reviewer asked for
 // changes (then it waits on the crew). Only projects the owner approved for polling (board: true) count,
@@ -63,12 +75,13 @@ export function prNeeds(projects: { name: string; board?: boolean }[], snapshots
   const out: NeedItem[] = [];
   for (const p of projects) {
     if (p.board !== true) continue;
-    for (const pr of snapshots[p.name]?.prs ?? []) {
+    for (const pr of getOwn(snapshots, p.name)?.prs ?? []) {
       if (pr.state !== "OPEN" || pr.draft !== false || pr.checks !== "pass" || pr.review === "CHANGES_REQUESTED") continue;
       if (typeof pr.number !== "number" || !Number.isSafeInteger(pr.number) || typeof pr.updatedAt !== "string") continue;
+      const ref = prRef(pr.url, pr.number);
       out.push({
         id: `n-pr-${p.name}-${pr.number}`, kind: "pr", text: `PR ready for you: checks green${pr.review === "REVIEW_REQUIRED" ? ", review required" : ""}`,
-        since: pr.updatedAt, project: p.name, number: pr.number, ...(typeof pr.url === "string" && PR_URL.test(pr.url) ? { ref: pr.url } : {}),
+        since: pr.updatedAt, project: p.name, number: pr.number, ...(ref ? { ref } : {}),
       });
     }
   }

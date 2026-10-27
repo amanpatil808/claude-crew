@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { writePrivate } from "./lib/private-fs.ts";
 import { join } from "node:path";
-import { appendEvent, needOf, NEED_TEXT, readEvents, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
+import { agentIdOf, agentTypeOf, appendEvent, needOf, NEED_TEXT, readEvents, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
 import { AGENTS_DIR, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
@@ -69,7 +69,7 @@ function declaredModelOf(agentType: string): string | undefined {
 // Main-session tool use that hands work to the crew: starting an agent, or messaging (resuming) one.
 function assignEvent(input: HookInput, lookup: (id: string) => string | undefined, env: Record<string, string | undefined>): Draft | null {
   const ti = input.tool_input ?? {};
-  const from = input.agent_id ? input.agent_type || "agent" : "doraemon";
+  const from = input.agent_id ? agentTypeOf(input.agent_type) ?? "agent" : "doraemon";
   if (input.tool_name === "Agent" || input.tool_name === "Task") {
     const to = clip(ti.subagent_type, 60);
     const m = resolveModel(ti.model, declaredModelOf(to), env);
@@ -88,14 +88,15 @@ function assignEvent(input: HookInput, lookup: (id: string) => string | undefine
 // `env` is injectable for tests. The project is the registered project (or folder name) of CLAUDE_PROJECT_DIR, else of the hook's cwd.
 export function toEvent(input: HookInput, due: () => boolean = () => heartbeatDue(), lookup: (id: string) => string | undefined = typeOfAgent, env: Record<string, string | undefined> = process.env): Draft | null {
   const project = projectName(env.CLAUDE_PROJECT_DIR || input.cwd);
+  // Identity is pattern-checked here, once, for every event built from this payload.
   const base = {
     ...(project ? { project } : {}),
     sid: clip(input.session_id, 8) || undefined,
-    agentId: input.agent_id || undefined,
-    agentType: input.agent_type || undefined,
+    agentId: agentIdOf(input.agent_id),
+    agentType: agentTypeOf(input.agent_type),
   };
   // A resumed agent stops without its own type; the log knows it from the earlier start.
-  if (!base.agentType && base.agentId && input.hook_event_name === "SubagentStop") base.agentType = lookup(base.agentId);
+  if (!base.agentType && base.agentId && input.hook_event_name === "SubagentStop") base.agentType = agentTypeOf(lookup(base.agentId));
   const who = base.agentType || "main session";
   switch (input.hook_event_name) {
     case "SubagentStart":
@@ -145,10 +146,12 @@ export async function toUsage(input: HookInput, read: ReadUsage, lookup: (id: st
   const ev = input.hook_event_name, agent = ev === "SubagentStop";
   if (ev !== "Stop" && ev !== "SessionEnd" && !agent) return null;
   const path = agent ? input.agent_transcript_path : input.transcript_path;
-  if (typeof path !== "string" || !path || (agent && !input.agent_id)) return null;
+  // The event's identity comes from the payload, so it passes the same patterns as toEvent's; a bad id means no event.
+  const agentId = agent ? agentIdOf(input.agent_id) : undefined;
+  if (typeof path !== "string" || !path || (agent && !agentId)) return null;
   const project = projectName(env.CLAUDE_PROJECT_DIR || input.cwd), sid = clip(input.session_id, 8) || undefined;
-  const agentType = agent ? input.agent_type || lookup(input.agent_id ?? "") : undefined;
-  const who = agent ? { agentId: input.agent_id, ...(agentType ? { agentType } : {}) } : {};
+  const agentType = agentId ? agentTypeOf(input.agent_type) ?? agentTypeOf(lookup(agentId)) : undefined;
+  const who = agentId ? { agentId, ...(agentType ? { agentType } : {}) } : {};
   // readUsage wants both as strings; the event below leaves out what the payload did not give.
   const opts: UsageOptions = { scope: agent ? "agent" : "main", final: ev !== "Stop", ...who, project: project ?? "", sid: sid ?? "" };
   let got: unknown;

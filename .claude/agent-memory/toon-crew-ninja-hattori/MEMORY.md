@@ -1,0 +1,9 @@
+# Ninja Hattori: lessons
+
+- Path guards that lstat/realpath a path and then open it need O_NONBLOCK on the open and an nlink === 1 check: a FIFO swapped in after the check blocks open() before any fstat re-check runs, and realpath cannot see a hard link. (seen 1) [crew]
+- Streaming line readers: keep the unfinished line as a list of chunks and concat once at "\n". Buffer.concat on every read is quadratic: a 200 MB line pushed peak RSS to about 2.7 GB despite a 64 MB line cap. Measure peak memory in a child process with process.resourceUsage().maxRSS, never in the test runner. (seen 1) [crew]
+- Records keyed by names a user or folder controls (project basenames) must not use `obj[k] = v` on `{}`: "__proto__" swaps the prototype and the key disappears from the JSON. Use Map, Object.fromEntries or defineProperty. Object.create(null) breaks existing deepStrictEqual checks against `{}`. (seen 1) [crew]
+- Cumulative snapshots where the newest one wins: a capped or partial read must not replace a larger earlier total, and the partial flag must reach every rollup level (room, agent, task). (seen 1) [crew]
+- To prove fixes without touching the repo: `git archive <sha> <paths> | tar -x` into the work folder, patch it with a node script that throws if a target string is missing, point the proofs at the copy with a path rewrite, and run the repo's own suite on the patched copy. (seen 1) [crew]
+- The toon-crew guard blocks shell writes it cannot place under $TMPDIR: relative redirects, `$VAR` paths, `sed -i ''`, and inline code that mentions deleting files. In the work folder, use literal absolute paths, or write helper scripts with Write and run them with node. (seen 1) [project]
+- Board server.ts has no try/catch around buildState, so one log line with a non-string agentType kills the server (crew.ts roleFor calls .split). Check every hook payload field for type and pattern in hook.ts before appendEvent. (seen 1) [project]

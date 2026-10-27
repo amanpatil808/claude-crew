@@ -1,5 +1,7 @@
 # Kevin memory
 
+- [Guard workarounds and proving fixes](board-guard-and-proofs.md) — Bash forms the guard blocks; failing-before-fix proofs; records.ts; server import.meta.main
+
 - Never name a board event field with token, session, secret, password, cookie or similar words: `redactDeep` (plugin/board/lib/redact.ts SENSITIVE_PROP) replaces the whole value with "[redacted]", numbers included. Why: proved on 2026-10-27, where `inputTokens` and `cacheReadTokens` were wiped by `appendEvent`. Use short neutral keys (`in`, `out`, `cr`). (seen 2) [project]
 - Keep counts out of event `text`: `redact()` masks a 10-digit run starting 6-9 as [phone] and a 13-19 digit Luhn-valid run as [card]. Why: big token counts are plausible. Put numbers in numeric fields only. (seen 2) [project]
 - Claude Code transcripts write one API response as several adjacent lines that repeat the same `message.usage`. Dedupe on `message.id` (keep the last id seen) before summing, or totals come out about 2x high. Main and `subagents/agent-<id>.jsonl` files don't overlap (verified on CLI 2.1.310). (seen 2) [crew]
