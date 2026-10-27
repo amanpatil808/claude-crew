@@ -42,7 +42,7 @@ Board v2.
 
 ## 0.2.0 - 23 Oct 2026
 
-Cast v2: the engineering crew re-cast with the owner's favourite cartoons (see `docs/planning/cast-v2.md`). 15 agents, every prompt tag now `(v0.4)`.
+Cast v2: the engineering crew re-cast with the owner's favourite cartoons (the plan is in git history). 15 agents, every prompt tag now `(v0.4)`.
 
 - New ids: miguel-rivera (Knowledge Manager, was dorami), kevin (Backend Lead, was scrooge), bob (Backend Developer, was bob-the-builder), ninja-hattori (Security Engineer, was scooby-doo), joe-gardner (QA Engineer, was tom), dekisugi (Research Lead, was dexter), olaf (Research Analyst, was velma), stuart (Code Search Assistant, was chip-and-dale).
 - DevOps split in two: mike-wazowski (DevOps Engineer: CI, builds, Docker, local stack) and sulley (SRE: deploys, rollouts, rollbacks, backups, monitoring, incidents), both from chhota-bheem.
@@ -50,7 +50,7 @@ Cast v2: the engineering crew re-cast with the owner's favourite cartoons (see `
 - Every description starts with title and team and routes with the new names; Doraemon assigns by team and title.
 - Skills: generic `integrations` replaces the project-specific `guarded-integrations`; `security-backend` trimmed to generic rules; crew-lessons and the project-profile template use the new names.
 - Evals: cases renamed to the new ids (for example `joe-not-run-vs-passed`, `hattori-proof-fails-before-fix`, `stuart-path-line-read-only`), plus `twenty-two-edge-case-repro`.
-- Retired characters hang as framed pictures; `docs/roster.md` maps old memory folders to new ones.
+- Retired characters hang as framed pictures; `docs/setup.md` (Upgrading from 0.x) maps old memory folders to new ones.
 
 ## 0.1.0 - 23 Oct 2026
 

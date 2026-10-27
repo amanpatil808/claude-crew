@@ -15,7 +15,7 @@ claude plugin eval . --tag smoke --runs 1 --ablation none --scaffold --trust-plu
 claude plugin eval . --case joe-not-run-vs-passed --runs 1 --ablation none --scaffold \
   --trust-plugin --allow-tools Bash Write --no-publish
 
-# Full suite before a release (3 runs, one arm; estimated $25-30, see docs/cost-baseline.md)
+# Full suite before a release (3 runs, one arm; estimated $25-30)
 claude plugin eval . --scaffold --trust-plugin --allow-tools Bash Write Edit --ablation none \
   --threshold 0.8 --no-publish --max-cost-usd 35
 ```
@@ -88,7 +88,7 @@ evals/
 | hattori-proof-fails-before-fix | 1.00 | $0.93 |
 | cost-general-purpose-leak (run twice, without and with `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`) | 1.00 / 1.00 | $0.15 / $0.20 |
 
-These runs used the old (pre-0.2.0) names (tom, chip-and-dale, scooby-doo); the cases were renamed for cast v2 and not re-run. The other cases load but have not been run yet. Costs and findings are in `docs/cost-baseline.md`.
+These runs used the old (pre-0.2.0) names (tom, chip-and-dale, scooby-doo); the cases were renamed for cast v2 and not re-run. The other cases load but have not been run yet.
 
 ## Known limits
 
