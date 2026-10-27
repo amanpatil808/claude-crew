@@ -2,7 +2,7 @@
 
 A local page that shows the whole crew across every project you work on: who is working where, hand-backs, and (per project, optional) CI, pull requests, commits and deploys. It listens on `127.0.0.1` only and reads an event log the plugin's hooks write.
 
-Diagrams of how the board fits into the plugin and the crew's workflow: see [How it works](../../README.md#how-it-works) in the main README.
+Diagrams of how the board fits into the plugin and the crew's workflow: see [The Crew Room board](../../README.md#the-crew-room-board) and [How it works](../../README.md#how-it-works) in the main README, and [section 8 of docs/how-it-works.md](../../docs/how-it-works.md#8-how-the-parts-fit-together).
 
 ## Start it
 

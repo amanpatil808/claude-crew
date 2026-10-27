@@ -1,0 +1,69 @@
+# Guards: what the toon-crew guard allows, asks and blocks
+
+For anyone who has installed the `toon-crew` plugin and wants to know exactly what the guard does. The README has the short version ([Guards](../README.md#guards)). This page has the full rule list.
+
+> [!WARNING]
+> The guard is a seatbelt, not a sandbox. It reads the text of a tool call before it runs. It catches mistakes and lazy bypasses. A determined agent with a shell can still get around any text check, for example by writing a script file and running it. For roles that have Bash, Claude Code's own sandbox is the real boundary.
+
+## How it works
+
+`plugin/hooks/guard.mjs` is a PreToolUse hook. Claude Code runs it before each call to one of these tools: Bash, Monitor (it runs shell commands too), Edit, Write, MultiEdit, NotebookEdit, Agent (and its old name Task), SendMessage, CronCreate, Workflow, RemoteTrigger, Read, Grep and any `mcp__*` tool.
+
+For each call it gives one of three answers:
+
+| Answer | What you see |
+|---|---|
+| Allow | Nothing. The call runs. |
+| Ask | Claude Code's own approval prompt, with a one-line reason. You decide. |
+| Block | The call does not run. The agent gets a one-line reason. |
+
+**It fails closed.** If the guard cannot read its input, hits an internal error, or cannot parse something that touches git, gh, rm, docker, settings or memory files, it blocks. The hook also sets `"onFailure": "block"` (which is why the plugin needs Claude Code 2.1.295 or later), so a crash or a 10-second timeout blocks the call instead of letting it through.
+
+## Who is who
+
+- **Doraemon** is the main session. He may run most things, but he may not push to `main`, merge or approve a pull request. He is the only one who starts crew agents, and the only one who may use SendMessage, CronCreate, Workflow and RemoteTrigger.
+- **The DevOps Team** is `toon-crew:mike-wazowski` and `toon-crew:sulley`. They are the only callers who get an "ask" (instead of a refusal) for pushes to `main`, merges and pull request approvals. The exact plugin names are required: a project agent with the same bare name (`sulley`) gets nothing.
+- **Miguel Rivera** (the knowledge manager) may only push `crew-lessons/<name>` branches and open a pull request on the crew repo.
+- **Read-only roles** are ninja-hattori, joe-gardner, twenty-two, nobita, dekisugi, olaf and stuart. See the table below.
+- **Everyone else** is the rest of the crew, or any other agent. The general rules apply.
+
+## The rules
+
+| Rule | What happens |
+|---|---|
+| Push to `main` or `master` | Mike Wazowski and Sulley: you are asked. Everyone else, Doraemon and the main thread included: refused. Covers `git push origin main`, `HEAD:main`, `refs/heads/main`, a bare `git push` whose real destination (`@{push}`) is `main`, and pushes through an alias or xargs. `--delete main`, `:main`, `--all`, `--mirror` and `--prune` are refused for everyone. |
+| Force push | Refused for everyone, on any branch: `--force`, `-f` (also `-fu`), `--force-with-lease`, `--force-if-includes`, any unique abbreviation (`--force-w`, `--mir`) and `+refspec`. |
+| Git config tricks | Refused: `git -c alias.*`, `remote.*.push`, `push.*`, `core.sshCommand`, `url.*.insteadOf`; `git config` writes of the same keys (also through `--file` or `-f`); the `GIT_CONFIG_*` environment overrides; `--git-dir`, `--work-tree` or `GIT_DIR` on a push or an unknown subcommand. Repo aliases are resolved first. Before a bare push, `remote.<name>.push` rules are applied (`+` counts as a force push) and a push target the guard cannot verify asks you. `core.hooksPath` asks you. |
+| Merge | `gh pr merge`, `gh api .../pulls/N/merge`, `.../merges` and the GraphQL `mergePullRequest`. Mike Wazowski and Sulley: you are asked, once per merge. Everyone else, Doraemon and Miguel Rivera included: refused. `--admin` and `--auto` merges are refused for everyone. |
+| Pull request approvals, workflow runs, repo edits | `gh pr review --approve`, `gh workflow run`, `gh repo edit` and workflow dispatches: the DevOps Team is asked, everyone else is refused. |
+| Other MCP tools | A tool with merge, push, delete, destroy, drop, force, remove or wipe in its name asks you. An auto-merge tool is refused. Merge and approval tools follow the merge rule above. |
+| GitHub destruction | Refused: `gh repo delete`, `gh api -X DELETE repos/o/r` (also a full URL, or `curl` with `gh auth token`), moving or deleting `refs/heads/main`, branch protection changes, `gh alias`, `gh auth token`. |
+| Credential reads | Refused for every role: reading `~/.config/gh` or `~/.git-credentials`, by Bash, Read or Grep. A search rooted above those folders is refused too. |
+| Recursive delete | Refused: `rm -r`, `rm -rf`, `find -delete`, `rsync --delete`, `git clean -x`, `docker run ... rm -rf`, unless every target is inside the system temp folder, the session scratchpad, or a real (not symlinked) `tmp/`, `.tmp/`, `scratch/` or `.scratch/` folder in the project. A project that itself sits in a temp folder gets no temp-folder exemption. `cd` into an unknown variable, `cd` inside `( )`, `mv` into scratch and `ln` inside scratch are blocked, because they make a later delete look legal. |
+| Docker data | Refused (docker, docker-compose, podman): `down -v` or `--volumes`, `compose rm -v`, `volume rm`, `volume prune`, `system prune --volumes`. |
+| Protected files | Refused, for Edit and Write and for shell writes (`>`, `tee`, `cp`, `mv`, `ln`, `sed -i`, `dd of=`, and `python`, `node` or `perl` with `-c` or `-e`): `.claude/settings*.json`, the installed plugin under `~/.claude/plugins` (a checkout you load with `--plugin-dir` stays editable), `.git/config`, `.git/hooks`, a `config` or `hooks/` file inside a git-dir-looking folder, `~/.claude.json` and `.mcp.json`. |
+| Project crew config | Edit, Write and shell writes to a project's `.claude/hooks`, `.claude/agents`, `.claude/skills` or `.claude/commands` ask you. |
+| Memory files | Refused: shell writes into any `agent-memory*` folder, and file writes whose resulting text holds a token, key, private key, URL password, `password=` value, UPI id, email address, card number (Luhn-valid) or phone number (Indian 10-digit with `0`, `+91`, spaces, dots or dashes; or international). |
+| Read-only roles | Edit, MultiEdit and NotebookEdit refused. Tree-changing git refused (reset, checkout, restore, apply, am, stash, clean, commit, merge, rebase, cherry-pick, revert, pull, rm, mv, add), and so are `patch` and inline-code file writes outside temp. Write is allowed only to the role's own `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, the system temp folder or session scratchpad, and its deliverable folders: `docs/research/` for dekisugi and olaf; `docs/design/` and `docs/research/` for nobita. Paths are resolved to their real location, so `..` and symlinks cannot escape. The memory secret scan applies to all of these. Shell writes are allowed only into temp. |
+| Spawning | Only the main session (Doraemon) starts crew agents. Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, written with the prefix (a bare `olaf` could match a project agent with more tools). Every other crew role is refused. Agents that are not crew are not limited. |
+| Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except Doraemon. |
+| Knowledge manager pushes | Miguel Rivera may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`, and only when `origin` is the crew repo. No merges, no other pushes. The guard accepts both `miguel-rivera` and `toon-crew:miguel-rivera` as his name. |
+
+## What the guard looks through
+
+It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` chains, subshells, `env`, `sudo`, `xargs` and `env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings, pipes into a shell, `find -exec`, and inline `python`, `node` or `perl` code given with `-c` or `-e`. It blocks shell functions and aliases that mention these programs, and programs named by a variable. A script that is written and run in the same command is blocked. `projects.mjs set` from a shell asks you.
+
+## What the guard cannot do
+
+- **It cannot see inside a script file.** If a role writes `/tmp/w.sh` and then runs `bash /tmp/w.sh`, the guard sees only the second command.
+- **It cannot see what a tool does by itself.** It checks the call, not what the program does afterwards.
+- **It does not check your own commands.** Commands you type with `!` and actions on GitHub's website skip the guard, so you can always merge yourself.
+- **A tool list alone does not make a role read-only.** Turning on `memory: project` adds Write back to an agent's tools. On Claude Code 2.1.309, Stuart (declared Read, Grep, Glob) got Read, Write, Grep and Glob. So for read-only roles, the guard is the lock on writes.
+- **It does not read files outside the matched tools.** Glob is not matched.
+
+## Where to look in the code
+
+- Rules: `plugin/hooks/guard.mjs`, with inline-code parsing in `plugin/hooks/inline-writes.mjs`.
+- Which tools it runs on, the timeout and `onFailure`: `plugin/hooks/hooks.json`.
+- Tests: `plugin/hooks/test/*.test.mjs`. Run them with `node --test plugin/hooks/test/*.test.mjs`.
+- The roles and who may do what: [roster.md](roster.md).
