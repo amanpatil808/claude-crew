@@ -82,7 +82,7 @@
   // ---- door trip (Mike, Sulley): about 2.6 s. Door A opens, he steps in (hidden about 0.55 s while door A closes and shrinks), door B opens, he steps out and settles ----
   async function tDoor(w, f, t, A, B, fromKind, toKind, D, leg, face) {
     const DMS = 1800, step = (p, q) => tLeg(w, [p, q], { ms: 560, ease: lin, stride: leg.stride, go: leg.go });
-    const dA = [f[0] + (A ? A.side : 1) * (fromKind === "seat" ? 64 : 40), f[1]], dB = [t[0] + (B ? B.side : 1) * (toKind === "seat" ? 64 : 40), t[1]];
+    const dA = [f[0] + (A ? A.side : 1) * (fromKind === "seat" ? 64 : 0), f[1]], dB = [t[0] + (B ? B.side : 1) * (toKind === "seat" ? 64 : 0), t[1]];
     tPlace(w, ...f);
     door(dA, D.colour, D.wpx, D.hpx, DMS); await rSleep(520);   // pops up and swings open
     await step(f, dA);
@@ -185,12 +185,44 @@
 
   // ---- the route: room.js hands over only the two end points, so find the desks they belong to and ask rRoute for the corridor path ----
   const close = (p, q) => Math.abs(p[0] - q[0]) < 2 && Math.abs(p[1] - q[1]) < 2;
+  // rRoute sends everyone down to the lane under the name plates and back up before they head for the door, which reads as a zig-zag.
+  // Here: leave the desk sideways to the stand, go straight up the aisle to the door at the top of the room, and take the corridor; arrive the mirror way.
+  // Points closer than 6 px are dropped and collinear points merged, so the walk has the fewest turns.
+  const tSimplify = (p) => {
+    const q = [];
+    for (let i = 0; i < p.length; i++) {
+      const last = i === p.length - 1;
+      if (q.length && Math.hypot(p[i][0] - q.at(-1)[0], p[i][1] - q.at(-1)[1]) < 6) { if (last) q[q.length - 1] = p[i]; continue; }
+      while (q.length >= 2) { const a = q.at(-2), b = q.at(-1), c = p[i], cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]), dot = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]); if (Math.abs(cr) < 40 && dot > 0) q.pop(); else break; }
+      q.push(p[i]);
+    }
+    return q;
+  };
+  // from the stand, straight up to the wall line of the room, along it to the door (only when the stand is not already in the aisle), out to the corridor
+  const tDoorway = (a, top) => { const x1 = Math.abs(a.sx - a.dx) < 14 ? a.dx : a.sx, sl = top + 24; return [[x1, a.seat[1]], [x1, sl], [a.dx, sl], [a.dx, a.cy]]; };
+  function tRouteDirect(A, B, from, to, spine, acc) {
+    const [a, fk] = A, [b, tk] = B, hb = rGeo().hb, top = a.room.getBoundingClientRect().top - hb.top, btop = b.room.getBoundingClientRect().top - hb.top;
+    if (a.room === b.room) {
+      const lo = Math.min(a.sx, b.sx) - 30, hi = Math.max(a.sx, b.sx) + 30;
+      if (acc.some((o) => o.room === a.room && o.seat[0] > lo && o.seat[0] < hi)) return null;   // a desk is in the way on the table line: keep the lane route
+      const p = [...(fk === "seat" ? [a.seat] : []), a.stand, b.stand, ...(tk === "seat" ? [b.seat] : [])];
+      return tSimplify(p);
+    }
+    const p = [...(fk === "seat" ? [a.seat] : []), a.stand, ...tDoorway(a, top)];
+    if (Math.abs(a.cy - b.cy) >= 2) p.push([spine, a.cy], [spine, b.cy]);
+    p.push(...tDoorway(b, btop).reverse(), b.stand, ...(tk === "seat" ? [b.seat] : []));
+    // the corridor row: keep the walk level between the two doors
+    return tSimplify(p);
+  }
   function tRoute(from, to) {
     try {
       const g = rGeo(), acc = [...document.querySelectorAll("#r-rooms .desk")].map((d) => { try { return rAccess(d, g); } catch { return null; } }).filter(Boolean);
       const find = (p) => { for (const a of acc) { if (close(p, a.seat)) return [a, "seat"]; if (close(p, a.stand)) return [a, "stand"]; } return null; };
       const A = find(from), B = find(to);
-      if (A && B && A[0] !== B[0]) return { route: rRoute(A[0], B[0], g.corr / 2, A[1], B[1]), a: A[0], b: B[0], fromKind: A[1], toKind: B[1], cross: A[0].room !== B[0].room };
+      if (A && B && A[0] !== B[0]) {
+        const direct = tRouteDirect(A, B, from, to, g.corr / 2, acc), ok = direct && direct.length > 1 && close(direct[0], from) && close(direct.at(-1), to);
+        return { route: ok ? direct : rRoute(A[0], B[0], g.corr / 2, A[1], B[1]), a: A[0], b: B[0], fromKind: A[1], toKind: B[1], cross: A[0].room !== B[0].room };
+      }
     } catch (e) { /* fall through to the elbow */ }
     return { route: rDedupe([from, [to[0], from[1]], to]), a: null, b: null, fromKind: "seat", toKind: "seat", cross: false };
   }
