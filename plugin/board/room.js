@@ -274,44 +274,98 @@ const rStageLine = (x) => [x.version, x.stage === "training" && "in training"].f
 const NAP_MS = 10 * 60000;
 const rNaps = (key, m) => key === "nobita" && m.status === "done" && !!m.since && Date.now() - Date.parse(m.since) >= NAP_MS;
 
-let rProj = "", rPicked = false;     // "" = all projects
+
+// ===== The board: one page, fed by /api/state. Every string goes in with textContent; nothing from the data is parsed as HTML. =====
+const $ = (id) => document.getElementById(id);
+const IST = { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false };
+const hm = (iso) => iso ? new Date(iso).toLocaleTimeString("en-GB", IST) : "";
+const day = (iso) => iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : "";
+const dayName = (iso) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const agoOf = (iso) => { if (!iso) return ""; const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`; };
+const shortSpan = (m) => m < 1 ? "now" : m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`;
+// Today: the clock time. Yesterday and older: the date, so a row never says "14:00" for last week.
+const whenOf = (iso) => { if (!iso) return ""; const d = day(iso), now = Date.now(); return d === day(new Date(now).toISOString()) ? hm(iso) : d === day(new Date(now - 86400000).toISOString()) ? "Yesterday" : dayName(iso); };
+const link = (href, text) => { const a = rel("a", null, text); if (/^https:\/\/github\.com\//.test(href || "")) { a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; } return a; };
+const SVGNS = "http://www.w3.org/2000/svg";
+const num = (n) => (Number.isFinite(n) ? n : 0);
+
+// ---- pixel icons: [w, h, rects], drawn with currentColor ----
+const ICONS = {
+  check: [10, 8, [[0, 4, 2, 2], [2, 6, 2, 2], [4, 4, 2, 2], [6, 2, 2, 2], [8, 0, 2, 2]]],
+  x: [8, 8, [[0, 0, 2, 2], [2, 2, 2, 2], [4, 4, 2, 2], [6, 6, 2, 2], [6, 0, 2, 2], [4, 2, 2, 2], [2, 4, 2, 2], [0, 6, 2, 2]]],
+  arrow: [10, 8, [[0, 3, 8, 2], [6, 1, 2, 2], [6, 5, 2, 2], [8, 3, 2, 2]]],
+  dot: [8, 8, [[2, 0, 4, 8], [0, 2, 8, 4]]],
+  pr: [10, 11, [[0, 0, 3, 3], [0, 8, 3, 3], [7, 8, 3, 3], [1, 3, 1, 5], [8, 2, 1, 6], [5, 1, 3, 1], [5, 0, 1, 3]]],
+  lock: [10, 11, [[1, 4, 8, 7], [2, 0, 6, 1], [2, 1, 1, 3], [7, 1, 1, 3]]],
+  warn: [10, 9, [[4, 0, 2, 2], [3, 2, 4, 2], [3, 4, 4, 2], [2, 6, 6, 2], [1, 7, 8, 2]]],
+  hand: [11, 12, [[1, 0, 2, 7], [4, 0, 2, 8], [7, 0, 2, 7], [0, 5, 1, 3], [2, 6, 7, 6], [9, 3, 2, 6]]],
+};
+function icon(name, scale = 1.5, cls = "") {
+  const [w, h, rs] = ICONS[name] || ICONS.dot, s = rel("span", "ic" + (cls ? " " + cls : "")); s.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("width", String(w * scale)); svg.setAttribute("height", String(h * scale)); svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.setAttribute("fill", "currentColor");
+  const rect = (x, y, a, b, fill) => { const r = document.createElementNS(SVGNS, "rect"); r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", a); r.setAttribute("height", b); if (fill) r.setAttribute("fill", fill); svg.append(r); };
+  for (const [x, y, a, b] of rs) rect(x, y, a, b);
+  if (name === "lock") rect(4, 6, 2, 3, "var(--need-bg)");
+  s.append(svg); return s;
+}
+// A pixel hand (skin, dark outline) that waves from a desk whose person is waiting for the owner.
+function handEl() {
+  const sk = "#ffd5b0", ol = "#232539", shapes = [[3, 1, 2, 7], [5, 0, 2, 8], [7, 1, 2, 7], [9, 3, 2, 6], [1, 5, 2, 4], [3, 7, 8, 6]];
+  const wrap = rel("span", "hand"); wrap.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(SVGNS, "svg"); svg.setAttribute("viewBox", "0 -1 14 16"); svg.setAttribute("width", "24"); svg.setAttribute("height", "27");
+  const g = (fill, grow, list) => { const e = document.createElementNS(SVGNS, "g"); e.setAttribute("fill", fill); for (const s of list) { const r = document.createElementNS(SVGNS, "rect"); r.setAttribute("x", s[0] - grow); r.setAttribute("y", s[1] - grow); r.setAttribute("width", s[2] + 2 * grow); r.setAttribute("height", s[3] + 2 * grow); e.append(r); } svg.append(e); };
+  g(ol, 1, shapes); g(sk, 0, shapes); g(ol, 0, [[5, 3, 1, 4], [7, 3, 1, 4]]);
+  wrap.append(svg); return wrap;
+}
+
+// ---- Names: the data's display name; a short form where a desk plate is narrow ----
+const SHORT = { "miguel-rivera": "Miguel", "mike-wazowski": "Mike", "joe-gardner": "Joe", "ninja-hattori": "Ninja" };
+const roleId = (x) => String(x || "").replace(/^.*:/, "");
+const nameOf = (id) => { const r = roleId(id); return rRoleName(r); };
+const plateName = (role) => SHORT[role.id] || role.mascot;
+
+let last = null, rProj = "", rPicked = false;     // rProj "" = all projects
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
 const rK = (id, p) => id + "@" + (p || "");
+let rNeed = new Set();                             // role@project keys whose person is waiting for the owner (state.needsYou)
+
 function rDesk(role, m, i, showTeam, proj = "") {
-  const waiting = rPending.has(rK(role.id, proj));                      // assigned but Doraemon has not arrived yet: seated, waiting
+  const k = rK(role.id, proj), waiting = rPending.has(k);          // assigned but Doraemon has not arrived yet: seated, waiting
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
-  const key = rKeyOf(role.id), nap = rNaps(key, m);
+  const key = rKeyOf(role.id), nap = rNaps(key, m), need = rNeed.has(k);
   const s = m.status === "idle" || nap ? "queued" : m.status;
-  const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.dataset.p = proj; desk.dataset.k = rK(role.id, proj); desk.style.setProperty("--i", i * 60 + "ms");
+  const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.dataset.p = proj; desk.dataset.k = k; desk.style.setProperty("--i", i * 60 + "ms");
   if (key) desk.dataset.who = key;
   if (nap) desk.dataset.nap = "1";
+  if (need) desk.dataset.need = "1";
   const hex = rColor(role); desk.style.setProperty("--c", hex); desk.style.setProperty("--c-edge", rLight(hex) ? "#7a5c00" : "var(--wall-ink)");
-  if (rAway.has(rK(role.id, proj))) desk.classList.add("away");
-  desk.tabIndex = 0; desk.setAttribute("role", "button"); { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle({ ...role, ...m })}${rTeam({ ...role, ...m }) ? ", " + rTeam({ ...role, ...m }) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""} Show details`); }
+  if (rAway.has(k)) desk.classList.add("away");
+  desk.tabIndex = 0; desk.setAttribute("role", "button");
+  { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle(x)}${rTeam(x) ? ", " + rTeam(x) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""}${need ? " Waiting for you." : ""} Show details`); }
   const pace = rel("span", "pace"), scale = rel("span", "scale"); scale.append(rAvatar(role.id, s, i)); pace.append(scale);
   const stage = rel("div", "stage"); stage.append(pace);
   if (s === "queued") stage.append(rel("span", "zzz", "z"));
   if (s === "working") { const g = rel("span", "gadget " + (R_GADGET[role.id] || "copter")); g.setAttribute("aria-hidden", "true"); stage.append(g); }
-  if (s === "done") { for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); } }
+  if (s === "done") for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); }
+  if (need) { const h = handEl(); h.title = `${role.mascot} is waiting for you`; stage.append(h); }
   const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
   const seat = rel("div", "seat"); seat.append(stage, table, ...rTouches(key));
+  // The plate keeps to a name and one status line: the full task text is in the Tasks card and the hover card.
   const plate = rel("div", "plate"), nm = rel("div", "plate-name"), st = rel("span", s === "working" ? "st bell" : "st", R_ICON[s]); st.setAttribute("aria-hidden", "true");
   const sw = rel("i", "swatch"); sw.setAttribute("aria-hidden", "true");
-  nm.append(sw, rel("b", null, role.mascot), st);
-  plate.append(nm); const chips = rChips({ ...role, ...m }); if (chips) plate.append(chips);
-  plate.append(rel("div", "plate-role", rTitle({ ...role, ...m })));
-  if (showTeam && rTeam({ ...role, ...m })) plate.append(rel("div", "pteam", rTeam({ ...role, ...m })));
-  plate.append(rel("div", "plate-task", m.line));
-  if (!proj && m.project && m.status === "working") plate.append(rel("div", "ptag", m.project));
-  if (m.ref) plate.append(rel("div", "plate-ref", m.ref));
+  nm.append(sw, rel("b", null, plateName(role)), st);
+  const span = m.since ? shortSpan(rMins(m.since)) : "";
+  const line = waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
+  const task = rel("div", "plate-task", line); task.title = m.task || m.line || ""; plate.append(nm, task);
   desk.append(seat, plate);
   if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
   rWireCard(desk, role.id, proj);
-  rFxPaint(desk, rK(role.id, proj));
+  rFxPaint(desk, k);
   return desk;
 }
 
-// ---- Projects and tasks: the picker filters both tabs; every count comes from state.tasks for the picked project ----
+// ---- Projects: the picker filters the floor, the tasks, the cost and the log ----
 const noTasks = { active: [], queued: [], done: [] };
 const tasksOf = (s) => s.tasks || noTasks;
 const inView = (t) => rProj === "" || t.project === rProj;
@@ -328,55 +382,309 @@ function pickInit(s) {
   const c = [q, stored, s.focus].find((p) => p === "all" || (p && names.includes(p)));
   rProj = !c || c === "all" ? "" : c; rPicked = true;
 }
-function rRenderProjects(s) {
+const sigs = {};                                   // section -> last painted signature: a section is repainted only when its data changed
+const changed = (name, value) => { const sig = JSON.stringify(value); if (sigs[name] === sig) return false; sigs[name] = sig; return true; };
+function pick(p) {
+  if (rProj === p) return;
+  rProj = p; rPut("crewProject", p || "all"); rSig = "";
+  try { const u = new URL(location.href); u.searchParams.set("project", p || "all"); history.replaceState(null, "", u); } catch {}
+  paintAll();
+}
+function renderProjects(s) {
   const names = rProjNames(s), T = tasksOf(s), n = (p) => T.active.filter((t) => !p || t.project === p).length;
+  const nav = $("projects"); nav.hidden = !names.length;
+  if (!changed("projects", [names, rProj, names.map(n), n("")])) return;
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
-    b.append(rel("span", "pn", text), rel("span", "pc", `${n(p)} active`));
-    b.onclick = () => {
-      if (rProj === p) return;
-      rProj = p; rPut("crewProject", p || "all"); rSig = "";
-      try { const u = new URL(location.href); u.searchParams.set("project", p || "all"); history.replaceState(null, "", u); } catch {}
-      paintAll();
-    };
-    return b;
+    b.append(document.createTextNode(text + " "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working`);
+    b.onclick = () => pick(p); return b;
   };
-  for (const id of ["r-projects", "l-projects"]) {
-    const box = RSVG(id); box.hidden = !names.length;
-    box.replaceChildren(...(names.length ? [rel("span", "plabel", "PROJECT"), ...names.map((p) => chip(p, p)), chip("", "All projects")] : []));
+  nav.replaceChildren(...names.map((p) => chip(p, p)), chip("", "All"));
+}
+
+// ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
+const NEED_ICON = { permission: "lock", input: "hand", idle: "hand", "agent-input": "hand", pr: "pr" };
+const NEED_HINT = { permission: "Answer the prompt in your {p} Claude Code session.", input: "Reply in your {p} Claude Code session.", idle: "Claude is waiting for your reply in {p}.", "agent-input": "An agent needs an answer in your {p} Claude Code session." };
+// `code` spans in the text become <code>; everything else stays text.
+function richText(box, text) {
+  String(text || "").split("`").forEach((part, i) => { if (!part) return; box.append(i % 2 ? rel("code", null, part) : document.createTextNode(part)); });
+  return box;
+}
+const needList = (s) => (Array.isArray(s.needsYou) ? s.needsYou.filter((x) => x && typeof x === "object") : []);
+function renderNeed(s) {
+  const list = needList(s), box = $("need"), now = Date.now();
+  box.hidden = !list.length;
+  if (!changed("need", [list, Math.floor(now / 60000)])) return;
+  if (!list.length) { $("need-items").replaceChildren(); return; }
+  $("need-h").textContent = `Needs you · ${list.length}`;
+  $("need-items").replaceChildren(...list.map((x) => {
+    const row = rel("div", "nitem"); row.dataset.kind = x.kind;
+    const rid = roleId(x.role), body = rel("div"), nt = rel("div", "nt");
+    row.append(icon(NEED_ICON[x.kind] || "hand", 2));
+    if (rid) { const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(rid, "working", 0)); row.append(w); } else row.append(rel("span"));
+    richText(nt, x.text); body.append(nt);
+    const meta = [x.project, rid ? nameOf(rid) : "", x.since ? agoOf(x.since) : ""].filter(Boolean).join(" · ") + (x.stale ? " · may be old" : "");
+    body.append(rel("div", "nm", meta)); row.append(body);
+    if (x.kind === "pr") {
+      const r = rel("div", "nr"); const a = link(x.ref, "Open on GitHub ↗"); if (!a.href) a.removeAttribute("target"); r.append(a); row.append(r);
+    } else row.append(rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")));
+    return row;
+  }));
+}
+
+// ---- Floor header ----
+function renderFloor(s) {
+  const T = tasksOf(s);
+  $("floor-h").textContent = `The floor · ${rProj || "all projects"}`;
+  $("floor-meta").textContent = `${T.active.filter(inView).length} working · ${T.queued.filter(inView).length} queued`;
+}
+
+// ---- Cost: Today / 7 days, for the picked project (All projects sums the rooms). usd null is "–", never $0. ----
+let period = "today";
+const tokOf = (u) => u ? num(u.in) + num(u.out) + num(u.cw5m) + num(u.cw1h) + num(u.cr) : 0;
+const fmtTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(n);
+const fmtUsd = (v) => v == null ? "–" : v > 0 && v < 0.005 ? "<$0.01" : v >= 100 ? "$" + Math.round(v) : "$" + v.toFixed(2);
+const fmtApprox = (v) => v == null ? "–" : "≈ " + fmtUsd(v);
+function costFor(s) {
+  const c = s.cost, w = c && typeof c === "object" ? c.windows?.[period] : null;
+  if (!w) return null;
+  const names = rProj ? [rProj] : [...new Set([...Object.keys(w.rooms || {}), ...Object.keys(w.agents || {})])];
+  const out = { usd: null, tok: 0, runs: null, partial: false, agents: [], tasks: [] };
+  const agents = new Map();
+  for (const p of names) {
+    const r = w.rooms?.[p];
+    if (r) { out.tok += tokOf(r.usage); if (r.usd != null) out.usd = (out.usd ?? 0) + r.usd; if (r.partial || r.unpriced?.length) out.partial = true; }
+    for (const a of w.agents?.[p] || []) {
+      const k = a.role + (a.main ? "#main" : ""), cur = agents.get(k) || { role: a.role, main: !!a.main, runs: null, tok: 0, usd: null, partial: false };
+      cur.tok += tokOf(a.usage); if (a.usd != null) cur.usd = (cur.usd ?? 0) + a.usd; if (a.runs != null) cur.runs = (cur.runs ?? 0) + a.runs;
+      if (a.unpriced?.length) cur.partial = true;
+      agents.set(k, cur);
+    }
   }
+  out.agents = [...agents.values()].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || b.tok - a.tok);
+  const runs = out.agents.filter((a) => a.runs != null); out.runs = runs.length ? runs.reduce((n, a) => n + a.runs, 0) : null;
+  const T = tasksOf(s), byId = new Map([...T.active, ...T.queued, ...T.done].map((t) => [t.id, t]));
+  for (const [id, v] of Object.entries(w.tasks || {})) { const t = byId.get(id); if (t && inView(t)) out.tasks.push({ text: t.text, role: t.role, tok: tokOf(v.usage), usd: v.usd ?? null }); }
+  out.tasks.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
+  return out;
 }
-// One row: face, name, P0/P1/P2 chip, time / task text / project.
+const agentLabel = (a) => nameOf(a.role) + (a.main ? " (main)" : "");
+const tr = (cells, th) => { const r = rel("tr"); cells.forEach((c, i) => r.append(rel(th && i === 0 ? "th" : "td", null, String(c)))); if (th) r.firstChild.scope = "row"; return r; };
+function renderCost(s) {
+  const card = $("cost"), c = costFor(s), tracked = !!c, body = $("cost-body");
+  card.dataset.state = !last ? "loading" : tracked ? "ok" : "none";
+  for (const b of document.querySelectorAll(".seg button")) { b.setAttribute("aria-pressed", String(b.dataset.p === period)); b.disabled = !tracked && !!last; }
+  const prices = s.cost?.prices || {};
+  if (!changed("cost", [c, period, rProj, prices, s.cost?.updatedAt ? Math.floor(Date.now() / 60000) : 0, !!last])) return;
+  if (!tracked) {
+    $("c-total").textContent = "–"; $("c-tok").textContent = "–"; $("c-runs").textContent = "";
+    $("c-sub").textContent = last ? "not tracked yet" : "loading";
+    $("c-bars").replaceChildren(); $("c-rows").replaceChildren(); $("c-task-rows").replaceChildren(); $("c-details").hidden = true;
+    $("c-note").textContent = last ? "Cost shows here once the board server records token usage. Nothing is hidden: it is not tracked yet, so there is no total, not a zero." : "Waiting for the board.";
+    $("c-badge").hidden = true; return;
+  }
+  const label = period === "today" ? "today" : "last 7 days";
+  $("c-total").textContent = c.usd == null ? "–" : (c.partial ? "≈ " + fmtUsd(c.usd) + "+" : "≈ " + fmtUsd(c.usd));
+  $("c-tok").textContent = fmtTok(c.tok); $("c-sub").textContent = "tokens"; $("c-runs").textContent = c.runs != null ? ` · ${c.runs} run${c.runs === 1 ? "" : "s"}` : "";
+  const top = c.agents.slice(0, 4), rest = c.agents.slice(4), max = Math.max(0.0001, ...c.agents.map((a) => a.usd ?? 0));
+  const rows = top.map((a) => ({ n: nameOf(a.role) + (a.main ? " (main)" : ""), v: a.usd })).concat(rest.length ? [{ n: "Others", v: rest.some((a) => a.usd != null) ? rest.reduce((n, a) => n + (a.usd ?? 0), 0) : null, note: `${rest.length} agent${rest.length === 1 ? "" : "s"}` }] : []);
+  $("c-bars").replaceChildren(...rows.map(({ n, v, note }) => {
+    const li = rel("li", "cbar" + (note ? " oth" : "")), trk = rel("span", "trk"), fill = rel("i");
+    if (v == null) fill.hidden = true; else fill.style.width = (v / max * 100) + "%";
+    trk.append(fill); li.append(rel("span", "who", n), trk, rel("span", "val", v == null ? "–" : fmtUsd(v)));
+    li.title = note ? `${n}: ${note}` : `${n}: ${fmtApprox(v)}`; return li;
+  }));
+  $("c-bars").hidden = !rows.length;
+  $("c-details").hidden = !c.agents.length && !c.tasks.length;
+  $("c-cap").textContent = `By agent, ${label} (estimated)`;
+  $("c-rows").replaceChildren(...c.agents.map((a) => tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), a.usd == null ? "–" : fmtApprox(a.usd)], true)));
+  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), c.usd == null ? "–" : fmtApprox(c.usd)])]);
+  $("c-task-cap").textContent = `By task, ${label} (estimated)`; $("c-task-table").hidden = !c.tasks.length;
+  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, nameOf(t.role), fmtTok(t.tok), t.usd == null ? "–" : fmtApprox(t.usd)]); r.firstChild.className = "tt"; r.firstChild.title = t.text; return r; }));
+  const note = $("c-note"); note.replaceChildren();
+  note.append(document.createTextNode(`Token counts × list prices${prices.asOf ? ", prices as of " + prices.asOf : ""}. Not your bill.`));
+  if (c.partial) note.append(document.createTextNode(" Some models have no price, so the total is a floor."));
+  if (prices.note) note.append(document.createTextNode(" " + prices.note));
+  if (prices.stale) { note.append(document.createTextNode(" "), rel("span", "stale-warn", "Prices may be out of date.")); }
+  if (s.cost.updatedAt) note.append(document.createTextNode(` Updated ${agoOf(s.cost.updatedAt)}.`));
+  const b = $("c-badge"); b.hidden = false; b.textContent = prices.stale ? "estimate · stale prices" : "estimate"; b.dataset.stale = prices.stale ? "1" : "";
+}
+
+// ---- Tasks: Running and Queued (the full task text lives here; desk plates keep a short status) ----
+const TPRIO = { P0: 0, P1: 1, P2: 2 };
 const R_PRIO = { P0: "P0: do first", P1: "P1: next", P2: "P2: when free" };
-let rTkSeen = null;
-function rTaskRow(t, kind) {
-  const act = kind === "active", iso = act ? t.startedAt : t.queuedAt, li = rel("li", "tk-row"), body = rel("div", "tk-body"), l1 = rel("div", "tk-l1");
-  l1.append(rel("span", "who", rRoleName(t.role)));
-  if (t.priority) { const c = rel("span", "pri", t.priority); c.dataset.p = t.priority; c.title = R_PRIO[t.priority]; l1.append(c); }
-  const tm = rel("time", null, rSpan(rMins(iso)).replace("under a minute", "now")); tm.dateTime = iso; tm.title = `${act ? "Started" : "Queued"} ${rclock(iso)}`; l1.append(tm);
-  const txt = rel("p", "tk-txt", t.text); txt.title = t.text; body.append(l1, txt);
-  const meta = rel("p", "tk-meta"); if (!rProj) meta.append(rel("span", "proj", t.project)); if (t.ref) meta.append(rel("span", "ref", t.ref));
-  if (meta.childElementCount) body.append(meta);
-  li.append(rMini(t.role, act ? "working" : "queued", 0), body);
-  li.setAttribute("aria-label", `${rRoleName(t.role)}${t.priority ? ", " + t.priority : ""}: ${t.text}. ${act ? "Working for" : "Waiting"} ${rSpan(rMins(iso))}${!rProj ? ". " + t.project : ""}`);
-  if (rTkSeen && !rTkSeen.has(t.id)) li.classList.add("fresh");
-  return li;
+const tkOpen = { run: false, q: false };
+function taskList(rows, kind, running) {
+  const ul = rel("ul", "tl"), shown = tkOpen[kind] ? rows : rows.slice(0, 4);
+  if (!rows.length) ul.append(rel("li", "tk-empty", running ? (rProj ? `Nobody is working on ${rProj} right now.` : "Nobody is working right now.") : "Nothing queued."));
+  shown.forEach((t, k) => {
+    const li = rel("li"), iso = running ? t.startedAt : t.queuedAt, mins = iso ? rMins(iso) : 0;
+    const chip = rel("span", "pc " + (t.priority ? t.priority.toLowerCase() : "p-"), t.priority || ""); if (t.priority) chip.title = R_PRIO[t.priority];
+    const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(t.role, running ? "working" : "queued", k));
+    const tx = rel("div", "tx2"), nm = rel("b", null, nameOf(t.role)); if (!rProj) nm.append(rel("small", null, " · " + t.project));
+    const text = rel("span", null, t.text); tx.title = t.text; tx.append(nm, text);
+    const age = rel("time", "age" + (running ? " run" : ""), shortSpan(mins)); if (iso) { age.dateTime = iso; age.title = `${running ? "Started" : "Queued"} ${rclock(iso)}`; }
+    li.append(chip, w, tx, age); ul.append(li);
+  });
+  const out = [ul];
+  if (rows.length > 4) {
+    const b = rel("button", "more", tkOpen[kind] ? "Show fewer ▾" : `+${rows.length - 4} more ▸`); b.type = "button"; b.setAttribute("aria-expanded", String(tkOpen[kind]));
+    b.onclick = () => { tkOpen[kind] = !tkOpen[kind]; sigs.tasks = ""; renderTasks(last); }; out.push(b);
+  }
+  return out;
 }
-function rRenderTasks(s) {
-  const T = tasksOf(s), act = T.active.filter(inView), que = T.queued.filter(inView);
-  const panel = (title, list, kind, empty) => {
-    const sec = rel("section", "tk"); sec.dataset.k = kind; sec.setAttribute("aria-label", title);
-    const h = rel("h2", null, title); h.append(rel("span", "tk-n", String(list.length))); sec.append(h);
-    const ul = rel(kind === "queued" ? "ol" : "ul", "tk-list"); ul.tabIndex = 0; ul.setAttribute("aria-label", `${title} tasks`);
-    ul.append(...(list.length ? list.map((t) => rTaskRow(t, kind)) : [rel("li", "tk-empty", empty)]));
-    sec.append(ul); return sec;
-  };
-  const label = rProj || "all projects";
-  for (const id of ["l-tasks", "r-tasks"]) RSVG(id).replaceChildren(panel("Active", act, "active", `Nobody is working on ${label} right now.`), panel("Queued", que, "queued", "Nothing queued."));
-  rTkSeen = new Set([...T.active, ...T.queued].map((t) => t.id));
-  document.title = `Crew Room · ${rProj || "All projects"} · ${act.length} active`;
+function renderTasks(s) {
+  const T = tasksOf(s), by = (key) => (a, b) => (TPRIO[a.priority] ?? 9) - (TPRIO[b.priority] ?? 9) || (a[key] || "").localeCompare(b[key] || "");
+  const run = T.active.filter(inView).sort(by("startedAt")), que = T.queued.filter(inView).sort(by("queuedAt"));
+  if (!changed("tasks", [run, que, tkOpen, rProj, Math.floor(Date.now() / 60000)])) return;
+  $("run-n").textContent = String(run.length); $("q-n").textContent = String(que.length);
+  $("tk-run").replaceChildren(...taskList(run, "run", true)); $("tk-q").replaceChildren(...taskList(que, "q", false));
+  $("run-pulse").dataset.on = run.length ? "1" : "";
 }
-function renderTasks(s) { rRenderProjects(s); rRenderTasks(s); }
+
+// ---- Ship: the picked project's snapshot (deploy, CI, PRs, commits, app errors); All projects shows the focus project's. Rows expand in place. ----
+function snapOf(s) { const n = rProj || s.focus, sn = n && s.snapshots?.[n]; return sn ? { ...s, ...sn, name: n } : { ...s, name: n, ci: [], prs: [], commits: {}, deploy: null, errors: [], problems: {}, polledAt: {} }; }
+const shipOpen = new Set();
+const tone = (c) => c === "success" || c === "ok" ? "ok" : c === "failure" || c === "failed" || c === "rolled-back" || c === "error" || c === "fatal" ? "bad" : "";
+function shipRow(key, ic, icTone, title, when, items, emptyText) {
+  if (!items) { const d = rel("div", "sl none"); d.append(icon(ic, 1.5, icTone), rel("span", null, title), rel("span", "when", when || "not read yet")); return d; }
+  const d = rel("details", "sl"); d.dataset.key = key; if (shipOpen.has(key)) d.open = true;
+  d.addEventListener("toggle", () => { if (d.open) shipOpen.add(key); else shipOpen.delete(key); });
+  const sum = rel("summary"); sum.append(icon(ic, 1.5, icTone)); const t = rel("span"); if (typeof title === "string") t.textContent = title; else t.append(...title); sum.append(t, rel("span", "when", when || ""));
+  d.append(sum); const ul = rel("ul"); ul.append(...items); d.append(ul); return d;
+}
+const li2 = (when, ...parts) => { const li = rel("li"), t = rel("time", null, when); const sp = rel("span"); sp.append(...parts.flat()); li.append(t, sp); return li; };
+const txt = (t, cls) => cls ? rel("span", cls, t) : document.createTextNode(t);
+function renderShip(s0) {
+  const s = snapOf(s0), out = [], pa = s.polledAt || {}, read = pa.github || pa.box;
+  const probs = [s.problems?.box && "Box: " + s.problems.box, s.problems?.ci, s.problems?.prs, s.problems?.git].filter(Boolean);
+  const minute = Math.floor(Date.now() / 60000);
+  if (!changed("ship", [s.name, s.deploy, s.ci, s.prs, s.commits, s.errors, probs, pa, minute])) return;
+  $("ship-meta").textContent = [s.name, read ? "read " + agoOf(read) : ""].filter(Boolean).join(" · ");
+  $("ship-meta").dataset.old = read && Date.now() - Date.parse(read) > 15 * 60000 ? "1" : "";
+  const holder = $("ship-rows");
+  if (probs.length) out.push(Object.assign(rel("p", "problem", probs.join(" · ")), {}));
+  // Live (deploy)
+  const d = s.deploy;
+  if (d) {
+    const bad = tone(d.status) === "bad", hist = (d.history || []).slice(0, 5).map((h) => {
+      const m = String(h).match(/^(\S+)\s+(\S+)\s+(\S+)\s*(.*)$/), at = m && Date.parse(m[3]) ? m[3] : "";
+      return m ? li2(at ? whenOf(at) : "", txt(m[1] === "ok" ? "Deployed" : m[1] === "rolled-back" ? "Rolled back" : m[1], tone(m[1])), txt(" " + m[2] + (m[4] ? ": " + m[4] : ""))) : li2("", txt(String(h)));
+    });
+    out.push(shipRow("deploy", bad ? "x" : "check", bad ? "bad" : "ok", [bad ? txt(d.status === "rolled-back" ? "Rolled back " : "Deploy " + d.status + " ", "bad") : txt("Live "), rel("b", null, d.version || "?")], d.at ? `${hm(d.at)} · ${agoOf(d.at)}` : "", hist));
+  } else out.push(shipRow("deploy", "dot", "", "Live version", "not read yet", null));
+  // CI
+  const ci = s.ci || [];
+  if (ci.length) {
+    const r = ci[0], res = r.status === "completed" ? r.conclusion : r.status, bad = tone(res) === "bad", okc = tone(res) === "ok";
+    const word = res === "success" ? "passed" : res === "failure" ? "failed" : res;
+    out.push(shipRow("ci", bad ? "x" : okc ? "check" : "dot", bad ? "bad" : okc ? "ok" : "", [txt("CI "), rel("code", null, r.branch), txt(" " + word)], whenOf(r.createdAt), ci.slice(0, 6).map((x) => {
+      const rr = x.status === "completed" ? x.conclusion : x.status;
+      return li2(whenOf(x.createdAt), link(x.url, `${x.workflow} · ${x.branch}`), txt(" " + (rr === "success" ? "passed" : rr === "failure" ? "failed" : rr), tone(rr)), txt(": " + x.title));
+    })));
+  } else out.push(shipRow("ci", "dot", "", "CI runs", "not read yet", null));
+  // Pull requests
+  const prs = s.prs || [], open = prs.filter((p) => p.state === "OPEN");
+  if (prs.length) out.push(shipRow("prs", "pr", "", `${open.length} open PR${open.length === 1 ? "" : "s"}`, open[0] ? `#${open[0].number}${open[0].draft ? " draft" : ""}` : "none open", prs.slice(0, 6).map((p) => li2(whenOf(p.updatedAt), link(p.url, `#${p.number}`), txt(` ${p.draft ? "draft" : p.state.toLowerCase()}: ${p.title}`)))));
+  else out.push(shipRow("prs", "pr", "", "Pull requests", "not read yet", null));
+  // Commits
+  const commits = Object.values(s.commits || {}).flat().sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+  if (commits.length) out.push(shipRow("commits", "dot", "", `${commits.length} recent commit${commits.length === 1 ? "" : "s"}`, `last ${commits[0].short}`, commits.slice(0, 6).map((c) => li2(whenOf(c.at), rel("code", null, c.short), txt(" " + c.subject)))));
+  else out.push(shipRow("commits", "dot", "", "Commits", "not read yet", null));
+  // App errors
+  const errs = s.errors || [];
+  if (pa.box || errs.length) {
+    const e = errs.filter((x) => x.level === "error" || x.level === "fatal").length, w = errs.length - e;
+    out.push(shipRow("errors", errs.length ? "warn" : "check", errs.length ? (e ? "bad" : "") : "ok", errs.length ? `${e} error${e === 1 ? "" : "s"} · ${w} warning${w === 1 ? "" : "s"}` : "No app errors", "app log", errs.length ? errs.slice(0, 8).map((x) => li2(whenOf(x.at), txt(x.level + " ", tone(x.level) || "warn"), rel("b", null, x.service + ": "), txt(x.msg))) : null));
+  } else out.push(shipRow("errors", "dot", "", "App errors", "not read yet", null));
+  holder.replaceChildren(...out);
+}
+
+// ---- Log: what the crew did. Hand-backs, assignments and dropped tasks; commits, PRs, CI and deploys are in Ship. Rows are kept by event id and only the difference is applied. ----
+let logFilter = "all", logAll = false, logSeen = null;
+const logNodes = new Map();
+const quietType = (t) => !t || /^(general-purpose|agent)$/.test(roleId(t));
+function logEntries(s) {
+  const out = [];
+  for (const e of s.events || []) {
+    if (rProj && e.project && e.project !== rProj) continue;
+    if (e.kind === "agent-stop" && !quietType(e.agentType)) {
+      const sum = (e.text.match(/\bfinished:\s*(.*)$/s)?.[1] || "").trim(), who = nameOf(e.agentType);
+      out.push({ id: e.id, ts: e.ts, f: "back", ic: "check", tone: "ok", text: `${who} handed back${sum ? ": " + sum : "."}` });
+    } else if (e.kind === "assign" && e.to && !quietType(e.to)) out.push({ id: e.id, ts: e.ts, f: "task", ic: "arrow", tone: "", text: `${nameOf(e.from || MGR)} gave ${nameOf(e.to)}: ${e.text}` });
+    else if (e.kind === "task-drop") out.push({ id: e.id, ts: e.ts, f: "task", ic: "x", tone: "bad", text: `Task dropped: ${e.text}${e.role ? " (" + nameOf(e.role) + ")" : ""}` });
+  }
+  return out;
+}
+function logRow(en, fresh) {
+  const r = rel("div", "lrow"); r.dataset.f = en.f; r.dataset.id = en.id; if (fresh) r.classList.add("fresh");
+  const t = rel("time", null, hm(en.ts)); t.dateTime = en.ts; t.title = `${day(en.ts)} ${hm(en.ts)} IST`;
+  r.append(t, icon(en.ic, 1.5, en.tone), rel("div", "tx", en.text)); return r;
+}
+const dayLabel = (iso) => { const d = day(iso); return d === day(new Date().toISOString()) ? "Today" : d === day(new Date(Date.now() - 86400000).toISOString()) ? "Yesterday" : dayName(iso); };
+function renderLog(s) {
+  const all = logEntries(s).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 150);
+  const list = all.filter((e) => logFilter === "all" || e.f === logFilter), cap = logAll ? list.length : 12, shown = list.slice(0, cap);
+  const box = $("logbox"), want = [];
+  let lastDay = "";
+  for (const e of shown) {
+    const dl = dayLabel(e.ts);
+    if (dl !== lastDay) { lastDay = dl; const k = "day:" + dl; let n = logNodes.get(k); if (!n) { n = rel("div", "day", dl); logNodes.set(k, n); } want.push([k, n]); }
+    let n = logNodes.get(e.id); if (!n) { n = logRow(e, logSeen && !logSeen.has(e.id)); logNodes.set(e.id, n); } want.push([e.id, n]);
+  }
+  const keep = new Set(want.map(([k]) => k));
+  for (const [k, n] of logNodes) if (!keep.has(k)) { n.remove(); logNodes.delete(k); }
+  let ref = box.firstChild;
+  while (ref && !(ref.classList && (ref.classList.contains("lrow") || ref.classList.contains("day")))) ref = ref.nextSibling;   // skip the empty-state / button nodes
+  for (const [, n] of want) { if (n === ref) ref = ref.nextSibling; else box.insertBefore(n, ref); }
+  const empty = box.querySelector(".empty"), more = box.querySelector(".more");
+  if (!want.length) { if (!empty) box.append(rel("p", "empty", all.length ? "Nothing matches this filter." : "Nothing logged yet.")); else empty.textContent = all.length ? "Nothing matches this filter." : "Nothing logged yet."; } else empty?.remove();
+  if (list.length > cap || (logAll && list.length > 12)) {
+    const label = logAll ? "Show fewer ▾" : `Show ${list.length - cap} more ▸`;
+    if (more) { more.textContent = label; more.setAttribute("aria-expanded", String(logAll)); }
+    else { const b = rel("button", "more", label); b.type = "button"; b.setAttribute("aria-expanded", String(logAll)); b.onclick = () => { logAll = !logAll; renderLog(last); }; box.append(b); }
+  } else more?.remove();
+  logSeen = new Set((s.events || []).map((e) => e.id));
+}
+for (const b of document.querySelectorAll(".fchip")) b.onclick = () => { logFilter = b.dataset.f; for (const x of document.querySelectorAll(".fchip")) x.setAttribute("aria-pressed", String(x === b)); if (last) renderLog(last); };
+
+// ---- Header: connection, clock, title, favicon, announcer ----
+const announceEl = $("announce");
+let announceT = 0;
+function announce(msg) { clearTimeout(announceT); announceEl.textContent = ""; announceT = setTimeout(() => { announceEl.textContent = msg; }, 60); }
+const fav = (dot) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect x="2" y="1" width="9" height="14" fill="#ff9ec7" stroke="#2b2340" stroke-width="2"/>${dot ? '<circle cx="12" cy="4" r="4" fill="#fbbf24" stroke="#2b2340"/>' : ""}</svg>`);
+let needSeen = null, conn = "";
+function renderHead(s) {
+  const n = needList(s).length;
+  document.title = n ? `(${n}) Needs you · Crew Room` : "Crew Room";
+  const l = $("favicon"); if (l) l.href = fav(!!n);
+  const ids = new Set(needList(s).map((x) => x.id));
+  if (needSeen) { const fresh = needList(s).filter((x) => !needSeen.has(x.id)); if (fresh.length) announce(fresh.map((x) => `Needs you: ${x.text}`).join(". ")); }
+  needSeen = ids;
+  const f = $("foot-need");
+  f.textContent = Array.isArray(s.needsYou) ? "Needs you shows: permission asks, replies, PR reviews. Not yet: merge asks." : "Needs you: not tracked yet. It starts when the board server sends it.";
+}
+function setConn(ok, s) {
+  const st = $("status"), next = ok ? "ok" : "lost";
+  if (ok) st.replaceChildren(rel("i"), document.createTextNode("Live · "), rel("span", "num", hm(s.now)), document.createTextNode(" IST"));
+  else st.replaceChildren(rel("i"), document.createTextNode("Offline · retrying"));
+  st.dataset.s = next; document.documentElement.dataset.conn = next;
+  if (conn && conn !== next) announce(ok ? "Board connection is back." : "Board connection lost. Showing the last data.");
+  conn = next;
+}
+
+function needKeys(s) { return new Set(needList(s).filter((x) => x.role).map((x) => rK(roleId(x.role), x.project || (rProj || "")))); }
+function paintAll() {
+  const s = last; if (!s) return;
+  const run = (name, f) => { try { f(s); } catch (e) { console.error(name, e); } };
+  run("pick", pickInit); run("projects", renderProjects);
+  rNeed = needKeys(s);
+  run("head", renderHead); run("need", renderNeed); run("floor", renderFloor);
+  run("room", renderRoom); run("cost", renderCost); run("tasks", renderTasks); run("ship", renderShip); run("log", renderLog);
+  document.documentElement.dataset.ready = "1";
+}
+for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { period = b.dataset.p; if (last) renderCost(last); };
+
 // Each project has its own crew: a room shows only that project's people. Source: state.rooms[p].members when the server sends it,
 // else room.members filtered by project. Desks follow the tasks of that project (a role with an active task there is working).
 const inProj = (t, p) => !p || t.project === p;
@@ -404,36 +712,6 @@ function rGroupsOf(s) {
   for (const g of list) g.open = !g.head || (g.p in rOpen ? rOpen[g.p] : g.w > 0 || g.mb);
   return list;
 }
-// Top facts for the picked project: Working and Queued are task counts (the same numbers as the panels); Live and Branch from the server.
-function rFactsFor(s) {
-  const T = tasksOf(s), r = s.room, by = s.factsByProject || r.factsByProject || {}, pn = rProj || s.focus;
-  const f = by[pn] || (pn === s.focus ? r.facts : []) || [], live = f.find((x) => x.label === "Live"), br = f.find((x) => x.label === "Branch");
-  const out = [{ label: "Working", value: String(T.active.filter(inView).length), tone: "run" }, { label: "Queued", value: String(T.queued.filter(inView).length) }];
-  if (live) out.push({ label: rProj ? "Live" : "Live " + pn, value: live.value, tone: live.tone });
-  if (br && rProj) out.push({ label: "Branch", value: br.value });
-  return out;
-}
-
-// ---- Framed pictures: the retired characters, calm and still, each with a brass plate saying where they went ----
-function rRenderGallery(s) {
-  const box = RSVG("r-gallery"), list = s.retired || s.room?.retired || [], roles = s.room?.roles || [];
-  const sig = JSON.stringify([list, roles.map((x) => [x.id, x.mascot])]);
-  if (box.dataset.sig === sig) return; box.dataset.sig = sig;
-  box.hidden = !list.length;
-  if (!list.length) { box.replaceChildren(); return; }
-  const frames = list.map((p) => {
-    const to = roles.find((x) => x.id === p.mergedInto)?.mascot || p.mergedInto || "";
-    const f = rel("figure", "frame"); f.setAttribute("aria-label", `${p.name}${to ? ", now with " + to : ""}`);
-    const pic = rel("div", "pic"), mat = rel("div", "mat"); mat.setAttribute("aria-hidden", "true");
-    mat.append(rAvatarKind(R_RETIRED_KIND[p.id] || "cat", "queued", 1)); pic.append(mat);
-    const plate = rel("figcaption", "fplate"); plate.append(rel("b", null, p.name)); if (to) plate.append(rel("span", null, "Now with " + to));
-    f.append(pic, plate); return f;
-  });
-  const head = rel("div", "g-head"); head.append(rel("b", "sign", "ON THE WALL"));
-  const row = rel("div", "frames"); row.append(...frames);
-  box.replaceChildren(head, row);
-}
-
 let rSig = "", rFeedSeen = null, rState = null, rShown = [];   // rShown: projects whose room is on screen
 const rMemOf = (id, p) => rState?.byProj?.[p || ""]?.find((x) => x.id === id) || rState?.members.find((x) => x.id === id);
 function renderRoom(s) {
@@ -441,13 +719,8 @@ function renderRoom(s) {
   const groups = rGroupsOf(s), byProj = Object.fromEntries(groups.map((g) => [g.p, rMembersFor(s, g.p)]));
   const r = { ...s.room, members: byProj[groups[0].p], byProj, groups, mgrOn: Object.fromEntries(groups.map((g) => [g.p, g.p && s.rooms?.[g.p] ? !!s.rooms[g.p].managerActive : !!s.room.managerActive])) }, T = tasksOf(s);
   rShown = groups.filter((g) => g.open).map((g) => g.p);
-  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date())) % 24;
-  RSVG("r-sky").textContent = hour >= 6 && hour < 18 ? "☀️" : "🌙";
-  rRenderGallery(s);
-  // Facts for the picked project.
-  RSVG("r-facts").replaceChildren(...rFactsFor(s).slice(0, 4).map((f) => { const c = rel("span", "count", `${f.label.toUpperCase()}  ${f.value}`); if (f.tone) c.dataset.s = f.tone === "run" ? "working" : f.tone === "ok" ? "done" : "blocked"; return c; }));
   // Rooms: only rebuilt when something changed, so the pop-in and pacing do not restart every poll.
-  const sig = JSON.stringify([r.roles, rProj, groups.map((g) => [g.p, g.head, g.open, g.w, g.q]), groups.map((g) => byProj[g.p].map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])), T.active.map((t) => [t.id, t.project])]);
+  const sig = JSON.stringify([r.roles, rProj, groups.map((g) => [g.p, g.head, g.open, g.w, g.q]), groups.map((g) => byProj[g.p].map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])), T.active.map((t) => [t.id, t.project]), [...rNeed]]);
   if (sig !== rSig) {
     rSig = sig;
     const retired = new Set(Object.keys(R_RETIRED_KIND));
@@ -459,15 +732,14 @@ function renderRoom(s) {
       const mem = Object.fromEntries(byProj[g.p].map((x) => [x.id, x]));
       const teams = R_ROOMS.map(([k, team, lore, ids, decor, furn]) => {
         const here = ids.filter((id) => roles[id]), names = [...new Set(here.map((id) => rTeam({ ...roles[id], ...mem[id] })).filter(Boolean))];
-        return { k, name: `${names.length ? names.join(" + ") : team} \u00b7 ${lore}`, shared: names.length > 1, decor, furn, ids: here };
+        return { k, name: (names.length ? names.join(" + ") : team).replace(/ Team$/, "").replace("Documentation", "Docs"), lore, shared: names.length > 1, furn, ids: here };
       });
       const others = Object.keys(roles).filter((id) => !placed.has(id)); if (others.length) teams.push({ k: "others", name: "Others", decor: ["sconce", "window"], furn: ["plant"], ids: others });
       const rooms = teams.filter((t) => t.ids.length).map((t) => {
-        const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name);
+        const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name + (t.lore ? ", " + t.lore : ""));
         const busy = T.active.filter((x) => t.ids.includes(x.role) && inProj(x, g.p)).length;
         const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
-        const sign = rel("b", "sign", t.name); if (busy) sign.dataset.busy = busy;
-        wall.append(sign, rDecor(t.decor));
+        const sign = rel("b", "sign", t.name.toUpperCase()); wall.append(sign); if (busy) wall.append(rel("span", "wk", busy + " working"));
         for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared, g.p));
         floor.append(grid, rProps(t.furn)); team.append(wall, floor);
         return team;
@@ -529,24 +801,11 @@ function rReact(f, age) {
 }
 
 
-// Tabs: Live is the default; the pick is remembered per viewer (storage can be blocked, so every access is guarded).
-function setTab(name) {
-  const room = name === "room";
-  document.documentElement.dataset.tab = room ? "room" : "live";
-  $("view-live").hidden = room; $("view-room").hidden = !room;
-  $("tab-live").setAttribute("aria-selected", String(!room)); $("tab-room").setAttribute("aria-selected", String(room));
-  rPut("crewTab", name);
-  if (room && typeof last !== "undefined" && last) { try { renderRoom(last); } catch (e) { console.error(e); } }
-}
-$("tab-live").onclick = () => setTab("live"); $("tab-room").onclick = () => setTab("room");
-document.querySelector(".tabs").addEventListener("keydown", (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { const go = $("tab-room").getAttribute("aria-selected") === "true" ? "live" : "room"; setTab(go); $("tab-" + go).focus(); } });
-setTab(location.hash === "#room" ? "room" : rGet("crewTab", "live") === "room" ? "room" : "live");   // a #room link opens the Crew Room
-
 // ---- Motion: follows the system setting, but the owner can force it on or off with the Motion button (kept per viewer). ----
 const rMotion = () => { const m = document.documentElement.dataset.motion; return m === "on" || (m !== "off" && !matchMedia("(prefers-reduced-motion: reduce)").matches); };
 function rSetMotion(v) {
   if (v) document.documentElement.dataset.motion = v; else delete document.documentElement.dataset.motion;
-  const b = $("r-motion"); if (b) { b.textContent = rMotion() ? "MOTION ON" : "MOTION OFF"; b.setAttribute("aria-pressed", String(rMotion())); }
+  const b = $("anim"); if (b) b.setAttribute("aria-pressed", String(rMotion()));
 }
 
 // ---- Walks: Doraemon visits people he messages or checks on; finished people walk to him. Everyone else stays seated. ----
@@ -844,5 +1103,33 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") rHideCard(); });
 addEventListener("click", () => rHideCard());
 addEventListener("scroll", () => rHideCard(), { passive: true });
 
-$("r-motion").onclick = () => { const on = rMotion(); rPut("crewMotion", on ? "off" : "on"); rSetMotion(on ? "off" : "on"); if (on) { RSVG("r-walkers").replaceChildren(); } };
+$("anim").onclick = () => { const on = rMotion(); rPut("crewMotion", on ? "off" : "on"); rSetMotion(on ? "off" : "on"); if (on) { RSVG("r-walkers").replaceChildren(); } };
 rSetMotion((() => { try { const v = localStorage.getItem("crewMotion"); return v === "on" || v === "off" ? v : ""; } catch { return ""; } })());
+
+// ---- Theme: follows the device, the toggle overrides it for this viewer ----
+const root = document.documentElement;
+{ const t = rGet("crewTheme", ""); if (t === "dark" || t === "light") root.dataset.theme = t; }
+const themeBtn = $("theme");
+const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+const paintTheme = () => { const d = isDark(); themeBtn.textContent = d ? "☾ Dark" : "☀ Light"; themeBtn.setAttribute("aria-label", `Theme: ${d ? "dark" : "light"}. Switch to ${d ? "light" : "dark"}`); };
+themeBtn.onclick = () => { const next = isDark() ? "light" : "dark"; root.dataset.theme = next; rPut("crewTheme", next); paintTheme(); };
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintTheme); } catch {}
+paintTheme();
+
+// ---- Polling: every 2 s while the tab is visible, slower after failures, none while it is hidden ----
+let pollT = 0, polling = false, fails = 0;
+function schedule() { clearTimeout(pollT); if (document.hidden) return; pollT = setTimeout(tick, fails ? Math.min(15000, 2000 * (fails + 1)) : 2000); }
+async function tick() {
+  if (polling) return;
+  polling = true; clearTimeout(pollT);
+  try {
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
+    const r = await fetch("/api/state", { cache: "no-store", signal: ctl.signal }); clearTimeout(to);
+    if (!r.ok) throw new Error(String(r.status));
+    last = await r.json(); fails = 0;
+    setConn(true, last); paintAll();
+  } catch (e) { fails++; setConn(false); if (!last) $("status").dataset.s = "lost"; }
+  finally { polling = false; schedule(); }
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(pollT); else tick(); });
+tick();
