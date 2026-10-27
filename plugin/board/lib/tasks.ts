@@ -32,6 +32,25 @@ const isPriority = (p: unknown): p is Priority => PRIORITIES.includes(p as Prior
 interface Entry { task: BoardTask; seq: number; agent?: string; seen?: string }   // agent: the agent id its start/stop events are matched on
 const byTime = (key: "queuedAt" | "startedAt" | "doneAt") => (a: Entry, b: Entry) => (a.task[key] ?? "").localeCompare(b.task[key] ?? "") || a.seq - b.seq;
 
+const STOPWORDS = new Set(["the", "and", "for", "with", "per", "this", "that", "from", "into", "are", "was", "all", "any", "its", "our", "you", "your", "then", "than", "task", "please"]);
+const MATCH_MIN = 0.3, MATCH_LEAD = 0.1;
+// Word tokens of a text: lowercase, 3+ characters, no stopwords. A trailing "s" is dropped so "styles" meets "style".
+const tokens = (s: string) => new Set((s.toLowerCase().match(/[a-z0-9]+/g) ?? []).map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w)).filter((w) => w.length >= 3 && !STOPWORDS.has(w)));
+const overlap = (a: Set<string>, b: Set<string>) => {
+  let n = 0;
+  for (const w of a) if (b.has(w)) n++;
+  return a.size && b.size ? n / Math.min(a.size, b.size) : 0;
+};
+
+// Which queued task (given oldest first) an assign is for: the best word overlap with its text when that is
+// clear (score >= MATCH_MIN and ahead of the runner-up by MATCH_LEAD), else the oldest. Ties go to the oldest.
+function bestMatch(queued: Entry[], text: string): Entry | undefined {
+  if (queued.length < 2) return queued[0];
+  const want = tokens(text);
+  const scored = queued.map((x, i) => ({ x, i, s: overlap(want, tokens(x.task.text)) })).sort((a, b) => b.s - a.s || a.i - b.i);
+  return scored[0].s >= MATCH_MIN && scored[0].s - scored[1].s >= MATCH_LEAD ? scored[0].x : queued[0];
+}
+
 function all(events: BoardEvent[], roles: Map<string, Role>, now?: number, onBind?: (agentId: string, taskId: string) => void): Entry[] {
   const types = typesById(events), tasks = new Map<string, Entry>();
   let seq = 0;
@@ -68,7 +87,7 @@ function all(events: BoardEvent[], roles: Map<string, Role>, now?: number, onBin
       const stoppedAt = lastStop.get(`${project}\0${role.id}`);
       if (stoppedAt && Date.parse(e.ts) - Date.parse(stoppedAt) <= LATE_ASSIGN_MS) continue;
       const asked = normalizeModel(e.model), over = isOverride(asked, normalizeModel(e.declaredModel)) ? { modelOverride: asked } : {};
-      const queued = oldest(project, role.id, "queued");
+      const queued = bestMatch(mine(project, role.id, "queued"), e.text);
       if (queued) Object.assign(queued.task, { state: "active", startedAt: e.ts, ...over });
       else { const id = taskIdOf(e.id); tasks.set(id, { seq: seq++, task: { id, project, role: role.id, text: e.text, state: "active", startedAt: e.ts, ...over } }); }
     } else if (e.kind === "agent-start") {

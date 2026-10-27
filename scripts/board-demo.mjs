@@ -83,6 +83,9 @@ job(SHOP, 'joe-gardner', 'Run the order-flow integration suite', { queueMin: 60,
 job(SHOP, 'bob', 'Add rate limiting to the checkout route', { queueMin: 50, priority: 'P0', startMin: 18 });
 job(SHOP, 'mike-wazowski', 'Cache Docker layers in the CI build', { queueMin: 45, priority: 'P1', startMin: 12 });
 job(SHOP, 'ninja-hattori', 'Scan the new payment webhook for secrets', { startMin: 6 });
+// A clone: two Shinchans at once. The first started 8 minutes ago; the second, with its own "#2" assign, about a minute ago.
+job(SHOP, 'shinchan', 'Shinchan #1: Build the order status badges', { startMin: 8 });
+job(SHOP, 'shinchan', 'Shinchan #2: Build the order timeline view', { startMin: 1 });
 queued(SHOP, 'sulley', 'P1', 'Plan a blue-green rollout for orders-service', 40);
 queued(SHOP, 'twenty-two', 'P2', 'Explore carts with zero-quantity items', 38);
 queued(SHOP, 'shizuka', 'P2', 'Add a changelog entry for v2.9', 35);

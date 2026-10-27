@@ -216,6 +216,49 @@ test("a resume never takes a queued task or makes a new one", () => {
   assert.deepEqual(t.queued.map((x) => x.id), [q]);
 });
 
+// Two queued tasks for nobita: the older is unrelated, the newer is the one an assign may name.
+const queueTwo = () => {
+  const older = idOf(cli("shop", "add", "--role", "nobita", "Review clone animation and meter").out);
+  const newer = idOf(cli("shop", "add", "--role", "nobita", "Design a travel style per character").out);
+  return { older, newer };
+};
+const nobitaAssign = (ms: number, text: string, extra: Partial<BoardEvent> = {}) =>
+  ev(ms, { kind: "assign", from: "doraemon", to: "toon-crew:nobita", text, project: "shop", ...extra });
+
+test("an assign binds the queued task its text matches, not the oldest", () => {
+  const { older, newer } = queueTwo();
+  nobitaAssign(0, "Design per-character travel styles");
+  const t = state();
+  assert.deepEqual(t.active.map((x) => x.id), [newer]);
+  assert.deepEqual(t.queued.map((x) => x.id), [older]);
+});
+
+test("an assign with unrelated text binds the oldest queued task", () => {
+  const { older, newer } = queueTwo();
+  nobitaAssign(0, "Fix the login redirect");
+  const t = state();
+  assert.deepEqual(t.active.map((x) => x.id), [older]);
+  assert.deepEqual(t.queued.map((x) => x.id), [newer]);
+});
+
+test("a tie between matching queued tasks goes to the oldest", () => {
+  const a = idOf(cli("shop", "add", "--role", "nobita", "Polish the walk cycle").out);
+  const b = idOf(cli("shop", "add", "--role", "nobita", "Polish the walk cycle").out);
+  nobitaAssign(0, "Polish walk cycle");
+  assert.deepEqual(state().active.map((x) => x.id), [a]);
+  assert.deepEqual(state().queued.map((x) => x.id), [b]);
+});
+
+test("a follow-up to a running, bound agent does not bind a second queued task", () => {
+  const { older, newer } = queueTwo();
+  nobitaAssign(0, "Design per-character travel styles");
+  ev(1000, { kind: "agent-start", agentId: "a-nob", agentType: "toon-crew:nobita", text: "s", project: "shop" });
+  nobitaAssign(2000, "Review clone animation and meter", { toId: "a-nob" });   // SendMessage follow-up, same agent
+  const t = state();
+  assert.deepEqual(t.active.map((x) => x.id), [newer]);
+  assert.deepEqual(t.queued.map((x) => x.id), [older]);
+});
+
 test("modelOverride is set only when the assign's model differs from the agent file's", () => {
   bobAssign(0, { model: "opus", declaredModel: "sonnet", effectiveModel: "opus" });
   assert.equal(state().active[0].modelOverride, "opus");
