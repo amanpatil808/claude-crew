@@ -70,9 +70,50 @@ Then add a `## Board` section to the project's `.claude/crew/project.md` (the `p
 
 Then `/reload-plugins`. Read [CHANGELOG.md](../CHANGELOG.md) first. To remove the plugin, use `/plugin` and uninstall `toon-crew`; Claude Code's default also deletes the plugin's data folder.
 
+## Upgrading from 0.x
+
+The memory folders are named `toon-crew-<id>`. Early versions used other names for the crew. Doraemon carries a map of the old names, and the board counts old events for the role that took over, so nothing breaks. Only a project that still holds old memory folders needs a one-time move.
+
+<details>
+<summary>Memory folder moves (old name to new)</summary>
+
+Do this once per project, in a pull request you merge.
+
+| Old folder | New folder |
+|---|---|
+| `toon-crew-dorami/` (or `dorami/`) | `toon-crew-miguel-rivera/` |
+| `toon-crew-scrooge/`, `shaktimaan/` | `toon-crew-kevin/` |
+| `toon-crew-bob-the-builder/`, `ninja-hattori/` (old routes role) | `toon-crew-bob/` |
+| `toon-crew-chhota-bheem/`, `dekisugi/` (old SRE role) | split: CI, builds, Docker, local stack -> `toon-crew-mike-wazowski/`; deploys, rollouts, rollbacks, backups, the host -> `toon-crew-sulley/` |
+| `toon-crew-scooby-doo/` | `toon-crew-ninja-hattori/` |
+| `toon-crew-tom/` | `toon-crew-joe-gardner/` (exploratory or browser lessons may go to `toon-crew-twenty-two/`) |
+| `toon-crew-dexter/` | `toon-crew-dekisugi/` |
+| `toon-crew-velma/` | `toon-crew-olaf/` |
+| `toon-crew-chip-and-dale/` | `toon-crew-stuart/` |
+| `suneo/` | `toon-crew-shizuka/` |
+| (new) | `toon-crew-twenty-two/` starts empty |
+
+1. Copy (or append) each old `MEMORY.md` into its new folder. Folders without the `toon-crew-` prefix come from the earlier project-level agents.
+2. Where two sources meet, merge duplicate bullets into one with a `(seen n)` count instead of keeping both.
+3. Watch the two re-used ids: old `dekisugi/` and `ninja-hattori/` folders hold lessons from their old jobs (SRE and routes), so they go to sulley and bob, not to the new research lead and security engineer.
+4. Check each merged file stays under 200 lines and holds no secrets, then remove the old folders in the same PR.
+
+The retired characters and who took over each job are listed in [the Crew Room guide](crew-room.md#the-wall-retired-characters).
+
+</details>
+
+## Troubleshooting
+
+- **The board is empty.** The hooks and the board must use the same data folder. Start the board with `/toon-crew:board`, not by hand.
+- **The board shows a project but no CI or deploys.** Polling is off until you run `/toon-crew:project board on` and the project's `project.md` has a `## Board` section. See [Show CI, pull requests, commits and deploys on the board](#optional-show-ci-pull-requests-commits-and-deploys-on-the-board).
+- **Nothing is logged at all.** Check `node --version`. The board's hook needs 24.2 or later. (On older Node it likely loads but writes no events; that has not been tested.)
+- **A builder's worktree started from the wrong branch.** Add the `worktree` setting in [Recommended: make builders start from your branch](#recommended-make-builders-start-from-your-branch). Plugin settings cannot set it.
+- **A read-only agent wrote a file.** That is allowed for its own memory file, temp folders and its docs folder. See [Guards](guards.md#the-rules).
+- **The guard blocked something you want.** Run that command yourself with `!`, or on GitHub's website. The guard does not check your own commands.
+
 ## Develop
 
-The installable plugin lives in `plugin/` (agents, skills, hooks, board, evals, settings). The marketplace entry points at `./plugin`, so `docs/`, CI files and planning notes are not copied into installs. The repo root holds the marketplace file, docs, scripts and CI.
+The installable plugin lives in `plugin/` (agents, skills, hooks, board, evals, settings). The marketplace entry points at `./plugin`, so `docs/`, CI files and scripts are not copied into installs. The repo root holds the marketplace file, docs, scripts and CI.
 
 ```
 node --test plugin/hooks/test/*.test.mjs                 # guard, review proofs and registry tests

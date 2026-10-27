@@ -66,4 +66,4 @@ It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` c
 - Rules: `plugin/hooks/guard.mjs`, with inline-code parsing in `plugin/hooks/inline-writes.mjs`.
 - Which tools it runs on, the timeout and `onFailure`: `plugin/hooks/hooks.json`.
 - Tests: `plugin/hooks/test/*.test.mjs`. Run them with `node --test plugin/hooks/test/*.test.mjs`.
-- The roles and who may do what: [roster.md](roster.md).
+- The roles and their settings: [how it works, section 2](how-it-works.md#2-teams-and-roles).

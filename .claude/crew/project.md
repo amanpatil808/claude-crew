@@ -26,13 +26,13 @@ Lines marked `(owner)` were set by the owner; agents keep them as they are.
 ## Docs per role
 | Role | Read first |
 |---|---|
-| doraemon (Engineering Manager) | `README.md`, `docs/planning/toon-crew-plan.md`, `docs/roster.md`, `CHANGELOG.md` |
+| doraemon (Engineering Manager) | `README.md`, `docs/how-it-works.md`, `docs/setup.md`, `CHANGELOG.md` |
 | miguel-rivera (Knowledge Manager) | `docs/lessons/`, `.claude/agent-memory/`, `plugin/skills/crew-lessons/` |
 | kevin, bob (Backend) | `plugin/hooks/`, `plugin/board/lib/`, `plugin/board/README.md` |
 | mike-wazowski (DevOps Engineer) | `.github/workflows/ci.yml`, `scripts/check-structure.mjs`, `.gitleaks.toml` |
-| nobita, shinchan (Frontend) | `docs/planning/crew-room-brief.md`, `plugin/board/page.html`, `room.css`, `room.js`, `docs/design/` |
-| shizuka (Technical Writer) | `README.md`, `plugin/board/README.md`, `docs/roster.md`, `CHANGELOG.md` |
-| dekisugi, olaf (Research) | `docs/planning/crew-research.md`, `docs/planning/cast-v2.md` |
+| nobita, shinchan (Frontend) | `docs/crew-room.md`, `plugin/board/page.html`, `room.css`, `room.js`, `docs/design/` |
+| shizuka (Technical Writer) | `README.md`, `docs/*.md`, `plugin/board/README.md`, `CHANGELOG.md` |
+| dekisugi, olaf (Research) | `docs/how-it-works.md`, `plugin/agents/*.md` |
 | ninja-hattori (Security Engineer) | `plugin/hooks/guard.mjs`, `plugin/board/lib/redact.ts`, `private-fs.ts`, `server.ts` |
 | joe-gardner, twenty-two (QA) | this page's Commands section; `plugin/evals/` |
 
@@ -48,7 +48,7 @@ Lines marked `(owner)` were set by the owner; agents keep them as they are.
 - Required checks: the `ci` workflow (`plugin` job and `secrets` job).
 
 ## Deploy and release
-- Release: bump `version` in the plugin manifest plus a `CHANGELOG.md` entry; users update with `/plugin update toon-crew@crew`.
+- Release: bump `version` in `plugin/.claude-plugin/plugin.json`, the README version badge and the top `CHANGELOG.md` heading together (`scripts/check-structure.mjs` fails if they disagree), then tag `vX.Y.Z` on main after the merge. Users update with `/plugin update toon-crew@crew`.
 - No server deploy.
 
 ## Work folders
