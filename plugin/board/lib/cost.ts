@@ -2,13 +2,9 @@
 // Today / 7 days windows. Pure: the clock, the roles and the task binding come in as arguments.
 // Each usage event is cumulative for one transcript, so only the newest per (sid, agent) counts, and a window's
 // share is that newest total minus the newest total from before the window opened.
-import type { BoardEvent } from "./events.ts";
+import type { BoardEvent, UsageRow } from "./events.ts";
 import { loadRoles, roleFor, type Role } from "./crew.ts";
 import { priceRows, pricesInfo } from "./prices.ts";
-import type { UsageRow } from "./usage.ts";
-
-// The log as this file reads it. MERGE: plain BoardEvent once lib/events.ts has the `usage` kind and fields.
-export type CostEvent = Omit<BoardEvent, "kind"> & { kind: string; scope?: unknown; partial?: unknown; rows?: unknown };
 
 export interface Usage { n: number; in: number; out: number; cw5m: number; cw1h: number; cr: number; ws: number; wf: number }
 export interface Priced { usage: Usage; usd: number | null; unpriced: string[] }
@@ -61,7 +57,7 @@ interface Snap { ms: number; ts: string; project: string; agentId?: string; agen
 interface Run { key: string; project: string; agentId?: string; agentType?: string; partial: boolean; rows: UsageRow[] }
 
 // Usage snapshots per run key, oldest first (log order breaks a same-millisecond tie).
-function snapshots(events: readonly CostEvent[], now: number): Map<string, Snap[]> {
+function snapshots(events: readonly BoardEvent[], now: number): Map<string, Snap[]> {
   const byKey = new Map<string, Snap[]>();
   for (const e of events) {
     if (e.kind !== "usage") continue;
@@ -141,7 +137,7 @@ function rollup(list: Run[], roleOf: (r: Run) => string, taskOf: ReadonlyMap<str
   return { rooms, agents, tasks };
 }
 
-export function buildCost(events: readonly CostEvent[], now: number, opts: CostOptions = {}): CostState {
+export function buildCost(events: readonly BoardEvent[], now: number, opts: CostOptions = {}): CostState {
   const roles = opts.roles ?? loadRoles(), taskOf = opts.taskOf ?? new Map<string, string>();
   // agent id -> type from any event that names both (a stop or usage event may carry none of its own).
   const types = new Map<string, string>();

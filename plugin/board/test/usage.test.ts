@@ -6,10 +6,10 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
-import { appendEvent, readEvents, type BoardEvent } from "../lib/events.ts";
+import { appendEvent, readEvents, type UsageEvent, type UsageOptions } from "../lib/events.ts";
 import { EVENTS_FILE } from "../lib/paths.ts";
 import { redactDeep } from "../lib/redact.ts";
-import { readUsage, safeTranscript, sumTranscript, type ReadLimits, type UsageEvent, type UsageOptions } from "../lib/usage.ts";
+import { readUsage, safeTranscript, sumTranscript, type ReadLimits } from "../lib/usage.ts";
 
 const base = mkdtempSync(join(tmpdir(), "crew-usage-"));
 const root = join(base, "projects");                 // stands in for ~/.claude/projects
@@ -204,8 +204,7 @@ test("scope: main carries no agent fields; agent needs a clean id; the text is f
   assert.equal(readUsage(p, { ...AGENT, agentType: "kevin says hi" }, L)?.agentType, undefined);
 });
 
-// MERGE: drop this widening once lib/events.ts has the `usage` kind (contract C1); appendEvent then takes UsageEvent as is.
-const append = (e: UsageEvent) => appendEvent(e as unknown as Omit<BoardEvent, "id" | "ts">, new Date("2026-10-27T16:40:00Z"));
+const append = (e: UsageEvent) => appendEvent(e, new Date("2026-10-27T16:40:00Z"));
 
 test("the event survives appendEvent / redactDeep with every number intact", () => {
   // Counts that look like a phone (10 digits) or a Luhn-valid card (16 digits) would be masked inside text.

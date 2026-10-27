@@ -1,11 +1,34 @@
 // Builds the one JSON document /api/state serves, so it can be tested without a server.
-import { readEvents, type BoardEvent } from "./events.ts";
-import { crewFrom, listRoles, loadRoles } from "./crew.ts";
+import { QUIET_KINDS, readEvents, type BoardEvent } from "./events.ts";
+import { crewFrom, listRoles, loadRoles, type Role } from "./crew.ts";
 import { buildRooms, managerActive, managerProject, mainBusy, projectFacts, roomFacts, type RoomFact, roomFeed, roomMembers, roleNotes, roomTalks } from "./room.ts";
 import { emptySnapshot, loadSnapshot, type Snapshot } from "./pollers.ts";
 import { readRegistry, type Project } from "./projects.ts";
 import { RETIRED } from "./roster.ts";
-import { activeByProject, deriveTasks } from "./tasks.ts";
+import { activeByProject, deriveTasks, taskOfAgent } from "./tasks.ts";
+import { deriveNeeds } from "./needs.ts";
+// Types only (erased at run time), so this line never makes cost.ts required.
+import type { CostOptions, CostState } from "./cost.ts";
+
+// lib/cost.ts buildCost(events, now, opts): the cost ledger. Optional, so the board works without it.
+// `taskOf` maps an agent id to the one task its usage counts toward (see taskOfAgent).
+export type BuildCost = (events: readonly BoardEvent[], now: number, opts?: CostOptions) => CostState;
+
+export async function loadBuildCost(): Promise<BuildCost | null> {
+  try {
+    const m: Record<string, unknown> = await import("./cost.ts");
+    const fn = m.buildCost;
+    return typeof fn === "function" ? (events, now, opts) => fn(events, now, opts) : null;
+  } catch { return null; }
+}
+// Loaded once with the module (cost.ts must not import this file, or this await never settles).
+const buildCost = await loadBuildCost();
+
+// `cost` is null until lib/cost.ts exists; a throwing ledger gives null too, never a dead /api/state.
+export function costOf(events: BoardEvent[], roles: Map<string, Role>, now: number, fn: BuildCost | null = buildCost): CostState | null {
+  if (!fn) return null;
+  try { return fn(events, now, { roles, taskOf: taskOfAgent(events, roles) }) ?? null; } catch { return null; }
+}
 
 export interface ProjectSummary extends Project { working: number; polled: boolean }
 
@@ -44,6 +67,10 @@ export function buildState(now = Date.now()) {
     managerActive: managerActive(events, now), facts: roomFacts(members, snap.deploy, focusPath),
   };
   const rooms = buildRooms(events, registry, roleMap, roles, now);
-  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: events.slice(-300).reverse(), room, rooms, factsByProject, snapshots, ...snap };
+  const needsYou = deriveNeeds(events, roleMap, registry, snapshots, now);
+  const cost = costOf(events, roleMap, now);
+  // usage and needs-you are bookkeeping: they must not push real history out of the last 300.
+  const history = events.filter((e) => !QUIET_KINDS.has(e.kind)).slice(-300).reverse();
+  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: history, room, rooms, factsByProject, snapshots, needsYou, cost, ...snap };
 }
 

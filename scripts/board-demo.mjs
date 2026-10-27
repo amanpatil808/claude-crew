@@ -100,8 +100,10 @@ const [ls] = events.splice(lastShop, 1);
 ls.ts = new Date(now - 5_000).toISOString();
 events.push(ls);
 
+// board: true is the owner's polling approval: a real board only has PR snapshots (and "PR ready" items) for such a
+// project. The /work paths have no project.md, so the board's pollers still run nothing for it.
 const registry = [
-  { path: '/work/shop-api', name: SHOP, firstSeen: iso(60 * 24 * 12), lastSeen: iso(0.2) },
+  { path: '/work/shop-api', name: SHOP, firstSeen: iso(60 * 24 * 12), lastSeen: iso(0.2), board: true },
   { path: '/work/recipe-app', name: RECIPE, firstSeen: iso(60 * 24 * 5), lastSeen: iso(1.5) },
 ];
 

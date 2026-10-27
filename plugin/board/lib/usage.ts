@@ -5,27 +5,8 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpat
 import { homedir } from "node:os";
 import { isAbsolute, join, sep } from "node:path";
 import { LONG_PROMPT_TOKENS } from "./prices.ts";
-
-// Key names stay neutral: redactDeep drops any value under a key that contains "token" or "session".
-export interface UsageRow {
-  model: string; speed: "standard" | "fast"; long: boolean;
-  n: number;      // API responses
-  in: number;     // uncached input
-  out: number;    // output, thinking included
-  cw5m: number;   // cache writes, 5-minute TTL
-  cw1h: number;   // cache writes, 1-hour TTL
-  cr: number;     // cache reads
-  ws: number;     // web search requests
-  wf: number;     // web fetch requests
-}
-
-// MERGE: the `usage` member of BoardEvent once lib/events.ts has it (contract C1); same fields, same names.
-export interface UsageEvent {
-  kind: "usage"; project: string; sid: string; agentId?: string; agentType?: string;
-  text: typeof USAGE_TEXT; scope: "main" | "agent"; final: boolean; partial: boolean; rows: UsageRow[];
-}
-
-export interface UsageOptions { scope: "main" | "agent"; agentId?: string; agentType?: string; project: string; sid: string; final: boolean }
+// The event shape, row fields, fixed text and model pattern have one home: lib/events.ts.
+import { MODEL_ID, USAGE_TEXT, type UsageEvent, type UsageOptions, type UsageRow } from "./events.ts";
 
 // Overridable for tests only; the hook passes nothing.
 export interface ReadLimits {
@@ -37,7 +18,6 @@ export interface ReadLimits {
   maxLineBytes?: number;
 }
 
-export const USAGE_TEXT = "Usage update";   // fixed: counts in free text get masked as phone or card numbers
 export const MAX_BYTES = 512 * 2 ** 20;
 export const MAX_MS = 3_000;
 const CHUNK_BYTES = 2 ** 20;
@@ -45,7 +25,6 @@ const MAX_LINE_BYTES = 64 * 2 ** 20;        // one line longer than this is drop
 
 const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const AGENT_TYPE = /^[A-Za-z0-9_.:-]{1,100}$/;
-const MODEL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;   // anything else is stored as "unknown", so no free text gets in
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEEDLE = '"type":"assistant"';             // cheap filter before JSON.parse; the parsed type is checked again
 
