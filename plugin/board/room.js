@@ -42,9 +42,9 @@ const rTitleFull = (x) => x.title || R_PRO[x.id]?.[0] || x.role || "";
 // The plate keeps the short form: "SRE (deploys, rollouts...)" shows as "SRE"; the card shows it all.
 const rTitle = (x) => rTitleFull(x).replace(/\s*\(.*$/, "");
 const rTeam = (x) => x.team || R_PRO[x.id]?.[1] || "";
-// Working people carry a gadget: time machine for deploys, 4D pocket for tools, bamboo-copter for everyone else.
+// Working people carry a gadget: time machine for deploys, 4D pocket for tools, a prop from their own world for the rest. The bamboo-copter is Doraemon's alone.
 const R_PET = { shinchan: "t-shiro", "ninja-hattori": "t-shishi" };   // companion dogs that walk with their owner
-const R_GADGET = { "mike-wazowski": "timem", sulley: "timem", kevin: "pocket", bob: "pocket", stuart: "pocket" };
+const R_GADGET = { "mike-wazowski": "canister", sulley: "canister", kevin: "banana", bob: "banana", stuart: "banana", doraemon: "copter", "miguel-rivera": "guitar", nobita: "glasses", shinchan: "crayon", "ninja-hattori": "scroll", "joe-gardner": "note", "twenty-two": "zap", dekisugi: "book", olaf: "flake", shizuka: "suds" };
 const R_ICON = { working: "⌨", done: "✓", queued: "z" };
 // Retired characters hang as framed pictures; their art is kept here, keyed by id.
 const R_RETIRED_KIND = { dorami: "dorami", scrooge: "duck", shaktimaan: "hero", "bob-the-builder": "builder", "chhota-bheem": "strong", "scooby-doo": "dog", tom: "tomcat", dexter: "dexter", velma: "velma", "chip-and-dale": "pair", suneo: "smug" };
@@ -334,7 +334,7 @@ let last = null, rProj = "", rPicked = false;     // the picked project ("" only
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
 const rK = (id, p) => id + "@" + (p || "");
 // ---- Clones: Doraemon runs 2-4 crew at once; two copies of one role show as a twin beside the desk. Nothing new is drawn when the fields are missing. ----
-const rCopiesOf = (m) => { const n = Math.floor(Number(m && m.copies)); return n > 1 ? Math.min(4, n) : 1; };
+const rCopiesOf = (m) => { if (!m || m.status !== "working") return 1; const n = Math.floor(Number(m.copies)); return n > 1 ? Math.min(4, n) : 1; };   // twins and the x-n badge only while working
 const rHold = {}, rCopySeen = {}, rCloneDone = new Set();       // rHold: desk key -> copy number kept hidden until the copy light flashes
 const CL_WORD = ["", "One", "Two", "Three", "Four"];
 const rCrewOf = (s, p) => { const c = p ? own(s.rooms, p)?.crew : (own(s.rooms, "")?.crew || s.room?.crew); return c && typeof c === "object" && Number.isFinite(c.running) ? c : null; };
@@ -383,7 +383,7 @@ function rDesk(role, m, i, showTeam, proj = "") {
     } }
   if (stale) { const q = rel("span", "lost", "?"); q.setAttribute("aria-hidden", "true"); stage.append(q); }
   else if (s === "queued") stage.append(rel("span", "zzz", "z"));
-  if (s === "working") { const g = rel("span", "gadget " + (R_GADGET[role.id] || "copter")); g.setAttribute("aria-hidden", "true"); stage.append(g); }
+  if (s === "working" && R_GADGET[role.id]) { const g = rel("span", "gadget " + R_GADGET[role.id]); g.setAttribute("aria-hidden", "true"); stage.append(g); }
   if (s === "done") for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); }
   if (need) { const h = handEl(); h.title = `${stripPet(role.mascot)} is waiting for you`; stage.append(h); }
   const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
@@ -1162,7 +1162,7 @@ async function rTrip(w, a, b, spine, from, to) {
     let h; try { const p0 = pts[0], p1 = pts[pts.length - 1]; h = window.crewTravel({ el: w, role: w.dataset.role, from: { x: p0[0], y: p0[1] }, to: { x: p1[0], y: p1[1] }, kind: w.dataset.kind, reduced: !rMotion() }); } catch (e) { console.error("crewTravel", e); }
     if (h && typeof h.then === "function") { await h; return; }
   }
-  if (a.room !== b.room && rLen(pts) > 1120) {
+  if (a.room !== b.room && rLen(pts) > 1120 && w.dataset.role === "doraemon") {   // the Bamboo-copter hat is Doraemon's alone
     const p0 = pts[0], p1 = pts[pts.length - 1], land = [p1[0], p1[1] - 44];
     const hat = rel("i", "copterhat"); w.append(hat); w.classList.add("flying");
     await rSleep(300);                                        // blade spins up

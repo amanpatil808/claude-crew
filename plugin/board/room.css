@@ -503,6 +503,31 @@ html[data-tab="room"] {
 #view-room .pocket { width: 32px; height: 16px; border: var(--bw) solid var(--wall-ink); border-radius: 0 0 32px 32px; background: #fff; }
 #view-room .pocket::after { content: ""; position: absolute; left: 5px; top: 3px; width: 8px; height: 3px; border-radius: 2px; background: #cfe3f7; }
 
+/* desk props from each character's own world, tiny and still (only the working desk shows them) */
+#view-room .gadget.canister, #view-room .gadget.banana { width: 20px; height: 16px; animation: none; }
+#view-room .gadget.canister::before { content: ""; position: absolute; left: 5px; top: 2px; width: 10px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(#f7d948 0 70%, #c9a820 70%); }
+#view-room .gadget.canister::after { content: ""; position: absolute; left: 8px; top: 0; width: 4px; height: 3px; background: var(--wall-ink); }
+#view-room .gadget.banana::before { content: ""; position: absolute; left: 1px; top: 6px; width: 17px; height: 8px; border: var(--bw) solid var(--wall-ink); border-radius: 0 0 14px 14px; background: #f7d948; }
+#view-room .gadget.banana::after { content: ""; position: absolute; left: 14px; top: 3px; width: 3px; height: 4px; background: #6a4a1c; }
+#view-room .gadget.guitar,#view-room .gadget.glasses, #view-room .gadget.crayon, #view-room .gadget.scroll, #view-room .gadget.note, #view-room .gadget.zap, #view-room .gadget.book, #view-room .gadget.flake, #view-room .gadget.suds { width: 20px; height: 16px; animation: none; }
+#view-room .gadget.guitar::before { content: ""; position: absolute; left: 0; top: 5px; width: 10px; height: 10px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: #c9822f; }
+#view-room .gadget.guitar::after { content: ""; position: absolute; left: 8px; top: 2px; width: 11px; height: 3px; border: var(--bw) solid var(--wall-ink); background: #6a3d1c; transform: rotate(-30deg); }
+#view-room .gadget.glasses::before, #view-room .gadget.glasses::after { content: ""; position: absolute; top: 3px; width: 8px; height: 8px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: rgba(255, 255, 255, .7); }
+#view-room .gadget.glasses::before { left: 0; }
+#view-room .gadget.glasses::after { right: 0; }
+#view-room .gadget.crayon::before { content: ""; position: absolute; left: 7px; top: 0; width: 6px; height: 14px; border: var(--bw) solid var(--wall-ink); background: linear-gradient(var(--red) 0 70%, #f4d6a0 70%); border-radius: 3px 3px 0 0; }
+#view-room .gadget.scroll::before { content: ""; position: absolute; left: 1px; top: 4px; width: 18px; height: 8px; border: var(--bw) solid var(--wall-ink); border-radius: 4px; background: linear-gradient(90deg, #8a5a2b 0 15%, #f4e4b8 15% 85%, #8a5a2b 85%); }
+#view-room .gadget.scroll::after { content: ""; position: absolute; left: 8px; top: 7px; width: 4px; height: 2px; background: var(--red); }
+#view-room .gadget.note::before { content: ""; position: absolute; left: 4px; top: 8px; width: 8px; height: 6px; border-radius: 50%; background: var(--wall-ink); }
+#view-room .gadget.note::after { content: ""; position: absolute; left: 10px; top: 0; width: 3px; height: 12px; background: var(--wall-ink); }
+#view-room .gadget.zap::before { content: ""; position: absolute; left: 3px; top: 0; width: 14px; height: 16px; background: var(--gold); clip-path: polygon(60% 0, 10% 58%, 45% 58%, 35% 100%, 92% 38%, 55% 38%); }
+#view-room .gadget.book::before { content: ""; position: absolute; left: 1px; top: 3px; width: 18px; height: 11px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: linear-gradient(90deg, #2f9e6a 0 50%, #e8f6ee 50%); }
+#view-room .gadget.book::after { content: ""; position: absolute; left: 9px; top: 3px; width: 2px; height: 11px; background: var(--wall-ink); }
+#view-room .gadget.flake::before { content: ""; position: absolute; left: 9px; top: 0; width: 2px; height: 16px; background: #8fb8d8; box-shadow: 0 0 0 .5px var(--wall-ink); }
+#view-room .gadget.flake::after { content: ""; position: absolute; left: 2px; top: 7px; width: 16px; height: 2px; background: #8fb8d8; box-shadow: 0 0 0 .5px var(--wall-ink); }
+#view-room .gadget.suds::before { content: ""; position: absolute; left: 1px; top: 3px; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #4f8fd0; background: radial-gradient(circle at 35% 30%, #fff 0 2px, rgba(255, 255, 255, .25) 3px); }
+#view-room .gadget.suds::after { content: ""; position: absolute; left: 12px; top: 0; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid #4f8fd0; }
+
 /* bell for "working" on the name plate; ring is gentle and stops with reduced motion */
 #view-room .st.bell { width: 11px; height: 11px; margin-top: 1px; border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 3px 3px; background: var(--gold); transform-origin: 50% 0; animation: ring 1.4s ease-in-out infinite; }
 @keyframes ring { 0%, 60%, 100% { transform: rotate(0); } 68% { transform: rotate(18deg); } 76% { transform: rotate(-16deg); } 84% { transform: rotate(10deg); } 92% { transform: rotate(-6deg); } }
