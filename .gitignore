@@ -5,8 +5,8 @@ node_modules/
 .env.*
 !.env.example
 .work-*/
-hooks/test/.work-*/
 *.tmp
 coverage/
 .claude/settings.local.json
 .claude/worktrees/
+*.tap
