@@ -98,9 +98,10 @@ test("a start 30 minutes ago is still working", () => {
   assert.equal(r.crew.running, 1);
 });
 
-test("the agent's own later events and its session's commits keep it alive, the manager's heartbeat does not", () => {
+test("the agent's own later events keep it alive; its session's commits and the manager's heartbeat do not", () => {
   assert.equal(shin(room([start("g1", 120), ev({ kind: "assign", to: SH, toId: "g1", from: "doraemon", ts: at(10), text: "go" })])).copies, 1);
-  assert.equal(shin(room([start("g1", 120, { sid: "s1" }), ev({ kind: "commit", sid: "s1", ts: at(5), text: "Commit" })])).copies, 1);
+  assert.equal(shin(room([start("g1", 120, { sid: "s1" }), ev({ kind: "commit", sid: "s1", agentId: "g1", ts: at(5), text: "Commit" })])).copies, 1);
+  assert.equal(shin(room([start("g1", 120, { sid: "s1" }), ev({ kind: "commit", sid: "s1", ts: at(5), text: "Commit" })])).copies, 0);
   assert.equal(shin(room([start("g1", 120, { sid: "s1" }), ev({ kind: "main-busy", sid: "s1", ts: at(1), text: "busy" })])).copies, 0);
 });
 
