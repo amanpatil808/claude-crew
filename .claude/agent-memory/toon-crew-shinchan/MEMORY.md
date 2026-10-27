@@ -18,4 +18,6 @@
 - The crewTravel hook passes only from/to points; travel.js rebuilds the route by matching desk seat and stand points to rAccess, then calls rRoute. The page script is one "use strict" scope shared with room.js, so keep new code in an IIFE. (seen 1) [project]
 - Trip effects must check the walker is still connected, or the Animation toggle leaves strays. (seen 1) [crew]
 - Doraemon never vanishes: T.doraemon uses noCut (he flies the whole route), and with Animation off or reduced motion he stays seated. Animation off goes through one rStopAll that also cancels queued trips and pending clone reveals. Prove with a 250 ms visibility probe over 60 s. (seen 1) [project]
+- Owner's travel rules (0.3.9): no character ever vanishes mid-trip (no cut path); trips 3-5.5 s; step frames at most about 3/s. The copy light: Doraemon flies to the desk to make the twin, and only the finished copy walks to submit, then poofs. Gate props on a role with `rKeyOf(role.id)`; dorayaki is Doraemon's alone. (seen 1) [project]
+- Use `perl -i -pe` on macOS for in-place edits (`sed -i` needs an empty suffix arg and leaves `file-e` otherwise). (seen 1) [crew]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]

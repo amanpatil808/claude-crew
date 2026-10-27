@@ -1,6 +1,6 @@
 <div align="center">
 <h1>toon-crew</h1>
-<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.8" src="https://img.shields.io/badge/version-0.3.8-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
+<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.9" src="https://img.shields.io/badge/version-0.3.9-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
 </div>
 
 ## Why toon-crew
@@ -56,7 +56,7 @@ flowchart LR
 4. **Doraemon opens a pull request.** The DevOps Team merges it after you approve.
 
 **Parallel work, kept cheap:**
-- **Waves of 2-4 crew at once.** More in parallel costs many times the tokens.
+- **Waves of 2-4 crew at once for light work, 6-8 for heavy work.** More in parallel costs many times the tokens.
 - **A second copy of one role.** When a role has more work, Doraemon starts a twin (two Shinchans, say) on separate files, so they never overwrite each other.
 - **The whole plan is queued up front.** The board's Queued list shows what is coming; each copy takes the oldest queued task for its role.
 - **On the Crew Room:** a "Crew 3 / 4" meter shows how many are running. When Doraemon starts a copy, he uses his copy-light gadget and a twin appears at the desk with a ×2 badge.

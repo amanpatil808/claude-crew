@@ -1,7 +1,7 @@
 {
   "name": "toon-crew",
   "displayName": "Toon Crew",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "A cartoon agent crew (manager, builders, testers, researchers, writers) with safety guards, a live Crew Room board and shared lessons.",
   "author": { "name": "Aman Patil" },
   "repository": "https://github.com/amanpatil808/claude-crew",
