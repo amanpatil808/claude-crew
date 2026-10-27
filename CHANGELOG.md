@@ -2,6 +2,19 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.9 - 28 Oct 2026
+
+### Changed
+
+- Doraemon runs 2-4 crew at once for light work and up to 6-8 for heavy work (many independent pieces on separate files), defaulting to the small end. The crew meter shows 8 slots with a marker after 4 and turns amber only above 8.
+- Nobody vanishes mid-trip: every character travels the whole route in view, in their own style, over about 3-5.5 s.
+- Calmer motion: looping animations run at half speed, walking is 40% slower, and nothing changes more than about 3 times a second.
+- Copy light: Doraemon flies to the desk and makes the twin there; when one copy finishes, only that copy walks to him to hand in its report, then poofs.
+
+### Fixed
+
+- Dorayaki appeared on every finished desk; it is Doraemon's alone now.
+
 ## 0.3.8 - 28 Oct 2026
 
 ### Changed

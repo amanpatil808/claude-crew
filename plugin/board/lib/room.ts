@@ -275,10 +275,11 @@ export function lifeTracker(probe: Probe) {
   };
 }
 
-// crew.running counts crew agents (copies included, the manager's main session excluded); cap is Doraemon's "waves 2-4 wide".
-export interface CrewLoad { running: number; cap: number; roles: number }
+// crew.running counts crew agents (copies included, the manager's main session excluded); cap is the heavy-load wave width (6-8) and light the light-load width (2-4) in Doraemon's wave rule.
+export interface CrewLoad { running: number; cap: number; light: number; roles: number }
 export interface ProjectRoom { members: RoomMember[]; managerBusy: boolean; managerActive: boolean; crew: CrewLoad }
-export const CREW_CAP = 4;
+export const CREW_CAP = 8;
+export const CREW_LIGHT = 4;
 // Same horizon as tasks.ts STALE_AFTER_MS: a ghost shows "Lost contact" this long, then plain idle.
 export const STALE_AGENT_MS = 6 * 3_600_000;
 export const ROOM_WINDOW_MS = 7 * 24 * 3_600_000;
@@ -307,7 +308,7 @@ export function roomFor(project: string, events: BoardEvent[], roles: Map<string
     // Copies are live running agents only: a desk that is not working never draws a twin.
     return out.status === "working" ? out : { ...out, copies: 0, copyIds: [] };
   });
-  return { members, managerBusy: busy, managerActive: managerActive(mine, now), crew: { running: live.length, cap: CREW_CAP, roles: new Set(live.map((c) => c.roleId)).size } };
+  return { members, managerBusy: busy, managerActive: managerActive(mine, now), crew: { running: live.length, cap: CREW_CAP, light: CREW_LIGHT, roles: new Set(live.map((c) => c.roleId)).size } };
 }
 
 // A room for every registered project and every project with an event in the last 7 days.

@@ -333,21 +333,23 @@ const own = (o, k) => !!o && typeof o === "object" && Object.hasOwn(o, k) ? o[k]
 let last = null, rProj = "", rPicked = false;     // the picked project ("" only while the board knows no project)
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
 const rK = (id, p) => id + "@" + (p || "");
-// ---- Clones: Doraemon runs 2-4 crew at once; two copies of one role show as a twin beside the desk. Nothing new is drawn when the fields are missing. ----
+// ---- Clones: Doraemon runs 2-4 crew for light work, up to 6-8 for heavy work; two copies of one role show as a twin beside the desk. Nothing new is drawn when the fields are missing. ----
 const rCopiesOf = (m) => { if (!m || m.status !== "working") return 1; const n = Math.floor(Number(m.copies)); return n > 1 ? Math.min(4, n) : 1; };   // twins and the x-n badge only while working
 const rHold = {}, rCopySeen = {}, rCloneDone = new Set();       // rHold: desk key -> copy number kept hidden until the copy light flashes
+const rIdsSeen = {}, rLeave = {}, rIdsOf = (m) => (Array.isArray(m?.copyIds) ? m.copyIds.filter((x) => typeof x === "string") : []);   // rIdsSeen: last copyIds per desk; rLeave: desk key -> Map(agentId -> slot) of copies that stopped and are about to walk to Doraemon
 const CL_WORD = ["", "One", "Two", "Three", "Four"];
 const rCrewOf = (s, p) => { const c = p ? own(s.rooms, p)?.crew : (own(s.rooms, "")?.crew || s.room?.crew); return c && typeof c === "object" && Number.isFinite(c.running) ? c : null; };
-// "Crew 3 / 4": four slots filled by the running count; over the cap it turns amber ("5 / 4").
+// "Crew 3 / 8": cap slots filled by the running count, a gap after slot `light`; over the cap it turns amber ("9 / 8").
 function rCrewMeter(c) {
   if (!c) return null;
-  const run = Math.max(0, Math.floor(c.running)), cap = Number.isFinite(c.cap) && c.cap > 0 ? Math.min(8, Math.floor(c.cap)) : 4;
+  const run = Math.max(0, Math.floor(c.running)), cap = Number.isFinite(c.cap) && c.cap > 0 ? Math.min(8, Math.floor(c.cap)) : 4, light = Number.isFinite(c.light) && c.light > 0 ? Math.floor(c.light) : 4;
   const m = rel("span", "crewm"); m.dataset.over = String(run > cap); m.setAttribute("role", "img");
   m.setAttribute("aria-label", "Crew: " + run + " running, up to " + cap + (run > cap ? ", over the usual " + cap : ""));
   const names = Array.isArray(c.roles) ? c.roles.filter((x) => typeof x === "string").map(nameOf) : [];
-  m.title = "Doraemon runs 2-4 crew at once to keep cost down." + (names.length ? "\nNow: " + names.join(", ") : "");
+  m.title = "Doraemon runs 2-4 crew for light work, up to 6-8 for heavy work." + (names.length ? "\nNow: " + names.join(", ") : "");
   const slots = rel("span", "cm-slots"); slots.setAttribute("aria-hidden", "true");
   for (let i = 0; i < Math.max(run, cap); i++) slots.append(rel("i", (i < run ? "on" : "") + (i >= cap ? " x" : "") + (i === cap - 1 && run > cap ? " cap" : "")));
+  if (light > 0 && light < cap) slots.children[light - 1].style.marginRight = "4px";   // gap marks the light/heavy threshold
   m.append(rel("span", "cm-l", "Crew"), slots, rel("b", "cm-n num", run + " / " + cap));
   return m;
 }
@@ -359,7 +361,15 @@ function rDesk(role, m, i, showTeam, proj = "") {
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
   const stale = m.stale === true && m.status === "idle" && !waiting;      // started, never stopped, silent for a while
   const key = rKeyOf(role.id), nap = rNaps(key, m), need = rNeed.has(k), nc = waiting ? 1 : rCopiesOf(m);
-  const vis = rHold[k] ? Math.max(1, rHold[k] - 1) : nc;      // the badge and the line wait for the copy light, like the twin
+  {                                                           // copies that just stopped: their twin stays (hidden) until it stands up to report; the badge drops then
+    const cur = m.status === "working" && !waiting ? rIdsOf(m) : [], prev = rIdsSeen[k]; rIdsSeen[k] = cur;
+    if (prev && rMotion() && cur.length) for (const id of prev) if (!cur.includes(id) && !rLeave[k]?.has(id)) {
+      const lv = rLeave[k] || (rLeave[k] = new Map()); lv.set(id, 0);
+      setTimeout(() => { if (rLeave[k]?.delete(id)) { if (!rLeave[k].size) delete rLeave[k]; rRefreshDesk(role.id, proj); } }, 25000);   // nobody came for it: it just goes
+    }
+  }
+  const nLeave = rLeave[k]?.size || 0;
+  const vis = (rHold[k] ? Math.max(1, rHold[k] - 1) : nc) + nLeave;      // the badge and the line wait for the copy light, like the twin; a leaving copy still counts
   const s = m.status === "idle" || nap ? "queued" : m.status;
   const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.dataset.p = proj; desk.dataset.k = k; desk.style.setProperty("--i", i * 60 + "ms");
   if (key) desk.dataset.who = key;
@@ -378,13 +388,14 @@ function rDesk(role, m, i, showTeam, proj = "") {
   };
   for (let c = 2; c <= nc; c++) { const tw = mkTwin(c); if (rHold[k] && c >= rHold[k]) tw.classList.add("pending"); stage.append(tw); }
   { const was = rCopySeen[k] || 1; rCopySeen[k] = nc;
-    if (was > nc && rMotion()) for (let c = nc + 1; c <= was; c++) {   // a copy finished: it fades out with a small poof
+    for (let j = 0; j < nLeave; j++) stage.append(mkTwin(nc + 1 + j, "leaving"));   // invisible stand-in so the badge and the spacing stay put until the copy walks off
+    if (was > nc && rMotion()) for (let c = nc + 1 + nLeave; c <= was; c++) {   // a copy finished: it fades out with a small poof
       const tw = mkTwin(c, "gone"); tw.append(rel("i", "poof")); stage.append(tw); setTimeout(() => tw.remove(), 900);
     } }
   if (stale) { const q = rel("span", "lost", "?"); q.setAttribute("aria-hidden", "true"); stage.append(q); }
   else if (s === "queued") stage.append(rel("span", "zzz", "z"));
   if (s === "working" && R_GADGET[role.id]) { const g = rel("span", "gadget " + R_GADGET[role.id]); g.setAttribute("aria-hidden", "true"); stage.append(g); }
-  if (s === "done") for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); }
+  if (s === "done") for (const c of ["spark a", "spark b"]) { const d = rKeyOf(role.id) === "doraemon" ? rel("span", c + " dorayaki") : rel("span", c, "✦"); d.setAttribute("aria-hidden", "true"); stage.append(d); }
   if (need) { const h = handEl(); h.title = `${stripPet(role.mascot)} is waiting for you`; stage.append(h); }
   const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
   const seat = rel("div", "seat"); seat.append(stage, table, ...rTouches(key));
@@ -896,7 +907,7 @@ function rMerge(host, nsec) {
   let ref = orooms.firstChild; for (const t of teams) { if (t === ref) ref = ref.nextSibling; else orooms.insertBefore(t, ref); }
   return true;
 }
-let rSig = "", rFeedSeen = null, rState = null, rShown = [];   // rShown: projects whose room is on screen
+let rSig = "", rFeedSeen = null, rState = null, rEv = [], rShown = [];   // rShown: projects whose room is on screen
 const rMemOf = (id, p) => rState?.byProj?.[p || ""]?.find((x) => x.id === id) || rState?.members.find((x) => x.id === id);
 function renderRoom(s) {
   if (!s.room) return;
@@ -948,7 +959,7 @@ function renderRoom(s) {
   const talks = (r.talks || []).filter((t) => !ids.has(t.id)).map((t) => ({ id: t.id, ts: t.ts, tone: "talk", role: t.to, from: t.from, to: t.to, say: t.text, text: `${name(t.from)} → ${name(t.to)}: ${t.text}` }));
   const feed = [...r.feed, ...talks].filter((f) => !rProj || !f.project || f.project === rProj).sort((x, y) => y.ts.localeCompare(x.ts)).slice(0, 25);
   rFeedSeen = new Set(feed.map((f) => f.id));
-  rState = r; rRefreshCard();
+  rState = r; rEv = s.events || []; rRefreshCard();
   rPlanWalks(feed); rPlanCheckins(r);
 }
 
@@ -1002,7 +1013,7 @@ const rDeskEl = (id, p = "") => { const all = [...document.querySelectorAll("#r-
 
 function rEnqueue(job) {
   if (job.kind === "visit") { const q = rWalkQ.find((j) => j.kind === "visit" && j.to === job.to && j.proj === job.proj); if (q) { q.say = job.say; return; } }   // several messages to one person: one visit, latest text
-  if (job.kind === "report" && rWalkQ.some((j) => j.kind === "report" && j.role === job.role && j.proj === job.proj)) return;
+  if (job.kind === "report" && rWalkQ.some((j) => j.kind === "report" && j.role === job.role && j.proj === job.proj && j.copy === job.copy)) return;
   rWalkQ.push(job);
   while (rWalkQ.length > 8) {            // queue cap 8: drop check-ins first, then the oldest visit, never a hand-over
     let i = rWalkQ.findIndex((j) => j.kind === "checkin"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "errand"); if (i < 0) i = rWalkQ.findIndex((j) => j.kind === "visit");
@@ -1035,6 +1046,8 @@ function rPlanWalks(feed) {
         const said = f.text.replace(/^.*?handed back:?\s*/, "").slice(0, 70), item = /\bPR\b|#\d+|commit|\b[0-9a-f]{7}\b/i.test(said) ? "paper" : "folder";
         rPending.delete(rK(f.role, rP(f)));
         job = { kind: "report", role: f.role, say: said && said !== f.text ? said : "Done!", item };
+        const aid = rEv.find((e) => e.id === f.id)?.agentId;       // one of several copies finished: only that copy's twin walks over
+        if (aid && rLeave[rK(f.role, rP(f))]?.has(aid)) { job.copy = aid; job.awayKey = rK(f.role, rP(f)) + "#" + aid; }
       } else if ((f.tone === "talk" || f.tone === "assign") && (f.to || f.role)) job = { kind: "visit", role: f.from || MGR, to: f.to || f.role, say: (f.say || "").slice(0, 70) };
       else if ((f.tone === "pr" || f.tone === "deploy") && !rWalkQ.length && !rAway.has(rK(MGR, rP(f)))) job = { kind: "errand", role: MGR, to: SRE, say: f.text.slice(0, 40) };
     }
@@ -1084,10 +1097,10 @@ function rPlanCheckins(r) {
 
 function rPump() {
   while (rActive < (rShown.length > 1 ? 3 : 2)) {            // at most 2 walkers on screen (3 when several project rooms are open)
-    const ok = (j) => !rAway.has(rK(j.role, j.proj)) && (j.role !== MGR || ((rReports[j.proj] || 0) === 0 && !rAway.has(rK(j.to, j.proj))));   // Doraemon: one thing at a time per project; a member on the way to him goes first
+    const ok = (j) => !rAway.has(j.awayKey || rK(j.role, j.proj)) && (j.role !== MGR || ((rReports[j.proj] || 0) === 0 && !rAway.has(rK(j.to, j.proj))));   // Doraemon: one thing at a time per project; a member on the way to him goes first
     const c = rWalkQ.map((j, i) => [j, i]).filter(([j]) => ok(j)).sort((x, y) => PRIO[x[0].kind] - PRIO[y[0].kind] || x[1] - y[1])[0];
     if (!c) return;
-    const job = rWalkQ.splice(c[1], 1)[0], jk = rK(job.role, job.proj); rActive++; rAway.add(jk); if (job.kind === "report") rReports[job.proj] = (rReports[job.proj] || 0) + 1;
+    const job = rWalkQ.splice(c[1], 1)[0], jk = job.awayKey || rK(job.role, job.proj); rActive++; rAway.add(jk); if (job.kind === "report") rReports[job.proj] = (rReports[job.proj] || 0) + 1;
     (job.kind === "report" ? rReport(job) : job.kind === "task" ? rTask(job) : rVisit(job)).catch(() => {}).finally(() => {
       rAway.delete(jk); document.querySelectorAll("#r-rooms .desk").forEach((d) => { if (d.dataset.k !== jk) return; d.classList.remove("away"); if (job.role === MGR) d.querySelectorAll(".pile").forEach((p) => p.remove()); });
       if (job.kind === "report") rReports[job.proj]--; rActive--; rPump();
@@ -1143,7 +1156,7 @@ function rMove(w, pts, fly) {
   pts = rDedupe(pts); if (pts.length < 2) return Promise.resolve();
   const L = rLen(pts), seg = pts.slice(1).map((q, i) => Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]));
   rPlace(w, pts[0][0], pts[0][1]);
-  return new Promise((res) => { rMovers.add({ w, pts, seg, L, dist: 0, t: 0, speed: fly ? 150 : L > 700 ? 160 : 100, arc: fly ? Math.min(64, 24 + L / 12) : 0, res }); if (!rRaf) rRaf = requestAnimationFrame(rTick); });   // ~100 px/s, up to 1.6x on long trips
+  return new Promise((res) => { rMovers.add({ w, pts, seg, L, dist: 0, t: 0, speed: fly ? 90 : L > 700 ? 96 : 60, arc: fly ? Math.min(64, 24 + L / 12) : 0, res }); if (!rRaf) rRaf = requestAnimationFrame(rTick); });   // ~60 px/s, up to 1.6x on long trips
 }
 const rFace = (w, dir) => { w.dataset.dir = dir; w.dataset.frame = "s"; };
 function rWalker(roleId, item, at) {
@@ -1218,8 +1231,10 @@ async function rTask(job) {                   // Doraemon brings the task paper;
 }
 async function rReport(job) {                 // a finished member hands the result to Doraemon
   const g = rGeo(), home = rDeskEl(job.role, job.proj), mgr = rDeskEl(MGR, job.proj), mk = rK(MGR, job.proj); if (!home || !mgr || home === mgr) return;
-  home.classList.add("away");
+  const copy = !!job.copy;                       // one of several copies: only its twin leaves; the original and the others keep working at the desk
+  if (!copy) home.classList.add("away");
   const a = rAccess(home, g), b = rAccess(mgr, g), spine = g.corr / 2, w = rWalker(job.role, job.item, a.seat); w.dataset.kind = "report";
+  if (copy && rLeave[job.awayKey.split("#")[0]]?.delete(job.copy)) { const dk = job.awayKey.split("#")[0]; if (!rLeave[dk].size) delete rLeave[dk]; rRefreshDesk(job.role, job.proj); }   // the stand-in goes, the badge drops by one
   try {
     await rTrip(w, a, b, spine, "seat", "stand"); rFace(w, b.side > 0 ? "left" : "right");
     for (let t = 0; rAway.has(mk) && t < 6000; t += 200) await rSleep(200);   // he is out on a visit: wait up to 6 s
@@ -1230,6 +1245,7 @@ async function rReport(job) {                 // a finished member hands the res
       const av = mgr.querySelector(".av"); if (av) { av.classList.add("hop"); setTimeout(() => av.classList.remove("hop"), 700); }
       await rSleep(Math.max(0, rBubbleMs(job.say) - 600)); await rUnsay(w);
     } else { w.querySelector(".carry")?.remove(); mgr.querySelector(".table")?.append(rel("i", "pile " + job.item)); }   // left on his desk until he sits down
+    if (copy) { w.classList.add("poofing"); w.append(rel("i", "poof")); await rSleep(700); return; }     // a copy has done its job: poof, and it is gone
     await rTrip(w, b, a, spine, "stand", "seat");
   } finally { w.remove(); }
 }
@@ -1257,28 +1273,46 @@ function rReveal(role, p, pop) {
 async function rClone({ role, p, n, k, text }) {
   const g = rGeo(), tgt = rDeskEl(role, p), mgr = rDeskEl(MGR, p), layer = RSVG("r-walkers"), made = [];
   if (!tgt || !rMotion()) return;
-  for (let t = 0; mgr && rAway.has(rK(MGR, p)) && t < 1200 && rMotion(); t += 200) await rSleep(200);   // wait a moment only; if he is still out, the copy light comes from the target's own desk
-  if (!rMotion()) return;   // Doraemon is out on a walk: let him sit down first, so the pocket gadget comes from his desk
+  for (let t = 0; mgr && rAway.has(rK(MGR, p)) && t < 9000 && rMotion(); t += 200) await rSleep(200);   // he is out on another errand: wait for him to be back (up to 9 s)
+  if (!rMotion()) return;
   const put = (el, x, y) => { const pos = rel("div", "cl-pos"); pos.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`; pos.style.zIndex = 1000; pos.append(el); layer.append(pos); made.push(pos); return pos; };
-  const b = rAccess(tgt, g), to = [b.seat[0], b.seat[1] - 82];       // the beam runs above the heads, the flash lands on the twin
-  const mp = mgr && mgr !== tgt && !rAway.has(rK(MGR, p)) ? rAccess(mgr, g) : null;
-  let lamp = null, beam = null, bub = null;
+  const b = rAccess(tgt, g);
+  const fly = mgr && mgr !== tgt && !rAway.has(rK(MGR, p)), mgrK = rK(MGR, p);
+  let lamp = null, beam = null, bub = null, w = null; rActive++;
+  if (fly) { rAway.add(mgrK); mgr.classList.add("away"); }
   try {
-    if (mp) {
-      const from = [mp.seat[0] + 12, mp.seat[1] - 78], ang = Math.atan2(to[1] - from[1], to[0] - from[0]), tip = [from[0] + Math.cos(ang) * 34, from[1] + Math.sin(ang) * 34];
+    if (fly) {
+      // Doraemon flies (or walks, in the same room) to the desk, stands beside it, and uses the copy light there.
+      const a = rAccess(mgr, g), spine = g.corr / 2; w = rWalker(MGR, null, a.seat); w.dataset.kind = "visit";
+      await rTrip(w, a, b, spine, "seat", "stand"); if (!rMotion()) return;
+      rFace(w, b.side > 0 ? "left" : "right");
+      rSay(w, text); await rSleep(600);
+      const from = [b.sx - b.side * 14, b.stand[1] - 34], to = [b.seat[0], b.seat[1] - 34], ang = Math.atan2(to[1] - from[1], to[0] - from[0]), tip = [from[0] + Math.cos(ang) * 34, from[1] + Math.sin(ang) * 34];
       lamp = rel("div", "cl-lamp"); lamp.innerHTML = CL_LIGHT; lamp.style.setProperty("--rot", ang + "rad"); put(lamp, from[0], from[1]);
-      bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); mgr.append(bub); rClampBubble(bub);
       await rSleep(450);
-      const len = Math.hypot(to[0] - tip[0], to[1] - tip[1]);
+      const len = Math.max(8, Math.hypot(to[0] - tip[0], to[1] - tip[1]));
       beam = rel("div", "cl-beam"); beam.style.width = len + "px"; beam.append(rel("i")); put(beam, tip[0], tip[1]).style.transform += ` rotate(${ang}rad)`;
-    } else { bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); tgt.append(bub); rClampBubble(bub); }
-    await rSleep(500);
-    const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, b.seat[0] + 38, b.seat[1] - 30);
-    delete rHold[k]; rReveal(role, p, true);
-    await rSleep(700);
-    beam?.classList.add("out"); lamp?.classList.add("out");
-    await rSleep(900);
-  } finally { for (const e of made) e.remove(); bub?.remove(); delete rHold[k]; rReveal(role, p, false); }
+      await rSleep(500);
+      const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, b.seat[0] + 38, b.seat[1] - 30);
+      delete rHold[k]; rReveal(role, p, true);       // the twin pops in and the x-n badge appears with the flash
+      await rSleep(700);
+      beam.classList.add("out"); lamp.classList.add("out");
+      await rSleep(500); await rUnsay(w);
+      for (const e of made) e.remove();
+      if (!rMotion()) return;
+      await rTrip(w, b, a, spine, "stand", "seat");
+    } else {                                          // he is the copied role himself, or cannot leave: the flash and the pop at the desk, nothing flies
+      bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); tgt.append(bub); rClampBubble(bub);
+      await rSleep(500);
+      const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, b.seat[0] + 38, b.seat[1] - 30);
+      delete rHold[k]; rReveal(role, p, true);
+      await rSleep(1200);
+    }
+  } finally {
+    for (const e of made) e.remove(); bub?.remove(); w?.remove(); delete rHold[k]; rReveal(role, p, false);
+    if (fly) { rAway.delete(mgrK); rDeskEl(MGR, p)?.classList.remove("away"); }
+    rActive--; rPump();
+  }
 }
 
 // ---- Reduced motion / Motion off: the same information with no movement ----

@@ -43,7 +43,7 @@ test("stopped without a stop: a twin whose transcript went quiet 20 minutes ago 
   f.file("a1", 20); f.file("a2", 1);
   const r = roomFor("shop", [start("a1", 40), start("a2", 30)], roles, cards, NOW, f.probe);
   assert.deepEqual([shin(r).status, shin(r).copies, shin(r).copyIds], ["working", 1, ["a2"]]);
-  assert.deepEqual(r.crew, { running: 1, cap: 4, roles: 1 });
+  assert.deepEqual(r.crew, { running: 1, cap: 8, light: 4, roles: 1 });
   // Alone, the stale one shows Lost contact at once, not after the 45-minute fallback.
   const alone = roomFor("shop", [start("a1", 30)], roles, cards, NOW, f.probe);
   assert.deepEqual([shin(alone).status, shin(alone).line, shin(alone).stale, shin(alone).copies], ["idle", "Lost contact", true, 0]);
