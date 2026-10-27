@@ -1172,6 +1172,8 @@ html[data-motion="off"] .pulse { animation: none; }
 .cost-hero .tok { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
 .cost[data-state="none"] .big, .cost[data-state="loading"] .big { color: var(--faint); }
 .seg button:disabled { cursor: default; opacity: .55; }
+.cost-cached, .cost-since { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.cost-since { font-size: 12px; }
 .cost table + table { margin-top: 12px; }
 .cost td.tt { white-space: normal; overflow-wrap: anywhere; }
 .cost-body { min-height: 150px; }

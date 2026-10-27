@@ -11,5 +11,7 @@ metadata:
 
 - When bringing a worktree's files into the branch, list the paths literally. zsh doesn't word-split an unquoted `$VAR`, so a loop over a multi-line variable becomes one path, and `mkdir -p $(dirname ...)` then creates empty folders with the files' names. `find -delete` is guard-blocked; use `rmdir` with the explicit paths. [project] (seen 1)
 
+- Before shipping a metric built from cumulative counters, test it against a real long-lived session, not only fresh demo data. The 0.3.3 cost "Today" put a whole session's lifetime ($787, 2.75B cache reads) into today because the first snapshot had nothing to subtract. Bucket by event timestamps, and show cache reads apart from other tokens. [crew] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.
