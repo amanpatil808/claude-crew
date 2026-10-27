@@ -5,7 +5,7 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 ## Requirements
 
 - **Claude Code 2.1.295 or later.** The guard hook uses `"onFailure": "block"`, which older versions do not support.
-- **Node 24.2 or later.** The board scripts are TypeScript run directly by Node, and the board's hook uses `import.meta.main`, which Node added in 24.2.
+- **Node 24.2 or later, with `node` on your PATH** (the hooks and the board both run it). The board scripts are TypeScript run directly by Node, and the board's hook uses `import.meta.main`, which Node added in 24.2.
 - **git access to this private repo**, to install (`gh auth status` is green, or an SSH key is set up).
 - **`gh`**, only if you turn on CI and pull request polling.
 - **`gitleaks`**, only for the owner's lessons pass.
@@ -14,7 +14,7 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 ## What happens on first run
 
 1. **You talk to Doraemon.** The plugin makes him the main agent in every session (`"agent": "toon-crew:doraemon"`). If you have your own `agent` setting, yours wins.
-2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder. Polling and the lessons pass are both off.
+2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder, which Claude Code gives the plugin as `$CLAUDE_PLUGIN_DATA`. It is usually `~/.claude/plugins/data/toon-crew-crew/` (plugin name, a dash, marketplace name); run `ls ~/.claude/plugins/data/` to check. The event log lives there too. Polling and the lessons pass are both off.
 3. **He writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, Doraemon runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
 4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#quick-start)).
 
@@ -95,7 +95,7 @@ Do this once per project, in a pull request you merge.
 
 1. Copy (or append) each old `MEMORY.md` into its new folder. Folders without the `toon-crew-` prefix come from the earlier project-level agents.
 2. Where two sources meet, merge duplicate bullets into one with a `(seen n)` count instead of keeping both.
-3. Watch the two re-used ids: old `dekisugi/` and `ninja-hattori/` folders hold lessons from their old jobs (SRE and routes), so they go to sulley and bob, not to the new research lead and security engineer.
+3. Watch the two re-used ids: old `dekisugi/` and `ninja-hattori/` folders hold lessons from their old jobs (SRE and routes). Split old `dekisugi/` between mike-wazowski and sulley as the table says, and move old `ninja-hattori/` to bob. Neither goes to the new research lead or security engineer.
 4. Check each merged file stays under 200 lines and holds no secrets, then remove the old folders in the same PR.
 
 The retired characters and who took over each job are listed in [the Crew Room guide](crew-room.md#the-wall-retired-characters).
@@ -104,7 +104,7 @@ The retired characters and who took over each job are listed in [the Crew Room g
 
 ## Troubleshooting
 
-- **The board is empty.** The hooks and the board must use the same data folder. Start the board with `/toon-crew:board`, not by hand.
+- **The board is empty.** The hooks and the board must use the same [data folder](#what-happens-on-first-run). Start the board with `/toon-crew:board`. Started by hand without `CLAUDE_PLUGIN_DATA`, it reads `~/.toon-crew` instead.
 - **The board shows a project but no CI or deploys.** Polling is off until you run `/toon-crew:project board on` and the project's `project.md` has a `## Board` section. See [Show CI, pull requests, commits and deploys on the board](#optional-show-ci-pull-requests-commits-and-deploys-on-the-board).
 - **Nothing is logged at all.** Check `node --version`. The board's hook needs 24.2 or later. (On older Node it likely loads but writes no events; that has not been tested.)
 - **A builder's worktree started from the wrong branch.** Add the `worktree` setting in [Recommended: make builders start from your branch](#recommended-make-builders-start-from-your-branch). Plugin settings cannot set it.
