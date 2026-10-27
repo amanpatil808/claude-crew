@@ -11,7 +11,7 @@ flowchart TD
     S1(["(1) 👤 You ask<br/>for something"])
     S2(["(2) Doraemon (manager)<br/>reads project.md<br/>and his memory"])
     S3["(3) He plans waves and<br/>gives every task<br/>P0, P1 or P2"]
-    S4["(4) He queues each task<br/>on the board<br/>(toon-crew:task)"]
+    S4["(4) He queues the whole plan<br/>on the board<br/>(toon-crew:task)"]
     S5["(5) He writes the contract<br/>and commits it"]
     S6["(6) He briefs the crew,<br/>2 to 4 at a time"]
 
@@ -353,7 +353,7 @@ flowchart LR
   linkStyle 14 stroke:#a371f7,stroke-width:2px
 ```
 
-Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue, start, finish or drop board tasks.
+Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue the whole plan up front and to drop pieces when the plan changes.
 
 The Crew Room board is a separate local page. `board.sh start` runs `server.ts` on `127.0.0.1`; it reads the log and serves the page, which shows one room per project. Only if you opt a project in (`/toon-crew:project board on`) and the project's `project.md` has a `## Board` section does it also poll GitHub CI, pull requests, commits and a deploy host, read-only.
 
