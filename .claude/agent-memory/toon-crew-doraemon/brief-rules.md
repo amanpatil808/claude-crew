@@ -19,5 +19,7 @@ metadata:
 
 - Never `git worktree remove --force` a stopped agent's worktree before listing its UNTRACKED files (`git status --short` with no `head` cut). On 2026-10-28 a partial travel.js and travel.css were deleted that way. Copy or diff everything out first, and ask builders on long jobs to make local commits as they go. [crew] (seen 1)
 
+- Never start building from research or ideas the owner didn't explicitly ask to build. "Just do what I said" means finish their current asks, not my proposals. On 2026-10-28 I started token cuts from Dekisugi's plan and the owner stopped it ("did I ask you"). Present proposals, then wait for a clear yes. [project] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.
