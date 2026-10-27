@@ -333,21 +333,22 @@ const own = (o, k) => !!o && typeof o === "object" && Object.hasOwn(o, k) ? o[k]
 let last = null, rProj = "", rPicked = false;     // the picked project ("" only while the board knows no project)
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
 const rK = (id, p) => id + "@" + (p || "");
-// ---- Clones: Doraemon runs 2-4 crew at once; two copies of one role show as a twin beside the desk. Nothing new is drawn when the fields are missing. ----
+// ---- Clones: Doraemon runs 2-4 crew for light work, up to 6-8 for heavy work; two copies of one role show as a twin beside the desk. Nothing new is drawn when the fields are missing. ----
 const rCopiesOf = (m) => { if (!m || m.status !== "working") return 1; const n = Math.floor(Number(m.copies)); return n > 1 ? Math.min(4, n) : 1; };   // twins and the x-n badge only while working
 const rHold = {}, rCopySeen = {}, rCloneDone = new Set();       // rHold: desk key -> copy number kept hidden until the copy light flashes
 const CL_WORD = ["", "One", "Two", "Three", "Four"];
 const rCrewOf = (s, p) => { const c = p ? own(s.rooms, p)?.crew : (own(s.rooms, "")?.crew || s.room?.crew); return c && typeof c === "object" && Number.isFinite(c.running) ? c : null; };
-// "Crew 3 / 4": four slots filled by the running count; over the cap it turns amber ("5 / 4").
+// "Crew 3 / 8": cap slots filled by the running count, a gap after slot `light`; over the cap it turns amber ("9 / 8").
 function rCrewMeter(c) {
   if (!c) return null;
-  const run = Math.max(0, Math.floor(c.running)), cap = Number.isFinite(c.cap) && c.cap > 0 ? Math.min(8, Math.floor(c.cap)) : 4;
+  const run = Math.max(0, Math.floor(c.running)), cap = Number.isFinite(c.cap) && c.cap > 0 ? Math.min(8, Math.floor(c.cap)) : 4, light = Number.isFinite(c.light) && c.light > 0 ? Math.floor(c.light) : 4;
   const m = rel("span", "crewm"); m.dataset.over = String(run > cap); m.setAttribute("role", "img");
   m.setAttribute("aria-label", "Crew: " + run + " running, up to " + cap + (run > cap ? ", over the usual " + cap : ""));
   const names = Array.isArray(c.roles) ? c.roles.filter((x) => typeof x === "string").map(nameOf) : [];
-  m.title = "Doraemon runs 2-4 crew at once to keep cost down." + (names.length ? "\nNow: " + names.join(", ") : "");
+  m.title = "Doraemon runs 2-4 crew for light work, up to 6-8 for heavy work." + (names.length ? "\nNow: " + names.join(", ") : "");
   const slots = rel("span", "cm-slots"); slots.setAttribute("aria-hidden", "true");
   for (let i = 0; i < Math.max(run, cap); i++) slots.append(rel("i", (i < run ? "on" : "") + (i >= cap ? " x" : "") + (i === cap - 1 && run > cap ? " cap" : "")));
+  if (light > 0 && light < cap) slots.children[light - 1].style.marginRight = "4px";   // gap marks the light/heavy threshold
   m.append(rel("span", "cm-l", "Crew"), slots, rel("b", "cm-n num", run + " / " + cap));
   return m;
 }
