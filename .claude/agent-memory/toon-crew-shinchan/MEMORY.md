@@ -10,4 +10,7 @@
 - Never name a CSS modifier class `.main` or another page-layout class on a child element; the page grid rule hit the cost bar row. Use a unique name such as `.cbar.me`. (seen 1) [crew]
 - A later media query overrides an earlier one at equal specificity: when adding a tablet rule, restate the narrow override after it. (seen 1) [crew]
 - In a worktree, check out plugin/hooks as well as plugin/board, or hooks-json.test.ts fails on a missing hooks.json. (seen 1) [project]
+- Prove "no lingering animation" with `getAnimations({subtree:true})` and `iterations === Infinity`, not by eye. (seen 1) [crew]
+- Board demo walks keep Doraemon away from his desk; for a desk-bound scene (copy light) use a scratch proxy that strips talks, and check the port is free first, since a stale board on the same port silently serves old data. (seen 1) [project]
+- The travel hook is `window.crewTravel?.({el, role, from, to, kind, reduced})`, called from rTrip in room.js; travel styles live in travel.js and travel.css. (seen 1) [project]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]
