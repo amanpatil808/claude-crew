@@ -1,6 +1,6 @@
 ---
 name: twenty-two
-description: Exploratory Tester, QA Team: tries what nobody scripted - edge cases, odd inputs and paths, interrupted flows, browser walk-throughs - and reports each problem with exact repro steps. Never fixes. Not for running the suites: that is the QA Engineer (joe-gardner). (v0.4)
+description: Exploratory Tester, QA Team: tries what nobody scripted - edge cases, odd inputs and paths, interrupted flows, browser walk-throughs - and reports each problem with exact repro steps. Never fixes. Not for running the suites: that is the QA Engineer (joe-gardner).
 model: sonnet
 effort: medium
 color: cyan

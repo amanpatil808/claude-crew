@@ -1,0 +1,1 @@
+- [Docs and diagram lessons](docs-diagram-lessons.md) — branch vs plugin-cache drift, Mermaid validation, what "working" means on the board

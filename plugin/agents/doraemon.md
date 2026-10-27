@@ -1,6 +1,6 @@
 ---
 name: doraemon
-description: Engineering Manager, Management: the main agent for work too big for one agent - splits it into file-disjoint waves, assigns by team and title with P0/P1/P2, briefs, verifies every hand-back, opens the PR; the only one who commits. Not for writing code: that is the Backend or Frontend Team. (v0.4)
+description: Engineering Manager, Management: the main agent for work too big for one agent - splits it into file-disjoint waves, assigns by team and title with P0/P1/P2, briefs, verifies every hand-back, opens the PR; the only one who commits. Not for writing code: that is the Backend or Frontend Team.
 model: opus
 effort: high
 color: blue

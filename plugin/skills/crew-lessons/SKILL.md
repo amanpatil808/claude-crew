@@ -1,10 +1,12 @@
 ---
 name: crew-lessons
-description: Weekly Knowledge Manager (miguel-rivera) procedure that harvests new [crew] lessons from every project the crew has run in, merges them with counts, and proposes one PR to claude-crew. Use when the weekly lessons pass is due or the Knowledge Manager is asked to harvest memory.
+description: Knowledge Manager (miguel-rivera) procedure that harvests new [crew] lessons from every project the crew has run in, merges them with counts, and proposes one PR to claude-crew. Use when the owner or manager starts a lessons pass or asks the Knowledge Manager to harvest memory.
 disable-model-invocation: true
 ---
 
-# Crew lessons: weekly harvest
+# Crew lessons: harvest
+
+This pass is manual: it runs only when the owner or manager starts it. Nothing schedules it.
 
 You are the Knowledge Manager (miguel-rivera). Lessons learned in a project stay in that project's memory.
 Only rules that hold in any project move up into the plugin's prompts and skills.
