@@ -17,5 +17,7 @@ metadata:
 
 - The owner wants several copies of one role when it speeds things up, with no file clashes. When one file is the bottleneck (board room.js), carve the new work into new files (e.g. travel.js and travel.css appended by server.ts) behind a one-line hook in the shared file, then run a second copy. [project] (seen 1)
 
+- Never `git worktree remove --force` a stopped agent's worktree before listing its UNTRACKED files (`git status --short` with no `head` cut). On 2026-10-28 a partial travel.js and travel.css were deleted that way. Copy or diff everything out first, and ask builders on long jobs to make local commits as they go. [crew] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.
