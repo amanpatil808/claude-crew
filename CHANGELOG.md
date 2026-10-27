@@ -2,6 +2,21 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.4 - 28 Oct 2026
+
+Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.
+
+### Fixed
+
+- Cost "Today" counted a long session's whole history the first time the board saw it. Usage is now filed by the day of each call, so Today and 7 days only count calls made in that time.
+- Queued was always empty because Doraemon queued each piece a moment before starting it. He now queues the whole plan up front.
+
+### Changed
+
+- Cost headline shows fresh tokens; cache reads (billed at about a tenth) are shown on their own line and column.
+- Project chips wrap onto their own row instead of scrolling sideways.
+- Every desk shows the crew member's title, model and effort level.
+
 ## 0.3.3 - 28 Oct 2026
 
 The Crew Room is one page, with a cost ledger and a Needs you strip. Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board (`/toon-crew:board stop`, then `/toon-crew:board`).

@@ -1,12 +1,15 @@
-// Token usage from one Claude Code transcript (.jsonl), as numbers only: the reader touches `type`, `message.id`,
-// `message.model` and the numeric `message.usage` fields, never content, tool output or the path itself.
+// Token usage from one Claude Code transcript (.jsonl), as numbers only: the reader touches `type`, `timestamp`,
+// `message.id`, `message.model` and the numeric `message.usage` fields, never content, tool output or the path itself.
 // The transcript format is internal to Claude Code (checked on CLI 2.1.309-2.1.310), so anything odd is skipped.
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, sep } from "node:path";
 import { LONG_PROMPT_TOKENS } from "./prices.ts";
-// The event shape, row fields, fixed text and model pattern have one home: lib/events.ts.
-import { agentIdOf, agentTypeOf, MODEL_ID, USAGE_TEXT, type UsageEvent, type UsageOptions, type UsageRow } from "./events.ts";
+// The event shape, row fields, fixed text, model and day patterns and the size caps have one home: lib/events.ts.
+import {
+  agentIdOf, agentTypeOf, dayOf, localDay, MODEL_ID, USAGE_MAX_DAYS, USAGE_MAX_ROWS, USAGE_TEXT,
+  type UsageEvent, type UsageOptions, type UsageRow,
+} from "./events.ts";
 
 // Overridable for tests only; the hook passes nothing.
 export interface ReadLimits {
@@ -16,6 +19,9 @@ export interface ReadLimits {
   clock?: () => number;   // milliseconds
   chunkBytes?: number;
   maxLineBytes?: number;
+  dayOf?: (ms: number) => string;   // the calendar day of a response; default the machine's local day
+  maxDays?: number;
+  maxRows?: number;
 }
 
 export const MAX_BYTES = 512 * 2 ** 20;
@@ -24,6 +30,8 @@ const CHUNK_BYTES = 2 ** 20;
 const MAX_LINE_BYTES = 16 * 2 ** 20;        // one line longer than this is dropped and the read marked partial
 
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+// Claude Code writes a top-level ISO time on every line ("2026-10-28T09:15:02.123Z"); nothing looser is parsed.
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 const NEEDLE = '"type":"assistant"';             // cheap filter before JSON.parse; the parsed type is checked again
 
 export const transcriptRoot = () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
@@ -51,8 +59,16 @@ const obj = (x: unknown): Record<string, unknown> => (x && typeof x === "object"
 
 type Response = Omit<UsageRow, "n">;
 
+// The response's calendar day, or "" when the line has no usable time (it then counts toward all-time only).
+function dayOfLine(t: unknown, day: (ms: number) => string): string {
+  // dayOf on the written date too: Date.parse rolls "2026-02-30" over to March instead of refusing it.
+  if (typeof t !== "string" || !ISO_TIME.test(t) || !dayOf(t.slice(0, 10))) return "";
+  const ms = Date.parse(t);
+  return Number.isFinite(ms) ? dayOf(day(ms)) : "";
+}
+
 // One assistant line to one response's numbers, or null when it is not one.
-function response(line: string): [string, Response] | null {
+function response(line: string, day: (ms: number) => string): [string, Response] | null {
   let parsed: unknown;
   try { parsed = JSON.parse(line); } catch { return null; }
   const rec = obj(parsed), msg = obj(rec.message), u = obj(msg.usage);
@@ -66,7 +82,7 @@ function response(line: string): [string, Response] | null {
   const cw5m = cc.ephemeral_5m_input_tokens === undefined ? Math.max(0, cwAll - cw1h) : num(cc.ephemeral_5m_input_tokens);
   const input = num(u.input_tokens), cr = num(u.cache_read_input_tokens);
   return [msg.id, {
-    model, speed: u.speed === "fast" ? "fast" : "standard", long: input + cwAll + cr > LONG_PROMPT_TOKENS,
+    model, speed: u.speed === "fast" ? "fast" : "standard", long: input + cwAll + cr > LONG_PROMPT_TOKENS, day: dayOfLine(rec.timestamp, day),
     in: input, out: num(u.output_tokens), cw5m, cw1h, cr, ws: num(tools.web_search_requests), wf: num(tools.web_fetch_requests),
   }];
 }
@@ -74,9 +90,9 @@ function response(line: string): [string, Response] | null {
 // Streams the file in chunks. A response is written as several lines (one per content block) repeating the
 // same usage, so responses are keyed by message.id and the last line seen wins.
 // Exported for the swap test only; callers use readUsage, which checks the path first.
-export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: UsageRow[]; partial: boolean } | null {
+export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: UsageRow[]; partial: boolean; since: string } | null {
   const maxBytes = limits.maxBytes ?? MAX_BYTES, maxMs = limits.maxMs ?? MAX_MS, clock = limits.clock ?? (() => performance.now());
-  const maxLine = limits.maxLineBytes ?? MAX_LINE_BYTES;
+  const maxLine = limits.maxLineBytes ?? MAX_LINE_BYTES, day = limits.dayOf ?? localDay;
   // O_NOFOLLOW plus the same inode as the checked path: a file swapped in after the check is not read.
   // O_NONBLOCK: a FIFO swapped in would otherwise block open() for good; a regular file ignores it.
   const fd = openSync(file.real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
@@ -87,7 +103,7 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
     const scan = (text: string) => {
       for (const line of text.split("\n")) {
         if (!line.includes(NEEDLE)) continue;
-        const hit = response(line);
+        const hit = response(line, day);
         if (hit) seen.set(hit[0], hit[1]);
       }
     };
@@ -120,19 +136,36 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
     }
     // A last line without "\n" may be torn (the transcript is written async); it is used only if it parses.
     if (!partial && !dropping && restLen) scan(Buffer.concat(parts, restLen).toString("utf8"));
-    return { rows: toRows(seen.values()), partial };
+    const out = toRows([...seen.values()], limits.maxDays ?? USAGE_MAX_DAYS, limits.maxRows ?? USAGE_MAX_ROWS);
+    return { rows: out.rows, partial: partial || out.cut, since: out.since };
   } finally { closeSync(fd); }
 }
 
-function toRows(responses: Iterable<Response>): UsageRow[] {
+function group(responses: readonly Response[], keep: ReadonlySet<string>): UsageRow[] {
   const rows = new Map<string, UsageRow>();
   for (const x of responses) {
-    const key = `${x.model}\0${x.speed}\0${x.long}`;
-    const row = rows.get(key) ?? { model: x.model, speed: x.speed, long: x.long, n: 0, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 };
+    const day = keep.has(x.day) ? x.day : "";
+    const key = `${x.model}\0${x.speed}\0${x.long}\0${day}`;
+    const row = rows.get(key) ?? { model: x.model, speed: x.speed, long: x.long, day, n: 0, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 };
     row.n++; row.in += x.in; row.out += x.out; row.cw5m += x.cw5m; row.cw1h += x.cw1h; row.cr += x.cr; row.ws += x.ws; row.wf += x.wf;
     rows.set(key, row);
   }
-  return [...rows.values()].sort((a, b) => a.model.localeCompare(b.model) || a.speed.localeCompare(b.speed) || Number(a.long) - Number(b.long));
+  return [...rows.values()].sort((a, b) =>
+    a.model.localeCompare(b.model) || a.speed.localeCompare(b.speed) || Number(a.long) - Number(b.long) || (a.day < b.day ? 1 : a.day > b.day ? -1 : 0));
+}
+
+// Rows per (model, speed, long, day). Only the newest `maxDays` days keep their own rows; older days fold into
+// day "" (all-time only), and more days fold while the rows exceed `maxRows`. Totals never change by folding.
+// Only rows that still do not fit are cut, and `cut` then marks the read partial.
+// `since` is the earliest day seen before any folding ("" for none), so "tracking since" survives the cap.
+function toRows(responses: readonly Response[], maxDays: number, maxRows: number): { rows: UsageRow[]; cut: boolean; since: string } {
+  const days = [...new Set(responses.map((x) => x.day).filter(Boolean))].sort().reverse();
+  const since = days.at(-1) ?? "";
+  for (let kept = Math.min(days.length, Math.max(0, maxDays)); ; kept--) {
+    const rows = group(responses, new Set(days.slice(0, kept)));
+    if (rows.length <= maxRows) return { rows, cut: false, since };
+    if (kept === 0) return { rows: rows.slice(0, maxRows), cut: true, since };
+  }
 }
 
 // Cumulative usage of one transcript as a ready-to-append event, or null: a refused path, an unreadable file,
@@ -147,5 +180,8 @@ export function readUsage(path: string, opts: UsageOptions, limits: ReadLimits =
   const agent = opts.scope === "agent"
     ? { agentId: opts.agentId, ...(agentTypeOf(opts.agentType) ? { agentType: opts.agentType } : {}) }
     : {};
-  return { kind: "usage", project: opts.project, sid: opts.sid, ...agent, text: USAGE_TEXT, scope: opts.scope, final: opts.final, partial: read.partial, rows: read.rows };
+  return {
+    kind: "usage", project: opts.project, sid: opts.sid, ...agent, text: USAGE_TEXT, scope: opts.scope, final: opts.final, partial: read.partial, rows: read.rows,
+    ...(read.since ? { since: read.since } : {}),
+  };
 }

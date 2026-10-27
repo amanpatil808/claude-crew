@@ -19,13 +19,13 @@
 <header class="topbar">
   <div class="wrap">
     <h1 class="brand pxf"><span class="door" aria-hidden="true"></span>Crew Room</h1>
-    <nav class="projects" id="projects" aria-label="Projects" hidden></nav>
     <span class="spacer"></span>
     <span class="status" id="status" data-s="wait"><i aria-hidden="true"></i>Connecting&hellip;</span>
     <button class="tbtn pxf" id="anim" type="button" aria-pressed="true"><span class="tick" aria-hidden="true"></span>Animation</button>
     <button class="tbtn pxf" id="theme" type="button" aria-label="Switch light or dark theme">Theme</button>
   </div>
 </header>
+<div class="projrow"><div class="wrap"><nav class="projects" id="projects" aria-label="Projects" hidden></nav></div></div>
 
 <div class="offband" id="offband" hidden></div>
 
@@ -65,18 +65,20 @@
         </div>
         <div class="cost-body" id="cost-body">
           <div class="cost-hero" id="c-hero"><span class="big num" id="c-total">&ndash;</span><span class="tok"><b class="num" id="c-tok">&ndash;</b> <span id="c-sub">loading</span><span id="c-runs"></span></span></div>
+          <p class="cost-cached" id="c-cached" hidden></p>
+          <p class="cost-since" id="c-since" hidden></p>
           <ul class="cbars" id="c-bars" aria-label="Estimated cost by agent"></ul>
           <details id="c-details" hidden>
             <summary>Per agent and task</summary>
             <table>
               <caption id="c-cap">By agent (estimated)</caption>
-              <thead><tr><th scope="col">Agent</th><th scope="col">Runs</th><th scope="col">Tokens</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <thead><tr><th scope="col">Agent</th><th scope="col">Runs</th><th scope="col">Tokens (fresh)</th><th scope="col">Cached</th><th scope="col">&asymp; Cost</th></tr></thead>
               <tbody id="c-rows"></tbody>
               <tfoot id="c-foot"></tfoot>
             </table>
             <table id="c-task-table" class="by-task">
               <caption id="c-task-cap">By task (estimated)</caption>
-              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">Tokens (fresh)</th><th scope="col">&asymp; Cost</th></tr></thead>
               <tbody id="c-task-rows"></tbody>
             </table>
           </details>
