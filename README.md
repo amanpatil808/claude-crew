@@ -12,17 +12,14 @@
 
 </div>
 
-```text
-   .-----------------------------------------------------------.
-   |  THE CREW ROOM                       (an illustration,    |
-   |                                       not a screenshot)   |
-   |  [Doraemon]   [Kevin]      [Mike]       [Olaf]            |
-   |  managing     writing      running      checking          |
-   |  3 tasks      the API      CI           a source          |
-   |                                                           |
-   |  WORKING 3         QUEUED  1         BRANCH  feat/cart    |
-   '-----------------------------------------------------------'
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/crew-room-dark.png">
+    <img src="docs/images/crew-room-light.png" alt="The Crew Room tab of the board: a pixel-art office with a desk for each crew member, grouped into team rooms, with counts for Working and Queued at the top and the Active and Queued task panels. The screenshot shows demo data." width="900">
+  </picture>
+  <br>
+  <sub>Crew Room with demo data</sub>
+</p>
 
 The `toon-crew` plugin gives Claude Code a manager (Doraemon) and 14 specialists, a guard that stops risky commands, and a local status page that shows who is working on what. This is a private repo, with one plugin and one marketplace named `crew`.
 
@@ -99,16 +96,15 @@ You talk to Doraemon only. He splits the work into waves, queues each piece on t
 
 ```mermaid
 flowchart TD
-  OWN["You"] -->|"request"| DOR["Doraemon (Management)<br/>main agent: plans file-disjoint waves,<br/>P0/P1/P2, writes briefs"]
+  OWN(["👤 You"]) -->|"request"| DOR(["Doraemon (Management)<br/>main agent: plans file-disjoint waves,<br/>P0/P1/P2, writes briefs"])
   DOR -->|"queue each planned piece"| TSK["toon-crew:task skill<br/>board.sh task add, start, done, drop<br/>(board/task.ts)"]
-
-  TEAMS["Teams started by Doraemon (toon-crew:id)<br/>Backend: kevin, bob<br/>Frontend: nobita, shinchan<br/>DevOps: mike-wazowski, sulley<br/>Security: ninja-hattori<br/>QA: joe-gardner, twenty-two<br/>Research: dekisugi, olaf<br/>Documentation: shizuka<br/>Helpers: stuart"]
+  TEAMS(["The crew: 15 agents in 8 teams<br/>started by Doraemon as toon-crew:id"])
 
   DOR -->|"Agent tool: brief per role"| TEAMS
   TEAMS -->|"hand-back"| DOR
   DOR -->|"verifies each hand-back,<br/>git commit (only Doraemon)"| BR["feature branch"]
-  BR -->|"gh pr create"| PR["pull request"]
-  PR -->|"you approve that PR"| MG["DevOps Team merges<br/>(guard asks you)"]
+  BR -->|"gh pr create"| PR["🔀 pull request"]
+  PR -->|"you approve that PR"| MG(["DevOps Team merges<br/>(guard asks you)"])
   MG --> MAIN["main"]
 
   subgraph BOARD["Crew Room board"]
@@ -125,15 +121,89 @@ flowchart TD
   PR -.->|"CI and PR state from GitHub"| POLL
   POLL -.-> EVT
   EVT --> ROOM
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+  class OWN,BR,PR,MAIN ext
+  class TEAMS crew
+  class DOR mgmt
+  class TSK,ROOM,POLL board
+  class EVT data
+  class BE backend
+  class FE frontend
+  class DV,MG devops
+  class SE security
+  class QA qa
+  class RS research
+  class DC docs
+  class HP helpers
+  style BOARD fill:transparent,stroke:#2da44e,color:#8b949e
+  %% dotted edges = what the board sees
+  linkStyle 8,9,10,11,12,13,14 stroke:#2da44e,stroke-width:2px
 ```
 
-The dotted lines are what the board records. A queued task sits in the Queued panel. When Doraemon assigns that role, the oldest queued task for it becomes active (an assignment with nothing queued becomes an active task itself). It is done when the agent stops, with that agent's one-line hand-back. A task nobody has touched for six hours is shown as done.
+The green dotted lines are what the board records. A queued task sits in the Queued panel. When Doraemon assigns that role, the oldest queued task for it becomes active (an assignment with nothing queued becomes an active task itself). It is done when the agent stops, with that agent's one-line hand-back. A task nobody has touched for six hours is shown as done.
+
+The teams, in the colours these diagrams use (green is the Crew Room board, grey is files and data):
+
+```mermaid
+flowchart TD
+  BE(["Backend<br/>kevin, bob"]) ~~~ QA(["QA<br/>joe-gardner, twenty-two"])
+  FE(["Frontend<br/>nobita, shinchan"]) ~~~ RS(["Research<br/>dekisugi, olaf"])
+  DV(["DevOps<br/>mike-wazowski, sulley"]) ~~~ DC(["Documentation<br/>shizuka"])
+  SE(["Security<br/>ninja-hattori"]) ~~~ HP(["Helpers<br/>stuart"])
+  MG(["Management<br/>doraemon, miguel-rivera"])
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+  class MG mgmt
+  class BE backend
+  class FE frontend
+  class DV devops
+  class SE security
+  class QA qa
+  class RS research
+  class DC docs
+  class HP helpers
+```
 
 For the 16-step flow, where memory lives and how several projects share one board, read [docs/how-it-works.md](docs/how-it-works.md). It also has a diagram of how the plugin's parts fit together.
 
 ## The Crew Room board
 
-The board is one local page for all your projects. Start it with `/toon-crew:board`. Hooks write a short, redacted line for each event to a log, and the board reads that log. Two diagrams: what feeds it, then what is on the page.
+The board is one local page for all your projects. Start it with `/toon-crew:board`. Hooks write a short, redacted line for each event to a log, and the board reads that log. Below is the Live tab, then two diagrams: what feeds the board, and what is on the page.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/live-dark.png">
+    <img src="docs/images/live-light.png" alt="The Live tab of the board: the project picker, the Active and Queued task panels, one chip per crew role, the agent log with the newest line first, and cards for deploys, CI and app errors. The screenshot shows demo data." width="900">
+  </picture>
+  <br>
+  <sub>Live tab with demo data</sub>
+</p>
+
+Both screenshots show demo data, not a real project. To see it yourself, seed a new empty folder and start the board on it: `node scripts/board-demo.mjs /tmp/crew-demo` prints the exact `board.sh start` and `stop` commands. The script refuses any folder it did not create, any real board data folder, and any folder whose board is still running.
 
 **What feeds the board**
 
@@ -144,8 +214,8 @@ flowchart LR
   PO["Optional pollers<br/>(opt-in per project)<br/>gh: CI runs, PRs, commits<br/>read-only ssh: deploy, app errors"]
   EV[("events.jsonl<br/>in the plugin data folder")]
   SN[("poller snapshots")]
-  RG["projects.json<br/>(which projects exist)"]
-  AF["Agent files<br/>(names, titles, models)"]
+  RG[("projects.json<br/>(which projects exist)")]
+  AF["📄 Agent files<br/>(names, titles, models)"]
   SV["Board server<br/>127.0.0.1 only<br/>GET /api/state"]
   PG["Board page<br/>Live tab and Crew Room tab<br/>(your browser remembers the tab,<br/>the project and Motion)"]
 
@@ -158,6 +228,21 @@ flowchart LR
   RG --> SV
   AF --> SV
   SV -->|"refresh every 2 s (Crew Room)<br/>or 4 s (Live)"| PG
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+  class HK,TK,PO,SV,PG board
+  class EV,SN,RG,AF data
 ```
 
 **What is on the page, and what feeds each part**
@@ -190,6 +275,26 @@ flowchart TB
       PN["Active and Queued panels<br/>Fed by: tasks"]
     end
   end
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+  class CC,AL,CI,ER board
+  class HR,RM,DK,WK,WL board
+  class TB,PK,PN mgmt
+  style PAGE fill:transparent,stroke:#8b949e,color:#8b949e
+  style LT fill:transparent,stroke:#2da44e,color:#8b949e
+  style RT fill:transparent,stroke:#2da44e,color:#8b949e
+  style TOP fill:transparent,stroke:#58a6ff,color:#8b949e
 ```
 
 Good to know:
