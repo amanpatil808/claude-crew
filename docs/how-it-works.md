@@ -8,23 +8,22 @@ Doraemon is the main agent. You talk to him; he talks to everyone else. Follow t
 
 ```mermaid
 flowchart TD
-    S1["(1) You ask<br/>for something"]
-    S2["(2) Doraemon (manager)<br/>reads project.md<br/>and his memory"]
+    S1(["(1) 👤 You ask<br/>for something"])
+    S2(["(2) Doraemon (manager)<br/>reads project.md<br/>and his memory"])
     S3["(3) He plans waves and<br/>gives every task<br/>P0, P1 or P2"]
     S4["(4) He queues each task<br/>on the board<br/>(toon-crew:task)"]
     S5["(5) He writes the contract<br/>and commits it"]
     S6["(6) He briefs the crew,<br/>2 to 4 at a time"]
 
     subgraph CREW["(7) The crew works"]
-        B["Builders, each in<br/>their own worktree<br/>kevin: backend lead<br/>bob: backend developer<br/>shinchan: frontend<br/>mike-wazowski: DevOps<br/>sulley: SRE"]
-        R["Reviewers<br/>nobita: UX and design<br/>ninja-hattori: security"]
-        T["Testers<br/>joe-gardner: QA<br/>twenty-two: exploratory"]
-        RS["Research<br/>dekisugi: research lead<br/>olaf: analyst"]
-        D["Docs<br/>shizuka: technical writer"]
-        L["Lookups<br/>stuart: code search"]
-        B ~~~ RS
-        R ~~~ D
-        T ~~~ L
+        BE(["Backend<br/>kevin: lead, own worktree<br/>bob: developer, own worktree"])
+        FE(["Frontend<br/>nobita: UX review<br/>shinchan: screens, own worktree"])
+        DV(["DevOps<br/>mike-wazowski: CI, own worktree<br/>sulley: SRE, own worktree"])
+        SE(["Security<br/>ninja-hattori: review"])
+        QA(["QA<br/>joe-gardner: checks<br/>twenty-two: exploratory"])
+        RS(["Research<br/>dekisugi: lead<br/>olaf: analyst"])
+        DC(["Documentation<br/>shizuka: technical writer"])
+        HP(["Helpers<br/>stuart: code search"])
     end
 
     S8["(8) The crew hand back<br/>(a short report each)"]
@@ -34,8 +33,8 @@ flowchart TD
     S12["(12) He opens a draft PR<br/>and tells you the branch<br/>and PR number"]
     S13{"(13) CI checks<br/>all green?"}
     S14{"(14) You say OK?"}
-    S15["(15) Mike Wazowski merges<br/>(Sulley for a production<br/>rollout) after your confirm"]
-    FIX["Back to step (6)<br/>with a fix brief<br/>(the loop repeats)"]
+    S15(["(15) Mike Wazowski merges<br/>(Sulley for a production<br/>rollout) after your confirm"])
+    FIX{{"Back to step (6)<br/>with a fix brief<br/>(the loop repeats)"}}
     S16["(16) Release and deploy,<br/>if the project's rules<br/>say a merge does it"]
 
     S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> CREW --> S8 --> S9
@@ -46,12 +45,12 @@ flowchart TD
     S14 -->|"changes wanted"| FIX
     S14 -->|"yes"| S15 --> S16
 
-    K1["Task queued<br/>(Queued list)"]
-    K2["Assign: the task<br/>goes Active"]
-    K3["Hand-back: the task<br/>is done"]
-    K4["Commit logged"]
-    K5["PR opened"]
-    K6["PR merged"]
+    K1(["Task queued<br/>(Queued list)"])
+    K2(["Assign: the task<br/>goes Active"])
+    K3(["Hand-back: the task<br/>is done"])
+    K4(["Commit logged"])
+    K5(["PR opened"])
+    K6(["PR merged"])
 
     S4 -.->|"board.sh task add"| K1
     S6 -.->|"hook"| K2
@@ -60,24 +59,45 @@ flowchart TD
     S12 -.->|"hook"| K5
     S15 -.->|"hook"| K6
 
-    classDef you fill:#57606a,stroke:#57606a,color:#ffffff
-    classDef mgr fill:#1f6feb,stroke:#1f6feb,color:#ffffff
-    classDef crew fill:#1a7f37,stroke:#1a7f37,color:#ffffff
-    classDef gate fill:#8250df,stroke:#8250df,color:#ffffff
-    classDef ops fill:#bc4c00,stroke:#bc4c00,color:#ffffff
-    classDef fix fill:#cf222e,stroke:#cf222e,color:#ffffff
-    classDef board fill:#0e7490,stroke:#0e7490,color:#ffffff
-    class S1 you
-    class S2,S3,S4,S5,S6,S8,S10,S11,S12 mgr
-    class B,R,T,RS,D,L crew
-    class S9,S13,S14 gate
+    BE ~~~ QA
+    FE ~~~ RS
+    DV ~~~ DC
+    SE ~~~ HP
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+    classDef fix fill:#ffa198,stroke:#cf222e,color:#111,stroke-width:2px,stroke-dasharray:5 3
+    class S1 ext
+    class S2,S3,S4,S5,S6,S8,S10,S11,S12 mgmt
+    class S9,S13,S14 crew
     class FIX fix
-    class S15,S16 ops
+    class S15,S16 devops
     class K1,K2,K3,K4,K5,K6 board
+    class BE backend
+    class FE frontend
+    class DV devops
+    class SE security
+    class QA qa
+    class RS research
+    class DC docs
+    class HP helpers
     style CREW fill:transparent,stroke:#8b949e,color:#8b949e
+    %% dotted edges = what the board records
+    linkStyle 18,19,20,21,22,23 stroke:#2da44e,stroke-width:2px
 ```
 
-Colours: grey is you, blue is Doraemon's own work, green is the crew, purple is a check, orange is the DevOps team, red is the loop back, teal is the board. The dotted lines are the board's feed. "Hook" means the plugin's hooks write one line to the event log; the board reads it (section 3 says how). Step 4 is not a hook: `board.sh task add` writes the queued task itself.
+Colours: the same palette is used in every diagram in this repo. Dashed grey is you (or something outside the plugin, such as GitHub), blue is Doraemon's own work, grey diamonds are checks, red with a dashed edge is the loop back, and green is the Crew Room board. The crew boxes use one colour per team: Backend gold, Frontend red, DevOps cyan, Security indigo, QA purple, Research orange, Documentation pink, Helpers khaki. Steps 15 and 16 are DevOps cyan too. The green dotted lines are the board's feed. "Hook" means the plugin's hooks write one line to the event log; the board reads it (section 3 says how). Step 4 is not a hook: `board.sh task add` writes the queued task itself.
 
 What to know:
 - **P0, P1, P2.** P0 blocks a release or the critical path. P1 is important next. P2 is nice to have. Doraemon gives every task one.
@@ -134,17 +154,17 @@ More detail (colours, retired characters, the memory folder move from old names)
 ```mermaid
 flowchart LR
     subgraph PROJ["Your project folder"]
-        CM["CLAUDE.md"]
-        PM[".claude/crew/project.md"]
-        MEM[".claude/agent-memory/<br/>toon-crew-id/MEMORY.md"]
+        CM[("CLAUDE.md")]
+        PM[(".claude/crew/project.md")]
+        MEM[(".claude/agent-memory/<br/>toon-crew-id/MEMORY.md")]
     end
     subgraph PLUG["The plugin"]
-        AG["agents and skills"]
+        AG(["agents and skills"])
         HK["hooks"]
     end
     subgraph DATA["Plugin data folder"]
-        EV["events.jsonl"]
-        REG["projects.json"]
+        EV[("events.jsonl")]
+        REG[("projects.json")]
     end
     BD["Board<br/>127.0.0.1 only"]
 
@@ -155,9 +175,27 @@ flowchart LR
     HK -->|"register project"| REG
     EV --> BD
     REG --> BD
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+    class CM,PM,MEM,EV,REG data
+    class AG mgmt
+    class HK,BD board
     style PROJ fill:transparent,stroke:#8b949e,color:#8b949e
-    style PLUG fill:transparent,stroke:#8b949e,color:#8b949e
+    style PLUG fill:transparent,stroke:#58a6ff,color:#8b949e
     style DATA fill:transparent,stroke:#8b949e,color:#8b949e
+    linkStyle 3,4 stroke:#2da44e,stroke-width:2px
 ```
 
 | What | Where | Who uses it |
@@ -184,20 +222,38 @@ Each project runs its own crew. Doraemon in project 1 and Doraemon in project 2 
 ```mermaid
 flowchart TB
     subgraph P1["Project 1"]
-        S1["Doraemon session and crew"]
-        M1[".claude/agent-memory/"]
+        S1(["Doraemon session and crew"])
+        M1[(".claude/agent-memory/")]
     end
     subgraph P2["Project 2"]
-        S2["Doraemon session and crew"]
-        M2[".claude/agent-memory/"]
+        S2(["Doraemon session and crew"])
+        M2[(".claude/agent-memory/")]
     end
     S1 --- M1
     S2 --- M2
-    S1 -->|"events with project 1"| EV["events.jsonl<br/>one file"]
+    S1 -->|"events with project 1"| EV[("events.jsonl<br/>one file")]
     S2 -->|"events with project 2"| EV
     EV --> BD["One board for all projects"]
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+    class S1,S2 mgmt
+    class M1,M2,EV data
+    class BD board
     style P1 fill:transparent,stroke:#8b949e,color:#8b949e
     style P2 fill:transparent,stroke:#8b949e,color:#8b949e
+    linkStyle 2,3 stroke:#2da44e,stroke-width:2px
 ```
 
 - The plugin and the board are installed once. Memory, `project.md` and sessions belong to each project.
@@ -224,6 +280,15 @@ stateDiagram-v2
     done --> active : a resume within 30 minutes
     done --> [*]
     dropped --> [*]
+
+    classDef queuedState fill:#e3b341,stroke:#9a6700,color:#111
+    classDef activeState fill:#58a6ff,stroke:#1f6feb,color:#111
+    classDef doneState fill:#56d364,stroke:#1a7f37,color:#111
+    classDef droppedState fill:#ff7b72,stroke:#cf222e,color:#111
+    class queued queuedState
+    class active activeState
+    class done doneState
+    class dropped droppedState
 ```
 
 The commands (run them as shown in section 6):
@@ -311,7 +376,7 @@ flowchart LR
   MP["marketplace.json<br/>(.claude-plugin/, marketplace crew)"] -->|"source: ./plugin"| SK
 
   subgraph PL["plugin/ : the toon-crew plugin (checked by .github/workflows/ci.yml)"]
-    AG["agents/*.md<br/>15 crew agents; settings.json<br/>makes Doraemon the main agent"]
+    AG(["agents/*.md<br/>15 crew agents; settings.json<br/>makes Doraemon the main agent"])
     SK["skills/*<br/>board, task, project-profile, ..."]
     subgraph HK["hooks/hooks.json"]
       GD["hooks/guard.mjs<br/>+ inline-writes.mjs<br/>(PreToolUse)"]
@@ -327,9 +392,9 @@ flowchart LR
     EV["evals/<br/>claude plugin eval cases"]
   end
 
-  CC["Claude Code session"]
+  CC(["Claude Code session"])
   DATA[("$CLAUDE_PLUGIN_DATA<br/>events.jsonl, projects.json,<br/>per-project poller state")]
-  CFG["your project's<br/>.claude/crew/project.md<br/>section: ## Board"]
+  CFG[("your project's<br/>.claude/crew/project.md<br/>section: ## Board")]
 
   CC <-->|"each risky tool call: allow, ask or block"| GD
   CC -->|"SessionStart"| PJ
@@ -345,6 +410,32 @@ flowchart LR
   CFG -->|"only if the project is opted in"| PO
   PO -->|"snapshots, CI and deploy events"| DATA
   EV -.->|"run by hand"| AG
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef backend fill:#e3b341,stroke:#9a6700,color:#111,stroke-width:2px
+  classDef frontend fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
+  classDef security fill:#8e9cf5,stroke:#4c5bd4,color:#111,stroke-width:2px
+  classDef qa fill:#bc8cff,stroke:#8250df,color:#111,stroke-width:2px
+  classDef research fill:#f0883e,stroke:#bc4c00,color:#111,stroke-width:2px
+  classDef docs fill:#f778ba,stroke:#bf3989,color:#111,stroke-width:2px
+  classDef helpers fill:#c9b97a,stroke:#8a7a3a,color:#111,stroke-width:2px
+  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
+  class MP,CC ext
+  class AG,SK mgmt
+  class GD security
+  class PJ,HT,TK,SRV,PG,PO board
+  class EV qa
+  class DATA,CFG data
+  style PL fill:transparent,stroke:#8b949e,color:#8b949e
+  style HK fill:transparent,stroke:#4c5bd4,color:#8b949e
+  style BD fill:transparent,stroke:#2da44e,color:#8b949e
+  %% green = writes to the data folder, violet = run by hand
+  linkStyle 4,5,7,13 stroke:#2da44e,stroke-width:2px
+  linkStyle 14 stroke:#a371f7,stroke-width:2px
 ```
 
 Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue, start, finish or drop board tasks.
