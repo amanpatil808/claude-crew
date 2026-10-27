@@ -2,9 +2,9 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
-## 1.0.0 - 27 Oct 2026
+## 0.3.2 - 27 Oct 2026 (not tagged)
 
-The first stable release: a manager plus 14 specialists, the guard, the Crew Room board and project memory. Needs Claude Code 2.1.295+ and Node 24.2+.
+Cleanup and docs ahead of 1.0.0. The version stays 0.3.2, so installed copies keep 0.3.2 until the next version bump. Needs Claude Code 2.1.295+ and Node 24.2+.
 
 ### Added
 
@@ -32,15 +32,7 @@ The first stable release: a manager plus 14 specialists, the guard, the Crew Roo
 
 - Board task tests no longer depend on the date.
 
-### Upgrading from 0.x
-
-1. `/plugin marketplace update crew`
-2. `/plugin update toon-crew@crew`
-3. `/reload-plugins`
-
-Old memory folders: see "Upgrading from 0.x" in `docs/setup.md`.
-
-## 0.3.2 - 26 Oct 2026 (not tagged)
+### Earlier in 0.3.2 (26 Oct 2026)
 
 - Board: every project has its own crew room. Picking a project shows only its crew; "All projects" stacks one room per project, busiest first, so two Doraemons (or two Bobs) can work at once. Nothing is dimmed any more. `/api/state.rooms` gives each project its members and manager state.
 
