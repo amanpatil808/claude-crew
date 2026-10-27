@@ -2,6 +2,12 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.7 - 28 Oct 2026
+
+### Fixed
+
+- Stopped agents in busy sessions no longer stay "working" for hours. A session can have folders under several project slugs (for example a worktree or /private/tmp); the board now searches all of them for the agent's own log, and the 45-min fallback counts only the agent's own activity.
+
 ## 0.3.6 - 28 Oct 2026
 
 Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.
