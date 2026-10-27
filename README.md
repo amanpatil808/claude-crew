@@ -15,6 +15,93 @@ From a shell, the same install is `claude plugin marketplace add amanpatil808/cl
 
 Needs Claude Code 2.1.295 or later: the guard hook uses `"onFailure": "block"`, which older versions don't support.
 
+## How it works
+
+Two pictures: what is in the plugin and how data moves between its parts, then what happens to a piece of work from your request to a merged pull request. [docs/how-it-works.md](docs/how-it-works.md) has the longer version: the 16-step flow, roles, where memory lives, several projects, and the board's tabs and task panels.
+
+### How the parts fit together
+
+```mermaid
+flowchart LR
+  MP["marketplace.json<br/>(.claude-plugin/, marketplace crew)"] -->|"source: ./plugin"| SK
+
+  subgraph PL["plugin/ : the toon-crew plugin (checked by .github/workflows/ci.yml)"]
+    AG["agents/*.md<br/>15 crew agents; settings.json<br/>makes Doraemon the main agent"]
+    SK["skills/*<br/>board, task, project-profile, ..."]
+    subgraph HK["hooks/hooks.json"]
+      GD["hooks/guard.mjs<br/>+ inline-writes.mjs<br/>(PreToolUse)"]
+      PJ["hooks/projects.mjs register<br/>(SessionStart)"]
+      HT["board/hook.ts<br/>(session, subagent, Bash,<br/>Agent and SendMessage events)"]
+    end
+    subgraph BD["board/"]
+      TK["task.ts<br/>(board.sh task ...)"]
+      SRV["server.ts<br/>127.0.0.1 only"]
+      PG["page.html + room.css + room.js<br/>one room per project"]
+      PO["lib/pollers.ts<br/>optional; runs gh, git, ssh<br/>read-only"]
+    end
+    EV["evals/<br/>claude plugin eval cases"]
+  end
+
+  CC["Claude Code session"]
+  DATA[("$CLAUDE_PLUGIN_DATA<br/>events.jsonl, projects.json,<br/>per-project poller state")]
+  CFG["your project's<br/>.claude/crew/project.md<br/>section: ## Board"]
+
+  CC <-->|"each risky tool call: allow, ask or block"| GD
+  CC -->|"SessionStart"| PJ
+  CC -->|"start, stop, tool events"| HT
+  PJ -->|"records the project"| DATA
+  HT -->|"appends events"| DATA
+  SK -->|"/toon-crew:task"| TK
+  TK -->|"appends task events"| DATA
+  SK -->|"/toon-crew:board"| SRV
+  DATA -->|"reads events and projects"| SRV
+  SRV -->|"page, /api/state"| PG
+  SRV -->|"runs in the same process"| PO
+  CFG -->|"only if board: true"| PO
+  PO -->|"snapshots, CI and deploy events"| DATA
+  EV -.->|"run by hand"| AG
+```
+
+Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue, start, finish or drop board tasks.
+
+The Crew Room board is a separate local page. `board.sh start` runs `server.ts` on `127.0.0.1`; it reads the log and serves the page, which shows one room per project. Only if you opt a project in (`"board": true` in `projects.json`) and the project's `project.md` has a `## Board` section does it also poll GitHub CI, pull requests, commits and a deploy host, read-only. CI (`.github/workflows/ci.yml`) runs the structure check, strict validation, the hook and board tests and gitleaks on the plugin. Evals are run by hand; CI does not run them.
+
+### How the crew works a task
+
+```mermaid
+flowchart TD
+  OWN["Owner"] -->|"request"| DOR["Doraemon (Management)<br/>main agent: plans file-disjoint waves,<br/>P0/P1/P2, writes briefs"]
+  DOR -->|"queue each planned piece"| TSK["toon-crew:task skill<br/>board.sh task add, start, done, drop<br/>(board/task.ts)"]
+
+  TEAMS["Teams started by Doraemon (toon-crew:id)<br/>Backend: kevin, bob<br/>Frontend: nobita, shinchan<br/>DevOps: mike-wazowski, sulley<br/>Security: ninja-hattori<br/>QA: joe-gardner, twenty-two<br/>Research: dekisugi, olaf<br/>Documentation: shizuka<br/>Helpers: stuart"]
+
+  DOR -->|"Agent tool: brief per role"| TEAMS
+  TEAMS -->|"hand-back"| DOR
+  DOR -->|"verifies each hand-back,<br/>git commit (only Doraemon)"| BR["feature branch"]
+  BR -->|"gh pr create"| PR["pull request"]
+  PR -->|"owner approves that PR"| MG["DevOps Team merges<br/>(guard asks the owner)"]
+  MG --> MAIN["main"]
+
+  subgraph BOARD["Crew Room board"]
+    EVT[("events.jsonl")]
+    ROOM["Crew Room page<br/>one room per project,<br/>Active and Queued panels"]
+    POLL["optional pollers<br/>CI, PRs, commits, deploy"]
+  end
+
+  TSK -.->|"task-queue, task-start,<br/>task-done, task-drop events"| EVT
+  DOR -.->|"assign event: who, one-line task"| EVT
+  TEAMS -.->|"agent-start and agent-stop<br/>with a hand-back line"| EVT
+  BR -.->|"commit event"| EVT
+  PR -.->|"pr event"| EVT
+  PR -.->|"CI and PR state from GitHub"| POLL
+  POLL -.-> EVT
+  EVT --> ROOM
+```
+
+You talk to Doraemon only. He splits the work into waves, queues each piece on the board, starts the right team for each piece, reads what each one hands back, and does the checking and the commits himself. Only Doraemon commits and starts crew members (Dekisugi may hand a narrow question to Olaf or Stuart), and only the DevOps Team merges, after you approve that pull request.
+
+The board watches through hooks. A queued task sits in the Queued panel. When Doraemon assigns that role, the oldest queued task for it becomes active (an assignment with nothing queued becomes an active task itself), and it is done when its agent stops, with the agent's one-line hand-back. A task nobody has touched for six hours is shown as done. A desk shows as working while the project has an active task for that role or the agent is running. Commits and pull requests that run through a Claude session show up as events too; the optional pollers add CI, pull request and commit changes that happened elsewhere.
+
 ## Update
 
 `version` in `.claude-plugin/plugin.json` pins each project to a release, so nothing changes until you ask:
@@ -64,10 +151,6 @@ Fifteen agents in nine teams. Call them as `toon-crew:<id>`; full details (model
 | Helpers | Stuart, Code Search Assistant (`stuart`) |
 
 Only Doraemon commits, and only Doraemon (the main session) starts crew agents; Dekisugi may hand narrow questions to Olaf or Stuart. Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first; the `project-profile` skill writes that file.
-
-## How it works
-
-You ask Doraemon. He plans the work in waves with P0/P1/P2 priorities, briefs the crew, checks every hand-back, commits and opens a pull request. Only after you approve it does Mike Wazowski (or Sulley, for a production rollout) merge. [docs/how-it-works.md](docs/how-it-works.md) has the diagrams: the flow, the roles, where memory and the board live, how several projects stay separate, and the board's tabs, project picker and task lists.
 
 ## Guards
 
