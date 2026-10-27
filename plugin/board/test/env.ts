@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 process.env.BOARD_LOG_DIR = mkdtempSync(join(tmpdir(), "crew-board-test-"));
+// The transcript root too (liveness stats, usage reads): no test ever looks at the real ~/.claude/projects.
+process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), "crew-board-config-"));
 
 // Fixture agent files, so model tests never depend on the plugin's real frontmatter.
 import { writeFileSync } from "node:fs";
