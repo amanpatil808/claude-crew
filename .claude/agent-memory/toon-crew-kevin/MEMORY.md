@@ -1,5 +1,8 @@
 # Kevin memory
 
+- A plugin cannot ship the main statusLine (plugin settings apply only `agent` and `subagentStatusLine`, and the subagent status line has no rate_limits). For plan windows use a mod's `session.measure` / `$.session.usage().rateLimits` (CC >= 2.1.287). (seen 1) [crew]
+- Never read ~/.claude.json for plan or usage: the keys (oauthAccount.*, cachedUsageUtilization) are undocumented and sit beside the email and name. Probe only with a key-name/type script that never prints values. (seen 1) [crew]
+
 - [Guard workarounds and proving fixes](board-guard-and-proofs.md) — Bash forms the guard blocks; failing-before-fix proofs; records.ts; server import.meta.main
 
 - Never name a board event field with token, session, secret, password, cookie or similar words: `redactDeep` (plugin/board/lib/redact.ts SENSITIVE_PROP) replaces the whole value with "[redacted]", numbers included. Why: proved on 2026-10-27, where `inputTokens` and `cacheReadTokens` were wiped by `appendEvent`. Use short neutral keys (`in`, `out`, `cr`). (seen 2) [project]
