@@ -41,7 +41,14 @@ export interface UsageRow {
   wf: number;     // web fetch requests
 }
 export const USAGE_NUMBERS = ["n", "in", "out", "cw5m", "cw1h", "cr", "ws", "wf"] as const;
-export const MODEL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;   // anything else is stored as "unknown", so no free text gets in
+// A Claude model id, optionally with a two-letter region and Bedrock's "anthropic." prefix ("us.anthropic.claude-...").
+// Anything else is stored as "unknown", so no free text gets in.
+export const MODEL_ID = /^(?:[a-z]{2}\.)?(?:anthropic\.)?claude-[a-z0-9.-]{1,56}$/;
+// Agent identity from a hook payload or the log: a value that fails these is left out, never stored as free text.
+export const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+export const AGENT_TYPE = /^[A-Za-z0-9_.:-]{1,100}$/;
+export const agentIdOf = (v: unknown): string | undefined => (typeof v === "string" && AGENT_ID.test(v) ? v : undefined);
+export const agentTypeOf = (v: unknown): string | undefined => (typeof v === "string" && AGENT_TYPE.test(v) ? v : undefined);
 export const USAGE_TEXT = "Usage update";   // fixed: counts go in rows, never in text (redact() would mask long ones)
 const MAX_ROWS = 64;
 
@@ -114,13 +121,24 @@ export function appendEvent(e: Omit<BoardEvent, "id" | "ts">, at = new Date()): 
   return event;
 }
 
+// Fields every reader treats as strings: a line where any of them has another type is dropped, so one
+// hand-edited line can never throw inside /api/state.
+const STRING_FIELDS = ["id", "ts", "kind"] as const, OPTIONAL_STRING_FIELDS = ["agentId", "agentType"] as const;
+function isEvent(x: unknown): x is BoardEvent {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return false;
+  const r = x as Record<string, unknown>;
+  return STRING_FIELDS.every((k) => typeof r[k] === "string") && OPTIONAL_STRING_FIELDS.every((k) => r[k] === undefined || typeof r[k] === "string");
+}
+
 // Skips a torn or hand-edited line instead of failing the whole page.
 export function readEvents(file = EVENTS_FILE): BoardEvent[] {
   if (!existsSync(file)) return [];
   const out: BoardEvent[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
-    try { out.push(JSON.parse(line)); } catch { /* ignore a broken line */ }
+    let parsed: unknown;
+    try { parsed = JSON.parse(line); } catch { continue; }   // a torn line
+    if (isEvent(parsed)) out.push(parsed);
   }
   return out;
 }

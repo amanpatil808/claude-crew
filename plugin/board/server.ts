@@ -16,14 +16,19 @@ const readPage = () => readFileSync(join(DIR, "page.html"), "utf8")
 const BASE = Number(process.env.BOARD_PORT) || 8811;
 const PORTS = Array.from({ length: 10 }, (_, i) => BASE + i);
 
-function handle(req: IncomingMessage, res: ServerResponse) {
+// Exported for tests, which pass their own state builder; the server passes nothing.
+export function handle(req: IncomingMessage, res: ServerResponse, state: () => unknown = () => buildState()) {
   // A Host check blocks DNS-rebinding: a web page elsewhere cannot read this through a lookalike name.
   const host = (req.headers.host ?? "").replace(/:\d+$/, "");
   if (host !== "127.0.0.1" && host !== "localhost") { res.writeHead(403).end(); return; }
   const headers = { "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" };
   if (req.method !== "GET") { res.writeHead(405, headers).end(); return; }
   if (req.url === "/api/state") {
-    res.writeHead(200, { ...headers, "content-type": "application/json" }).end(JSON.stringify(buildState()));
+    // An error thrown here would end the whole process (and the pollers with it). The answer is a fixed line:
+    // the error's own text can carry paths or log content.
+    let body: string;
+    try { body = JSON.stringify(state()); } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("board state unavailable"); return; }
+    res.writeHead(200, { ...headers, "content-type": "application/json" }).end(body);
   } else if (req.url === "/" || req.url?.startsWith("/?")) {
     let page: string;
     try { page = readPage(); } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("page.html is missing from the board folder"); return; }
@@ -48,4 +53,5 @@ function listen(i = 0) {
   });
 }
 
-listen();
+// Only when run as the board server (board.sh), never when a test imports handle().
+if (import.meta.main) listen();

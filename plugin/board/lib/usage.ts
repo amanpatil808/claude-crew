@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, sep } from "node:path";
 import { LONG_PROMPT_TOKENS } from "./prices.ts";
 // The event shape, row fields, fixed text and model pattern have one home: lib/events.ts.
-import { MODEL_ID, USAGE_TEXT, type UsageEvent, type UsageOptions, type UsageRow } from "./events.ts";
+import { agentIdOf, agentTypeOf, MODEL_ID, USAGE_TEXT, type UsageEvent, type UsageOptions, type UsageRow } from "./events.ts";
 
 // Overridable for tests only; the hook passes nothing.
 export interface ReadLimits {
@@ -21,10 +21,8 @@ export interface ReadLimits {
 export const MAX_BYTES = 512 * 2 ** 20;
 export const MAX_MS = 3_000;
 const CHUNK_BYTES = 2 ** 20;
-const MAX_LINE_BYTES = 64 * 2 ** 20;        // one line longer than this is dropped and the read marked partial
+const MAX_LINE_BYTES = 16 * 2 ** 20;        // one line longer than this is dropped and the read marked partial
 
-const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
-const AGENT_TYPE = /^[A-Za-z0-9_.:-]{1,100}$/;
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEEDLE = '"type":"assistant"';             // cheap filter before JSON.parse; the parsed type is checked again
 
@@ -32,13 +30,17 @@ export const transcriptRoot = () => join(process.env.CLAUDE_CONFIG_DIR || join(h
 
 export interface SafeFile { real: string; dev: number; ino: number }
 
-// Only an absolute .jsonl path that is a regular file (a symlink is refused, not followed) whose real path is
-// inside the root. Nothing is opened before every check passes.
+// A transcript has exactly one name: a hard link is a second name that realpath cannot see, so it could make a
+// file outside the root look like one inside it.
+const oneName = (st: { isFile(): boolean; nlink: number }) => st.isFile() && st.nlink === 1;
+
+// Only an absolute .jsonl path that is a regular file with one name (a symlink is refused, not followed) whose
+// real path is inside the root. Nothing is opened before every check passes.
 export function safeTranscript(path: unknown, root = transcriptRoot()): SafeFile | null {
   if (typeof path !== "string" || !isAbsolute(path) || !path.endsWith(".jsonl")) return null;
   try {
     const st = lstatSync(path);
-    if (!st.isFile()) return null;
+    if (!oneName(st)) return null;
     const real = realpathSync(path), base = realpathSync(root);
     return real.startsWith(base + sep) ? { real, dev: st.dev, ino: st.ino } : null;
   } catch { return null; }
@@ -76,10 +78,11 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
   const maxBytes = limits.maxBytes ?? MAX_BYTES, maxMs = limits.maxMs ?? MAX_MS, clock = limits.clock ?? (() => performance.now());
   const maxLine = limits.maxLineBytes ?? MAX_LINE_BYTES;
   // O_NOFOLLOW plus the same inode as the checked path: a file swapped in after the check is not read.
-  const fd = openSync(file.real, constants.O_RDONLY | constants.O_NOFOLLOW);
+  // O_NONBLOCK: a FIFO swapped in would otherwise block open() for good; a regular file ignores it.
+  const fd = openSync(file.real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const st = fstatSync(fd);
-    if (!st.isFile() || st.dev !== file.dev || st.ino !== file.ino) return null;
+    if (!oneName(st) || st.dev !== file.dev || st.ino !== file.ino) return null;
     const seen = new Map<string, Response>();
     const scan = (text: string) => {
       for (const line of text.split("\n")) {
@@ -89,7 +92,9 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
       }
     };
     const buf = Buffer.allocUnsafe(limits.chunkBytes ?? CHUNK_BYTES);
-    let rest = Buffer.alloc(0), bytes = 0, partial = false, dropping = false;
+    // The unfinished line is kept as a list of copied chunks and joined once, at its "\n". Joining on every read
+    // copies the whole line each time: memory then grows with the square of the line's length.
+    let parts: Buffer[] = [], restLen = 0, bytes = 0, partial = false, dropping = false;
     const start = clock();
     for (;;) {
       if (clock() - start > maxMs) { partial = true; break; }
@@ -97,21 +102,24 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
       const n = readSync(fd, buf, 0, Math.min(buf.length, maxBytes - bytes), null);
       if (n === 0) break;
       bytes += n;
-      const data = rest.length ? Buffer.concat([rest, buf.subarray(0, n)]) : buf.subarray(0, n);
+      const chunk = buf.subarray(0, n);
       let from = 0;
       if (dropping) {   // still inside an over-long line: skip to its end
-        const nl = data.indexOf(10);
-        if (nl < 0) { rest = Buffer.alloc(0); continue; }
+        const nl = chunk.indexOf(10);
+        if (nl < 0) continue;
         from = nl + 1; dropping = false;
       }
       // "\n" is a single byte that never occurs inside a multi-byte UTF-8 character, so cutting there is safe.
-      const cut = data.lastIndexOf(10);
-      if (cut >= from) { scan(data.toString("utf8", from, cut)); rest = Buffer.from(data.subarray(cut + 1)); }
-      else rest = Buffer.from(data.subarray(from));
-      if (rest.length > maxLine) { rest = Buffer.alloc(0); dropping = true; partial = true; }
+      const cut = chunk.lastIndexOf(10);
+      if (cut >= from) {
+        parts.push(chunk.subarray(from, cut));
+        scan(Buffer.concat(parts, restLen + cut - from).toString("utf8"));
+        parts = [Buffer.from(chunk.subarray(cut + 1))]; restLen = n - cut - 1;   // copied: `buf` is reused
+      } else { parts.push(Buffer.from(chunk.subarray(from))); restLen += n - from; }
+      if (restLen > maxLine) { parts = []; restLen = 0; dropping = true; partial = true; }
     }
     // A last line without "\n" may be torn (the transcript is written async); it is used only if it parses.
-    if (!partial && !dropping && rest.length) scan(rest.toString("utf8"));
+    if (!partial && !dropping && restLen) scan(Buffer.concat(parts, restLen).toString("utf8"));
     return { rows: toRows(seen.values()), partial };
   } finally { closeSync(fd); }
 }
@@ -130,14 +138,14 @@ function toRows(responses: Iterable<Response>): UsageRow[] {
 // Cumulative usage of one transcript as a ready-to-append event, or null: a refused path, an unreadable file,
 // or no usage found (never an event of zeros, which would wipe out an earlier good total).
 export function readUsage(path: string, opts: UsageOptions, limits: ReadLimits = {}): UsageEvent | null {
-  if (opts.scope === "agent" && !(opts.agentId && AGENT_ID.test(opts.agentId))) return null;
+  if (opts.scope === "agent" && !agentIdOf(opts.agentId)) return null;
   const file = safeTranscript(path, limits.root ?? transcriptRoot());
   if (!file) return null;
   let read: ReturnType<typeof sumTranscript>;
   try { read = sumTranscript(file, limits); } catch { return null; }
   if (!read || !read.rows.length) return null;
   const agent = opts.scope === "agent"
-    ? { agentId: opts.agentId, ...(opts.agentType && AGENT_TYPE.test(opts.agentType) ? { agentType: opts.agentType } : {}) }
+    ? { agentId: opts.agentId, ...(agentTypeOf(opts.agentType) ? { agentType: opts.agentType } : {}) }
     : {};
   return { kind: "usage", project: opts.project, sid: opts.sid, ...agent, text: USAGE_TEXT, scope: opts.scope, final: opts.final, partial: read.partial, rows: read.rows };
 }

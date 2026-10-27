@@ -129,6 +129,19 @@ export function taskOfAgent(events: BoardEvent[], roles: Map<string, Role> = loa
   return out;
 }
 
+export const COST_DONE_MS = 7 * 86_400_000;
+
+// taskOfAgent for /api/state's cost.tasks: only bindings to a task the board still has a reason to show (active,
+// queued, or done in the last COST_DONE_MS), so the page is not sent every task ever recorded. An agent whose
+// last task is older or dropped counts toward no task (never toward an earlier one).
+export function costTaskOf(events: BoardEvent[], roles: Map<string, Role>, now: number): Map<string, string> {
+  const bound = new Map<string, string>();
+  const keep = new Set(all(events, roles, now, (agentId, taskId) => bound.set(agentId, taskId))
+    .filter(({ task: t }) => t.state === "active" || t.state === "queued" || (t.state === "done" && now - Date.parse(t.doneAt ?? "") <= COST_DONE_MS))
+    .map((x) => x.task.id));
+  return new Map([...bound].filter(([, taskId]) => keep.has(taskId)));
+}
+
 // Active tasks per project: what the project chip shows as "working".
 export function activeByProject(tasks: TaskLists): Map<string, number> {
   const m = new Map<string, number>();
