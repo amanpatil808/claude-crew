@@ -1,18 +1,56 @@
 # Changelog
 
-All notable changes to toon-crew. Versions follow `version` in `.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
+All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
-## 0.3.2 - unreleased
+## 1.0.0 - 27 Oct 2026
+
+The first stable release: a manager plus 14 specialists, the guard, the Crew Room board and project memory. Needs Claude Code 2.1.295+ and Node 24.2+.
+
+### Added
+
+- README redesign: 81 lines, a hero image, a short "How it works" and a "Memory" section.
+- Four user docs: `docs/how-it-works.md`, `docs/crew-room.md`, `docs/guards.md` and `docs/setup.md`.
+- Real Crew Room screenshots and coloured diagrams.
+- `scripts/board-demo.mjs`: writes a made-up Crew Room data folder, for screenshots.
+- `LICENSE`: all rights reserved.
+- A check that the version agrees in `plugin.json`, the README badge and the top CHANGELOG heading.
+- CI job that validates the plugin and marketplace on Claude Code 2.1.295, the minimum version.
+- CI runs the script tests (`scripts/*.test.mjs`).
+
+### Changed
+
+- The lessons pass is manual: Miguel Rivera runs it only when the owner or manager starts it. Nothing schedules it.
+- Agent descriptions no longer end in "(v0.4)".
+- The Live tab's error panel names "your configured containers" instead of "api and worker".
+- CI needs at least one passing test in each test step, so an empty test glob can no longer pass.
+
+### Removed
+
+- The pre-1.0 planning notes, the 0.1.0 cost baseline, the roster page and the board-v2 design. The last commit that has them is `0ca2aee`.
+
+### Fixed
+
+- Board task tests no longer depend on the date.
+
+### Upgrading from 0.x
+
+1. `/plugin marketplace update crew`
+2. `/plugin update toon-crew@crew`
+3. `/reload-plugins`
+
+Old memory folders: see "Upgrading from 0.x" in `docs/setup.md`.
+
+## 0.3.2 - 26 Oct 2026 (not tagged)
 
 - Board: every project has its own crew room. Picking a project shows only its crew; "All projects" stacks one room per project, busiest first, so two Doraemons (or two Bobs) can work at once. Nothing is dimmed any more. `/api/state.rooms` gives each project its members and manager state.
 
-## 0.3.1 - unreleased
+## 0.3.1 - 26 Oct 2026 (not tagged)
 
 - Board: the animated Crew Room is back with Active/Queued and the picker. The page has two tabs, Live and Crew Room. The Crew Room has the pixel office with walking characters, speech bubbles, hover cards, the wall of framed former crew and a Motion button; the Live tab is the plain text view. Both tabs share the project picker and the Active and Queued panels.
 - Board tasks: a task is bound to the agent that started it and that agent's stop finishes it, so one missed stop no longer leaves the newest task Active forever; a task with no activity (its own or its agent's) for 6 hours shows as done (stale).
 - Docs: `docs/how-it-works.md` opens with one numbered flow diagram of the whole crew, from your request to the release, with the board's feed alongside.
 
-## 0.3.0 - unreleased
+## 0.3.0 - 26 Oct 2026 (not tagged)
 
 Board v2.
 
@@ -22,7 +60,7 @@ Board v2.
 - Per-project feed and facts: each feed item carries its project, and `/api/state.factsByProject` gives Live and Branch for every registered project.
 - Docs: `docs/how-it-works.md` (the flow, roles, memory, several projects, tasks, using the board); README points to it.
 
-## 0.2.2 - unreleased
+## 0.2.2 - 24 Oct 2026 (not tagged)
 
 - Guard: the memory email check no longer flags package specs (`mermaid@11.4.1`, `@types/node@20.1.0`, prereleases), IPs or `git@host:path` remotes; a domain must end in a letters-only TLD. Real emails (`someone@gmail.com`, `a.b+c@company.co.in`) are still refused.
 - Guard: only the DevOps Team (`mike-wazowski`, `sulley`) may merge pull requests, and the owner confirms each merge (ask). Everyone else is refused, Doraemon and the main thread included, on every route: `gh pr merge`, `gh api`/curl `pulls/<n>/merge` and `merges`, the GraphQL merge mutations, and MCP merge tools. `--admin` and auto-merge (`--auto`, `enablePullRequestAutoMerge`) are refused for every role. The owner's own `!` commands skip hooks, so the owner can always merge.
