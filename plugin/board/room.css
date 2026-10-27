@@ -142,6 +142,10 @@ h2::after { content: ""; flex: 1; height: var(--bw); background: var(--line); }
 
 
 .desk.changed { animation: statusPop .6s ease-out; }
+.desk.still { animation: none; }                        /* a desk that was already on screen and was only redrawn: no pop-in again */
+.enter { animation: feedIn .4s ease-out; }               /* a Needs-you item or task row that is genuinely new */
+html[data-motion="off"] .enter { animation: none; }
+@media (prefers-reduced-motion: reduce) { html:not([data-motion="on"]) .enter { animation: none; } }
 
 .seat { position: relative; width: 120px; height: 108px; }
 .seat::before { content: ""; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 76px; height: 46px; border: var(--bw) solid var(--wall-ink); border-radius: 14px 14px var(--r-chip) var(--r-chip);
@@ -1137,8 +1141,7 @@ html[data-motion="off"] .pulse { animation: none; }
 .tl .tx2 { min-width: 0; line-height: 1.3; }
 .tl .tx2 b { font-size: 14px; }
 .tl .tx2 span { display: block; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tl .age { font-size: 13px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tl .age.run { color: var(--ink); font-weight: 700; }
+.tl .age { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 #view-room .plate .swatch { display: none; }
 #view-room .sign small { display: none; }
 #view-room .plate { max-width: 114px; }
@@ -1316,3 +1319,72 @@ html, body { max-width: 100%; overflow-x: clip; }
 #view-room .plate .echip { gap: 3px; }
 #view-room .mchip.m-none { border: 1px solid var(--plate-soft); color: var(--plate-soft); }
 #view-room .plate-task { text-align: left; }
+
+/* ---- Picked project: a filled chip with a tick, so it cannot be missed ---- */
+html[data-tab="room"] { --on-accent: #ffffff; }
+@media (prefers-color-scheme: dark) { html[data-tab="room"]:not([data-theme="light"]) { --on-accent: #04121a; } }
+html[data-tab="room"][data-theme="dark"] { --on-accent: #04121a; }
+.pchip[aria-current="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 800; box-shadow: var(--sh); }
+.pchip[aria-current="true"] b { background: transparent; color: var(--on-accent); border-color: var(--on-accent); }
+.pchip .pchk { display: inline-flex; flex: none; }
+.pchip .pchk svg rect { stroke: currentColor; stroke-width: .7; }
+.pchip[data-need][aria-current="true"]::before { border-color: var(--on-accent); }
+
+/* ---- Done and idle desks are still: their small loops play once and settle. Only working desks loop (typing, pacing). ---- */
+#view-room .desk:is([data-s="done"], [data-s="queued"]) *,
+#view-room .desk:is([data-s="done"], [data-s="queued"]) *::before,
+#view-room .desk:is([data-s="done"], [data-s="queued"]) *::after,
+#view-room .desk:is([data-s="done"], [data-s="queued"]) .stage { animation-iteration-count: 1 !important; }
+#view-room .desk[data-s="done"] .av[data-s="done"] { animation: happy 1.8s ease-in-out 2.5s 1 both; }   /* one happy hop, 2.5 s after the status changes */
+#view-room .desk[data-need] .hand { animation-iteration-count: infinite !important; }
+
+/* ---- Lost contact: a still desk, muted plate, a small ? ---- */
+#view-room .desk[data-stale] .seat { opacity: .7; filter: saturate(.5); }
+#view-room .desk[data-stale] .plate { opacity: .82; border-style: dashed; }
+#view-room .desk[data-stale] .plate-task { font-weight: 600; font-style: italic; color: var(--plate-soft); }
+#view-room .lost { position: absolute; right: 4px; top: 2px; z-index: 3; width: 20px; height: 20px; display: grid; place-items: center; font: 400 var(--px-s)/1 var(--pixel); color: var(--plate-ink); background: var(--plate); border: var(--bw) solid var(--wall-ink); border-radius: 50%; }
+
+/* ---- Twins, the x2 badge and the Crew meter ---- */
+#view-room .stage .pace { position: relative; z-index: 1; }
+#view-room .stage .twin { position: absolute; inset: 0; z-index: 0; display: grid; place-items: center; pointer-events: none; translate: 38px 6px; }
+#view-room .stage .twin[data-c="3"] { translate: -38px 10px; }
+#view-room .stage .twin[data-c="4"] { translate: 66px 12px; }
+#view-room .stage .twin .scale { transform: scale(calc(var(--char) * .84)); }
+#view-room .stage .twin.pending { visibility: hidden; }
+#view-room .stage .twin.pop { animation: twinPop .5s steps(6, end) both; }
+#view-room .stage .twin.gone { animation: twinGone .8s steps(5, end) forwards; }
+#view-room .twin .poof { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; background: #fff; border: var(--bw) solid var(--dark); box-shadow: -14px -8px 0 -2px #fff, 14px -8px 0 -2px #fff, -10px 12px 0 -2px #fff, 12px 12px 0 -2px #fff; animation: twinPoof .6s steps(5, end) both; }
+@keyframes twinPop { 0% { transform: scale(0); opacity: 0; filter: brightness(3); } 60% { transform: scale(1.15); opacity: 1; filter: brightness(2); } 100% { transform: none; filter: none; } }
+@keyframes twinGone { 0% { opacity: 1; } 60% { opacity: .5; } 100% { opacity: 0; } }
+@keyframes twinPoof { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
+#view-room .cbadge { flex: none; padding: 2px 4px; font: 400 var(--px-s)/1 var(--pixel); color: var(--plate-hi); background: var(--wall-ink); border-radius: var(--r-chip); text-shadow: none; }
+#view-room .rc-copies { margin: 0; padding: 0 0 0 var(--s4); font-size: var(--t-xs); line-height: 1.4; }
+#view-room .crewm { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 24px; font: 400 var(--px-s)/1 var(--pixel); color: var(--ink); }
+#view-room .cm-slots { display: inline-flex; gap: 2px; }
+#view-room .cm-slots i { width: 10px; height: 14px; border: var(--bw) solid currentColor; border-radius: 1px; }
+#view-room .cm-slots i.on { background: currentColor; }
+#view-room .cm-slots i.x { border-style: dashed; background: repeating-linear-gradient(135deg, currentColor 0 2px, transparent 2px 4px); }
+#view-room .cm-slots i.cap { margin-right: 4px; }
+#view-room .cm-n { font-weight: 400; }
+#view-room .crewm[data-over="true"] { color: #8a3b06; }
+html[data-theme="dark"] #view-room .crewm[data-over="true"] { color: var(--amber); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) #view-room .crewm[data-over="true"] { color: var(--amber); } }
+#floor-crew { display: inline-flex; margin-left: var(--s2); }
+#floor-crew[hidden] { display: none; }
+
+/* ---- Copy light scene ---- */
+#view-room .cl-pos { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+#view-room .cl-lamp { position: absolute; left: 0; top: -10px; width: 36px; height: 20px; transform-origin: 0 50%; transform: rotate(var(--rot, 0rad)); filter: drop-shadow(2px 2px 0 var(--shade)); animation: clPull .4s steps(5, end) both; }
+#view-room .cl-lamp.out { animation: clStow .35s steps(4, end) forwards; }
+#view-room .cl-beam { position: absolute; left: 0; top: -4px; height: 8px; transform-origin: 0 50%; }
+#view-room .cl-beam i { display: block; width: 100%; height: 100%; transform-origin: 0 50%; background: repeating-linear-gradient(90deg, #fff7b0 0 8px, #ffd34d 8px 16px); border-block: var(--bw) solid #a8780a; box-shadow: 0 0 12px #ffd34d; animation: clBeam .45s steps(9, end) both; }
+#view-room .cl-beam.out i { animation: clBeamOut .4s steps(4, end) forwards; }
+#view-room .cl-flash { position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle, #fff 0 22%, #fff3a0 24% 44%, transparent 46%); animation: clFlash .6s steps(6, end) both; }
+#view-room .cl-flash b { position: absolute; width: 8px; height: 8px; background: #fff; border: var(--bw) solid #ffc43d; animation: clSpark .6s steps(6, end) both; }
+#view-room .cl-flash b.a { left: 26px; top: -6px; } #view-room .cl-flash b.b { left: 26px; bottom: -6px; } #view-room .cl-flash b.c { left: -6px; top: 26px; } #view-room .cl-flash b.d { right: -6px; top: 26px; }
+@keyframes clPull { from { transform: translate(-6px, 18px) rotate(var(--rot, 0rad)) scale(.4); opacity: 0; } to { transform: rotate(var(--rot, 0rad)); opacity: 1; } }
+@keyframes clStow { to { transform: translate(-6px, 18px) rotate(var(--rot, 0rad)) scale(.4); opacity: 0; } }
+@keyframes clBeam { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes clBeamOut { to { opacity: 0; transform: scaleY(.2); } }
+@keyframes clFlash { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+@keyframes clSpark { 0% { opacity: 1; transform: scale(.5); } 100% { opacity: 0; transform: scale(1.6); } }
