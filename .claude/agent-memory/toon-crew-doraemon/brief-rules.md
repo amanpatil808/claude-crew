@@ -13,5 +13,7 @@ metadata:
 
 - Before shipping a metric built from cumulative counters, test it against a real long-lived session, not only fresh demo data. The 0.3.3 cost "Today" put a whole session's lifetime ($787, 2.75B cache reads) into today because the first snapshot had nothing to subtract. Bucket by event timestamps, and show cache reads apart from other tokens. [crew] (seen 1)
 
+- Queue the WHOLE plan on the board at planning time, including later waves, reviews, QA and merges, not each piece right before dispatch. Otherwise Queued is always empty; the owner reported it as broken on 2026-10-28. [project] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.
