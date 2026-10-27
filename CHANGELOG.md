@@ -2,6 +2,17 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.8 - 28 Oct 2026
+
+### Changed
+
+- Calmer floor: one "working" signal per desk (slower typing, no pacing or bobbing, steady LEDs, the bell rings once); no blinking rack or looping hall door; steady Live and Running dots; softer floor patterns.
+- Needs you puts each item's next step or GitHub link right under it, so the strip is shorter.
+- Below 1100 px the floor comes before the side cards.
+- 16 px between the two plates in a room; no "N working" sign on room walls.
+- Travel poses and the copter blade change at most about 4 times a second; softer spins.
+- The copy-light bubble stays inside its room.
+
 ## 0.3.7 - 28 Oct 2026
 
 ### Fixed

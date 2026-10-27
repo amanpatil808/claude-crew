@@ -21,11 +21,11 @@ html[data-tab="room"] {
   --p-metal: repeating-linear-gradient(90deg, rgba(0,0,0,.3) 0 2px, transparent 2px 24px), linear-gradient(rgba(255,255,255,.12) 0 4px, transparent 4px), var(--w-metal);
   --p-tile: linear-gradient(rgba(0,0,0,.16) 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, rgba(0,0,0,.16) 1px, transparent 1px) 0 0 / 12px 12px, var(--w-tile);
   --p-brick: repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 2px, transparent 2px 8px), repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0 2px, transparent 2px 16px), var(--w-brick);
-  --f-wood: repeating-linear-gradient(90deg, transparent 0 58px, rgba(0,0,0,.18) 58px 60px), repeating-linear-gradient(0deg, rgba(0,0,0,.2) 0 2px, transparent 2px 14px), linear-gradient(var(--wood-a), var(--wood-b));
+  --f-wood: repeating-linear-gradient(90deg, transparent 0 58px, rgba(0,0,0,.12) 58px 60px), repeating-linear-gradient(0deg, rgba(0,0,0,.13) 0 2px, transparent 2px 14px), linear-gradient(var(--wood-a), var(--wood-b));
   --f-carpet: repeating-conic-gradient(var(--carpet-a) 0 25%, var(--carpet-b) 0 50%) 0 0 / 20px 20px;
   --f-lino: repeating-conic-gradient(var(--lino-a) 0 25%, var(--lino-b) 0 50%) 0 0 / 24px 24px;
-  --f-concrete: repeating-linear-gradient(90deg, rgba(0,0,0,.4) 0 2px, rgba(255,255,255,.1) 2px 6px) 0 62% / 100% 10px no-repeat, repeating-conic-gradient(var(--conc-a) 0 25%, var(--conc-b) 0 50%) 0 0 / 28px 28px;
-  --f-studio: repeating-linear-gradient(90deg, transparent 0 90px, rgba(0,0,0,.14) 90px 92px), repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 2px, transparent 2px 22px), linear-gradient(var(--studio-a), var(--studio-b));
+  --f-concrete: repeating-linear-gradient(90deg, rgba(0,0,0,.25) 0 2px, rgba(255,255,255,.06) 2px 6px) 0 62% / 100% 10px no-repeat, repeating-conic-gradient(var(--conc-a) 0 25%, var(--conc-b) 0 50%) 0 0 / 28px 28px;
+  --f-studio: repeating-linear-gradient(90deg, transparent 0 90px, rgba(0,0,0,.09) 90px 92px), repeating-linear-gradient(0deg, rgba(0,0,0,.1) 0 2px, transparent 2px 22px), linear-gradient(var(--studio-a), var(--studio-b));
   --f-rug: repeating-conic-gradient(var(--rug-a) 0 25%, var(--rug-b) 0 50%) 0 0 / 12px 12px;
   --font: ui-rounded, "SF Pro Rounded", ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -125,7 +125,7 @@ h2::after { content: ""; flex: 1; height: var(--bw); background: var(--line); }
 .f-coffee::after { content: ""; position: absolute; left: 6px; top: -12px; width: 3px; height: 3px; background: var(--muted); box-shadow: 4px -3px 0 var(--muted); animation: steam 1.6s steps(4) infinite; }
 
 .f-rack { width: 20px; height: 32px; background: var(--dark); }
-.f-rack::before { content: ""; position: absolute; left: 4px; top: 4px; width: 4px; height: 4px; background: var(--ok); box-shadow: 0 8px 0 var(--accent), 0 16px 0 var(--bad); animation: led 1s steps(1) infinite; }
+.f-rack::before { content: ""; position: absolute; left: 4px; top: 4px; width: 4px; height: 4px; background: var(--ok); box-shadow: 0 8px 0 var(--accent), 0 16px 0 var(--bad); }
 
 .f-shelf { width: 30px; height: 30px; background: var(--brown); background-image: linear-gradient(var(--wall-ink) 2px, transparent 2px), linear-gradient(var(--wall-ink) 2px, transparent 2px); background-size: 100% 10px; background-position: 0 8px, 0 18px; background-repeat: no-repeat; }
 .f-shelf::after { content: ""; position: absolute; left: 3px; top: 2px; width: 4px; height: 4px; background: var(--red); box-shadow: 6px 0 0 var(--blue), 12px 0 0 var(--gold), 3px 10px 0 var(--ok), 12px 10px 0 var(--accent2); }
@@ -153,7 +153,7 @@ html[data-motion="off"] .enter { animation: none; }
 .stage { position: absolute; left: 50%; top: 12px; width: 84px; height: 84px; margin-left: -42px; display: grid; place-items: center; z-index: 1; }
 .stage .scale, .walker .scale { display: block; transform: scale(1.45); }
 .pace { display: block; }
-.desk[data-s="working"]:not(.away) .pace { animation: pace 5s ease-in-out infinite; }
+.desk[data-s="working"]:not(.away) .pace { animation: none; }
 
 .desk.away .pace { visibility: hidden; }
 .table { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); width: 112px; height: 10px; z-index: 2; border: var(--bw) solid var(--wall-ink); border-radius: var(--r-chip); background: color-mix(in srgb, var(--brown) 70%, var(--panel)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .22); }
@@ -164,7 +164,7 @@ html[data-motion="off"] .enter { animation: none; }
 .laptop::after { content: ""; position: absolute; inset: 2px; border-radius: 1px; background: var(--accent); opacity: 0; }
 .desk[data-s="working"] .laptop, .desk[data-s="reviewing"] .laptop { height: 18px; border-radius: var(--r-chip) var(--r-chip) 0 0; }
 .desk[data-s="working"] .laptop { box-shadow: 0 0 10px var(--accent); }
-.desk[data-s="working"] .laptop::after, .desk[data-s="reviewing"] .laptop::after { opacity: 1; animation: type .35s steps(2) infinite; }
+.desk[data-s="working"] .laptop::after, .desk[data-s="reviewing"] .laptop::after { opacity: 1; animation: type 1.2s steps(2) infinite; }
 
 .zzz { position: absolute; right: 4px; top: 2px; font-weight: 900; color: var(--white); text-shadow: 1px 1px 0 var(--wall-ink); animation: zzz 2.6s ease-in infinite; }
 
@@ -187,8 +187,8 @@ html[data-motion="off"] .enter { animation: none; }
 .desk[data-s="done"] .st { color: #166534; font-weight: 900; }
 /* status lamp on the desk: reads from across the room */
 .led { position: absolute; left: 10px; bottom: 100%; width: 8px; height: 8px; margin-bottom: -1px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: var(--idle); }
-.desk[data-s="working"] .led { background: var(--accent); box-shadow: 0 0 8px 2px var(--accent); animation: ledPulse 1.6s ease-in-out infinite; }
-.desk[data-s="reviewing"] .led { background: var(--accent2); box-shadow: 0 0 8px 2px var(--accent2); animation: ledPulse 1.6s ease-in-out infinite; }
+.desk[data-s="working"] .led { background: var(--accent); box-shadow: 0 0 8px 2px var(--accent); }
+.desk[data-s="reviewing"] .led { background: var(--accent2); box-shadow: 0 0 8px 2px var(--accent2); }
 .desk[data-s="done"] .led { background: var(--ok); box-shadow: 0 0 8px 2px var(--ok); }
 .desk[data-s="blocked"] .led { background: var(--bad); box-shadow: 0 0 8px 2px var(--bad); animation: led .6s steps(1) infinite; }
 
@@ -348,7 +348,7 @@ html[data-motion="off"] .enter { animation: none; }
 .av-pair .eye { display: none; }
 
 /* status poses shared by everyone */
-.av[data-s="working"] { animation: bob 1s ease-in-out infinite; }
+.av[data-s="working"] { animation: none; }
 
 .av[data-s="done"] { animation: happy 1.8s ease-in-out infinite; }
 
@@ -455,9 +455,9 @@ html[data-tab="room"] {
   --bg: #0a1a33; --panel: #11284a; --ink: #eef6ff; --muted: #a8c0e2; --line: #2c4f80; --edge: #4a86c8; --shade: #040b18; --wall-ink: #040b18;
   --accent: #5cc2ff; --accent2: #b79cff; --accent3: #ff7d88; --idle: #93a9d2; --plate: #f3dd92; --plate-hi: #fbeab6;
   --hall-a: #12294d; --hall-b: #0f2342; --shell-hi: #2f6aa8;
-  --f-tatami: repeating-linear-gradient(90deg, transparent 0 78px, rgba(0, 0, 0, .35) 78px 80px), linear-gradient(#5c6a3c, #536035);
+  --f-tatami: repeating-linear-gradient(90deg, transparent 0 78px, rgba(0, 0, 0, .24) 78px 80px), linear-gradient(#5c6a3c, #536035);
   --f-grass: radial-gradient(rgba(255, 255, 255, .08) 2px, transparent 3px) 0 0 / 14px 14px, linear-gradient(#2f6a3c, #285c34);
-  --f-plank: repeating-linear-gradient(90deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 40px), linear-gradient(#6a5638, #5d4b30);
+  --f-plank: repeating-linear-gradient(90deg, rgba(0, 0, 0, .17) 0 2px, transparent 2px 40px), linear-gradient(#6a5638, #5d4b30);
   --p-shoji: repeating-linear-gradient(90deg, rgba(0, 0, 0, .4) 0 2px, transparent 2px 24px), #8a7e63;
   --p-chalk: linear-gradient(rgba(255, 255, 255, .6) 0 2px, transparent 2px) 0 22px / 100% 100% no-repeat, #1d4535;
   --p-sky: linear-gradient(#1b3f7a, #3d73b8);
@@ -468,9 +468,9 @@ html[data-tab="room"] {
   --bg: #0a1a33; --panel: #11284a; --ink: #eef6ff; --muted: #a8c0e2; --line: #2c4f80; --edge: #4a86c8; --shade: #040b18; --wall-ink: #040b18;
   --accent: #5cc2ff; --accent2: #b79cff; --accent3: #ff7d88; --idle: #93a9d2; --plate: #f3dd92; --plate-hi: #fbeab6;
   --hall-a: #12294d; --hall-b: #0f2342; --shell-hi: #2f6aa8;
-  --f-tatami: repeating-linear-gradient(90deg, transparent 0 78px, rgba(0, 0, 0, .35) 78px 80px), linear-gradient(#5c6a3c, #536035);
+  --f-tatami: repeating-linear-gradient(90deg, transparent 0 78px, rgba(0, 0, 0, .24) 78px 80px), linear-gradient(#5c6a3c, #536035);
   --f-grass: radial-gradient(rgba(255, 255, 255, .08) 2px, transparent 3px) 0 0 / 14px 14px, linear-gradient(#2f6a3c, #285c34);
-  --f-plank: repeating-linear-gradient(90deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 40px), linear-gradient(#6a5638, #5d4b30);
+  --f-plank: repeating-linear-gradient(90deg, rgba(0, 0, 0, .17) 0 2px, transparent 2px 40px), linear-gradient(#6a5638, #5d4b30);
   --p-shoji: repeating-linear-gradient(90deg, rgba(0, 0, 0, .4) 0 2px, transparent 2px 24px), #8a7e63;
   --p-chalk: linear-gradient(rgba(255, 255, 255, .6) 0 2px, transparent 2px) 0 22px / 100% 100% no-repeat, #1d4535;
   --p-sky: linear-gradient(#1b3f7a, #3d73b8);
@@ -529,7 +529,7 @@ html[data-tab="room"] {
 #view-room .gadget.suds::after { content: ""; position: absolute; left: 12px; top: 0; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid #4f8fd0; }
 
 /* bell for "working" on the name plate; ring is gentle and stops with reduced motion */
-#view-room .st.bell { width: 11px; height: 11px; margin-top: 1px; border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 3px 3px; background: var(--gold); transform-origin: 50% 0; animation: ring 1.4s ease-in-out infinite; }
+#view-room .st.bell { width: 11px; height: 11px; margin-top: 1px; border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 3px 3px; background: var(--gold); transform-origin: 50% 0; animation: ring 1.4s ease-in-out 1; }
 @keyframes ring { 0%, 60%, 100% { transform: rotate(0); } 68% { transform: rotate(18deg); } 76% { transform: rotate(-16deg); } 84% { transform: rotate(10deg); } 92% { transform: rotate(-6deg); } }
 
 /* done: a dorayaki instead of a spark; idle: tucked under a futon blanket */
@@ -552,7 +552,7 @@ html[data-tab="room"] { --hall-wood-a: #e2bd8b; --hall-wood-b: #d3a874; }
 #view-room .desk.away .stage { visibility: hidden; }
 @media (max-width: 600px) { #view-room .hall { --corr: 44px; padding-right: var(--s3); } }
 @media (prefers-reduced-motion: reduce) { html:not([data-motion="on"]) #view-room .walkers { display: none; } }
-#view-room .door.gate { animation: doorAjar 3.6s ease-in-out infinite; transform-origin: left center; }
+#view-room .door.gate { animation: doorAjar 3.6s ease-in-out; transform-origin: left center; }
 
 /* ---- Interaction: speech bubbles, hover card, motion switch, gentle life ---- */
 #view-room .motion { align-self: flex-start; z-index: 2; min-height: 44px; min-width: 44px; padding: 0 var(--s3); font: 400 var(--px-s)/1 var(--pixel); letter-spacing: .04em; color: var(--ink); background: var(--panel); border: var(--bw) solid var(--edge); border-radius: var(--r-chip); box-shadow: var(--sh); cursor: pointer; }
@@ -572,7 +572,7 @@ html[data-tab="room"] { --hall-wood-a: #e2bd8b; --hall-wood-b: #d3a874; }
 /* life: sleepers breathe, the bell jingles now and then (not constantly), workers keep typing */
 #view-room .desk[data-s="queued"] .stage { animation: breathe 3.8s ease-in-out infinite; transform-origin: 50% 90%; }
 @keyframes breathe { 50% { transform: scaleY(1.035) translateY(-1px); } }
-#view-room .st.bell { animation: ring 5s ease-in-out infinite; }
+#view-room .st.bell { animation: ring 5s ease-in-out 1; }
 @keyframes ring { 0%, 84%, 100% { transform: rotate(0); } 87% { transform: rotate(20deg); } 90% { transform: rotate(-18deg); } 93% { transform: rotate(12deg); } 96% { transform: rotate(-6deg); } }
 
 /* ---- Walkers (new): one size everywhere, feet-anchored, four facings, a four-frame step ---- */
@@ -683,7 +683,7 @@ html[data-tab="room"] {
   --f-lab: linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 24px 24px, #243248;
   --p-van: repeating-linear-gradient(0deg, transparent 0 20px, rgba(255, 255, 255, .22) 20px 26px, transparent 26px 32px), #23564f;
   --p-leaf: radial-gradient(rgba(255, 255, 255, .08) 3px, transparent 4px) 0 0 / 18px 18px, #2f5a2c;
-  --f-van: repeating-linear-gradient(90deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 30px), linear-gradient(#41386b, #3a3262);
+  --f-van: repeating-linear-gradient(90deg, rgba(0, 0, 0, .17) 0 2px, transparent 2px 30px), linear-gradient(#41386b, #3a3262);
 } }
  html[data-tab="room"][data-theme="dark"] {
   --frame: #6a432a; --frame-hi: #98643c; --mat: #e9dfc2; --pic-bg: #27406e;
@@ -692,7 +692,7 @@ html[data-tab="room"] {
   --f-lab: linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px) 0 0 / 24px 24px, #243248;
   --p-van: repeating-linear-gradient(0deg, transparent 0 20px, rgba(255, 255, 255, .22) 20px 26px, transparent 26px 32px), #23564f;
   --p-leaf: radial-gradient(rgba(255, 255, 255, .08) 3px, transparent 4px) 0 0 / 18px 18px, #2f5a2c;
-  --f-van: repeating-linear-gradient(90deg, rgba(0, 0, 0, .25) 0 2px, transparent 2px 30px), linear-gradient(#41386b, #3a3262);
+  --f-van: repeating-linear-gradient(90deg, rgba(0, 0, 0, .17) 0 2px, transparent 2px 30px), linear-gradient(#41386b, #3a3262);
 } 
 
 /* the six rooms: each has its own wall and floor */
@@ -1008,7 +1008,7 @@ a { color: var(--accent); }
 .pchip b { font-size: 12px; min-width: 20px; padding: 0 5px; text-align: center; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); }
 .spacer { flex: 1; }
 .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
-.status i { width: 10px; height: 10px; background: var(--ok); border: 2px solid var(--ink); border-radius: 2px; animation: livePulse2 2s ease-in-out infinite; }
+.status i { width: 10px; height: 10px; background: var(--ok); border: 2px solid var(--ink); border-radius: 2px; }
 @keyframes livePulse2 { 50% { opacity: .45; } }
 .tbtn { min-height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 2px solid var(--edge); border-radius: 4px; cursor: pointer; font-size: 12px; }
 .tbtn[aria-pressed="true"] .tick { background: var(--accent); }
@@ -1043,7 +1043,7 @@ a { color: var(--accent); }
 #view-room .team { grid-column: auto; }
 #view-room .room-floor { padding: 8px 6px 6px; }
 #view-room .wall { height: 30px; }
-#view-room .stations { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 2px; }
+#view-room .stations { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px var(--s4); }
 #view-room .team[data-n="1"] .stations { grid-template-columns: minmax(0, 1fr); }
 #view-room .props { height: 24px; }
 #view-room .desk { padding-top: 26px; }
@@ -1155,7 +1155,7 @@ html[data-motion="off"] .hand, html[data-motion="off"] .need { animation: none !
 .tk-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .tk-h h3 { margin: 0; font: 800 12px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
 .tk-h h3 b { padding: 0 6px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; }
-.pulse { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); animation: pulseDot 1.8s ease-out infinite; }
+.pulse { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
 @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
 html[data-motion="off"] .pulse { animation: none; }
 .tl { list-style: none; margin: 0; padding: 0; }
@@ -1170,7 +1170,7 @@ html[data-motion="off"] .pulse { animation: none; }
 #view-room .plate .swatch { display: none; }
 #view-room .sign small { display: none; }
 #view-room .plate { max-width: 114px; }
-#view-room .stations { gap: 4px 8px; }
+#view-room .stations { gap: 4px var(--s4); }
 #view-room .plate-name { gap: 4px; }
 
 
@@ -1262,7 +1262,7 @@ html:not([data-ready]) #r-hall { min-height: 640px; }
 @media (max-width: 1100px) {
   .main { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .main > section[aria-labelledby="floor-h"], .main > .logsec, .main > .rail { grid-column: 1; grid-row: auto; }
-  .main > .rail { order: -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; gap: 16px; }
+  .main > .rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; gap: 16px; }
   #view-room .rooms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #view-room .rooms > .team:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }

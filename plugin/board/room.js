@@ -516,12 +516,13 @@ function renderNeed(s) {
     if (rid) { const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(rid, "working", 0)); row.append(w); } else row.append(rel("span"));
     richText(nt, cp.text); body.append(nt);
     const meta = [x.project, cp.green && "checks green", x.since ? agoOf(x.since) : ""].filter(Boolean).join(" · ") + (x.stale ? " · may be old" : "");
-    body.append(rel("div", "nm", meta)); row.append(body);
+    const nmEl = rel("div", "nm", meta);
     if (x.kind === "pr") {
       const r = rel("div", "nr"), m = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)\/?(?:[?#].*)?$/.exec(typeof x.ref === "string" ? x.ref : "");
       if (m && (x.number == null || Number(m[1]) === Number(x.number))) r.append(link(x.ref, "Open on GitHub ↗")); else { r.classList.add("nr-none"); r.textContent = "link not shown"; }
-      row.append(r);
-    } else row.append(rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")));
+      r.style.gridColumn = "auto"; body.append(r);
+    } else { const nx = rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")); nx.style.gridColumn = "auto"; body.append(nx); }
+    body.append(nmEl); row.append(body);
     return row;
   });
   if (!list.length) needRows.push(rel("p", "need-none", "Nothing is waiting in " + rProj + "."));
@@ -922,7 +923,7 @@ function renderRoom(s) {
         const team = rel("section", "team"); team.dataset.room = t.k; team.dataset.n = t.ids.length; team.setAttribute("aria-label", t.name + (t.lore ? ", " + t.lore : ""));
         const busy = T.active.filter((x) => t.ids.includes(x.role) && inProj(x, g.p)).length;
         const wall = rel("div", "wall"), floor = rel("div", "room-floor"), grid = rel("div", "stations");
-        const sign = rel("b", "sign", t.name.toUpperCase()); wall.append(sign); if (busy) wall.append(rel("span", "wk", busy + " working"));
+        const sign = rel("b", "sign", t.name.toUpperCase()); wall.append(sign);
         for (const id of t.ids) grid.append(rDesk(roles[id], mem[id] || { status: "idle", line: "Idle" }, i++, t.shared, g.p));
         floor.append(grid, rProps(t.furn)); team.append(wall, floor);
         return team;
@@ -1183,6 +1184,7 @@ function rSay(w, text) {
   const wb = w.getBoundingClientRect(), bw = b.offsetWidth, ideal = wb.left + wb.width / 2 - bw / 2, left = Math.max(g.hb.left + 8, Math.min(g.hb.right - 8 - bw, ideal));
   b.style.marginLeft = left - ideal + "px"; b.style.setProperty("--tail", bw / 2 - (left - ideal) + "px");
 }
+const rClampBubble = (b) => { const room = b.closest(".room-floor") || b.closest(".team"); if (!room) return; requestAnimationFrame(() => { if (!b.isConnected) return; b.style.translate = ""; const r = room.getBoundingClientRect(), q = b.getBoundingClientRect(); const dx = Math.max(r.left - q.left, Math.min(0, r.right - q.right)), dy = Math.max(r.top - q.top, Math.min(0, r.bottom - q.bottom)); if (dx || dy) b.style.translate = Math.round(dx) + "px " + Math.round(dy) + "px"; }); };
 const rUnsay = async (w) => { const b = w.querySelector(".bubble"); if (!b) return; b.classList.add("out"); await rSleep(500); b.remove(); };
 
 // ---- Scenes ----
@@ -1265,11 +1267,11 @@ async function rClone({ role, p, n, k, text }) {
     if (mp) {
       const from = [mp.seat[0] + 12, mp.seat[1] - 78], ang = Math.atan2(to[1] - from[1], to[0] - from[0]), tip = [from[0] + Math.cos(ang) * 34, from[1] + Math.sin(ang) * 34];
       lamp = rel("div", "cl-lamp"); lamp.innerHTML = CL_LIGHT; lamp.style.setProperty("--rot", ang + "rad"); put(lamp, from[0], from[1]);
-      bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); mgr.append(bub);
+      bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); mgr.append(bub); rClampBubble(bub);
       await rSleep(450);
       const len = Math.hypot(to[0] - tip[0], to[1] - tip[1]);
       beam = rel("div", "cl-beam"); beam.style.width = len + "px"; beam.append(rel("i")); put(beam, tip[0], tip[1]).style.transform += ` rotate(${ang}rad)`;
-    } else { bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); tgt.append(bub); }
+    } else { bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); tgt.append(bub); rClampBubble(bub); }
     await rSleep(500);
     const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, b.seat[0] + 38, b.seat[1] - 30);
     delete rHold[k]; rReveal(role, p, true);
