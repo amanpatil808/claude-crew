@@ -17,6 +17,13 @@ env:
   # sha256 of gitleaks_<version>_linux_x64.tar.gz from the release's checksums file
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
   CLAUDE_CODE_VERSION: 2.1.308
+  # The stated minimum (README: "Needs Claude Code 2.1.295+"); onFailure: block needs it.
+  CLAUDE_CODE_MIN_VERSION: 2.1.295
+
+# pipefail, so `node --test ... | tee` fails when node fails.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   plugin:
@@ -36,27 +43,55 @@ jobs:
       - name: Validate plugin and marketplace (claude plugin validate --strict)
         run: |
           npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude --version | grep -qxF "${CLAUDE_CODE_VERSION} (Claude Code)"
           claude plugin validate . --strict          # marketplace
           claude plugin validate ./plugin --strict   # plugin
 
-      # Skipped or todo tests count as failures to investigate.
+      # Skipped or todo tests count as failures to investigate. An empty glob runs
+      # zero tests and still prints "# fail 0", so each step also needs "# pass N", N >= 1.
       - name: Guard and registry tests
         run: |
           node --test --test-reporter=tap plugin/hooks/test/*.test.mjs | tee guard-tests.tap
+          grep -qE '^# pass [1-9][0-9]*$' guard-tests.tap
           grep -qE '^# skipped 0$' guard-tests.tap
           grep -qE '^# todo 0$' guard-tests.tap
           grep -qE '^# fail 0$' guard-tests.tap
 
       - name: Board tests
         run: |
-          if ls plugin/board/test/*.test.ts >/dev/null 2>&1; then
-            node --no-warnings --test --test-reporter=tap plugin/board/test/*.test.ts | tee board-tests.tap
-            grep -qE '^# skipped 0$' board-tests.tap
-            grep -qE '^# todo 0$' board-tests.tap
-            grep -qE '^# fail 0$' board-tests.tap
-          else
-            echo "No plugin/board/test/*.test.ts yet; skipping."
-          fi
+          node --no-warnings --test --test-reporter=tap plugin/board/test/*.test.ts | tee board-tests.tap
+          grep -qE '^# pass [1-9][0-9]*$' board-tests.tap
+          grep -qE '^# skipped 0$' board-tests.tap
+          grep -qE '^# todo 0$' board-tests.tap
+          grep -qE '^# fail 0$' board-tests.tap
+
+      - name: Script tests
+        run: |
+          node --test --test-reporter=tap scripts/*.test.mjs | tee script-tests.tap
+          grep -qE '^# pass [1-9][0-9]*$' script-tests.tap
+          grep -qE '^# skipped 0$' script-tests.tap
+          grep -qE '^# todo 0$' script-tests.tap
+          grep -qE '^# fail 0$' script-tests.tap
+
+  # The oldest Claude Code the README promises. Validation only: the tests above do not
+  # depend on the CLI version, so this job stays small.
+  min-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Validate plugin and marketplace at the minimum Claude Code version
+        run: |
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_MIN_VERSION}"
+          claude --version | grep -qxF "${CLAUDE_CODE_MIN_VERSION} (Claude Code)"
+          claude plugin validate . --strict          # marketplace
+          claude plugin validate ./plugin --strict   # plugin
 
   secrets:
     runs-on: ubuntu-latest
