@@ -2,6 +2,25 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.3 - 28 Oct 2026
+
+The Crew Room is one page, with a cost ledger and a Needs you strip. Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board (`/toon-crew:board stop`, then `/toon-crew:board`).
+
+### Added
+
+- Needs you: an amber strip for permission and idle waits (from a new async Notification hook) and PRs that are ready for your review (projects with board polling on). Filtered to the picked project.
+- Cost: token usage read from session transcripts (numbers only) and priced at Anthropic list prices, as an estimate. Today and 7 days, per agent and per task.
+- Running and Queued task lists, a Ship card (deploy, CI, PRs, commits, app errors) and a log of finished tasks with hand-back, duration and cost.
+
+### Changed
+
+- One page: the Live tab and the wall of retired characters are gone.
+
+### Fixed
+
+- Hand-back lines no longer cut at the colon in "toon-crew:kevin".
+- Security review fixes in the transcript reader, PR links and the board server (bounded memory, no FIFO hang, GitHub-only PR links, checked agent ids, a bad log line no longer stops the server).
+
 ## 0.3.2 - 27 Oct 2026 (not tagged)
 
 Cleanup and docs ahead of 1.0.0. The version stays 0.3.2, so installed copies keep 0.3.2 until the next version bump. Needs Claude Code 2.1.295+ and Node 24.2+.
