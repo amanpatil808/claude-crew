@@ -263,7 +263,7 @@ function rChips(x) {
   if (eff && R_EFFORT[eff]) {          // quiet outlined chip with 1 to 4 bars, so levels compare at a glance
     const c = rel("span", "echip"), bars = rel("span", "bars"); bars.setAttribute("aria-hidden", "true");
     for (let i = 1; i <= 4; i++) bars.append(rel("i", i <= R_EFFORT[eff] ? "on" : ""));
-    c.append(bars, document.createTextNode(eff.toUpperCase())); row.append(c);
+    c.append(bars, document.createTextNode(eff === "medium" ? "MED" : eff.toUpperCase())); c.title = eff + " effort"; row.append(c);
   }
   return row.childElementCount ? row : null;
 }
@@ -362,7 +362,11 @@ function rDesk(role, m, i, showTeam, proj = "") {
   nm.append(sw, rel("b", null, plateName(role)), st);
   const span = m.since ? shortSpan(rMins(m.since)) : "";
   const line = waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
-  const task = rel("div", "plate-task", line); task.title = m.task || m.line || ""; plate.append(nm, task);
+  const task = rel("div", "plate-task", line); task.title = m.task || m.line || "";
+  // Name, designation, model + effort chips, status: the same four lines on every plate so the rows line up.
+  const px = { ...role, ...m }, ttl = rel("div", "plate-title", rTitle(px) || "Crew"); ttl.title = rTitleFull(px);
+  const chips = rChips(px) || rel("div", "chips", ""); if (!chips.childElementCount) chips.append(rel("span", "mchip m-none", "INHERIT"));
+  plate.append(nm, ttl, chips, task);
   desk.append(seat, plate);
   if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
   rWireCard(desk, role.id, proj);
@@ -399,14 +403,17 @@ function renderProjects(s) {
   const names = rProjNames(s), T = tasksOf(s), n = (p) => T.active.filter((t) => !p || t.project === p).length;
   const nav = $("projects"); nav.hidden = !names.length;
   const nd = (p) => needList(s).some((x) => !p || x.project === p);
-  if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd("")])) return;
+  if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd(""), (T.queued || []).map((t) => t.project)])) return;
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
     if (nd(p)) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
     b.title = text; b.append(rel("span", "pn-t", text), document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
-  nav.replaceChildren(...names.map((p) => chip(p, p)), chip("", "All"));
+  // All first, then the picked project, then projects with working or queued tasks (most first), then the quiet ones.
+  const Q = T.queued || [], load = (p) => n(p) + Q.filter((t) => t.project === p).length;
+  const order = names.map((p, i) => ({ p, i, l: load(p) })).sort((a, b) => (b.p === rProj) - (a.p === rProj) || b.l - a.l || a.i - b.i);
+  nav.replaceChildren(chip("", "All"), ...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
 }
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
@@ -476,7 +483,11 @@ function renderFloor(s) {
 // ---- Cost: Today / 7 days, for the picked project (All projects sums the rooms). usd null is "–", never $0. ----
 let period = "today";
 const tokOf = (u) => u ? num(u.in) + num(u.out) + num(u.cw5m) + num(u.cw1h) + num(u.cr) : 0;
-const fmtTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(n);
+// Compact counts: k, then M up to 999.9 M, then B with 2 decimals (never "2783.3 M").
+const fmtTok = (n) => n >= 999.95e6 ? (n / 1e9).toFixed(2) + " B" : n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(Math.round(n));
+// fresh = in + out + cache writes (full price); cached = cache reads (about a tenth). Older data lacks the fields: compute from usage.
+const freshOf = (x) => x && x.fresh != null ? num(x.fresh) : x ? tokOf(x.usage) - num(x.usage?.cr) : 0;
+const cachedOf = (x) => x && x.cached != null ? num(x.cached) : num(x?.usage?.cr);
 const fmtUsd = (v) => v == null ? "–" : v > 0 && v < 0.005 ? "<$0.01" : v >= 100 ? "$" + Math.round(v) : "$" + v.toFixed(2);
 const fmtApprox = (v) => v == null ? "–" : "≈ " + fmtUsd(v);
 // A total that leaves out an unpriced model is a floor: it always carries the "+".
@@ -485,14 +496,14 @@ function costFor(s) {
   const c = s.cost, w = c && typeof c === "object" ? own(c.windows, period) : null;
   if (!w) return null;
   const names = rProj ? [rProj] : [...new Set([...Object.keys(w.rooms || {}), ...Object.keys(w.agents || {})])];
-  const out = { usd: null, tok: 0, runs: null, partial: false, agents: [], tasks: [] };
+  const out = { usd: null, tok: 0, cached: 0, since: null, runs: null, partial: false, agents: [], tasks: [] };
   const agents = new Map();
   for (const p of names) {
     const r = own(w.rooms, p);
-    if (r) { out.tok += tokOf(r.usage); if (r.usd != null) out.usd = (out.usd ?? 0) + r.usd; if (r.partial || r.unpriced?.length) out.partial = true; }
+    if (r) { out.tok += freshOf(r); out.cached += cachedOf(r); if (r.usd != null) out.usd = (out.usd ?? 0) + r.usd; if (r.partial || r.unpriced?.length) out.partial = true; }
     for (const a of own(w.agents, p) || []) {
-      const k = a.role + (a.main ? "#main" : ""), cur = agents.get(k) || { role: a.role, main: !!a.main, runs: null, tok: 0, usd: null, partial: false };
-      cur.tok += tokOf(a.usage); if (a.usd != null) cur.usd = (cur.usd ?? 0) + a.usd; if (a.runs != null) cur.runs = (cur.runs ?? 0) + a.runs;
+      const k = a.role + (a.main ? "#main" : ""), cur = agents.get(k) || { role: a.role, main: !!a.main, runs: null, tok: 0, cached: 0, since: null, usd: null, partial: false };
+      cur.tok += freshOf(a); cur.cached += cachedOf(a); if (a.since && (!cur.since || a.since < cur.since)) cur.since = a.since; if (a.usd != null) cur.usd = (cur.usd ?? 0) + a.usd; if (a.runs != null) cur.runs = (cur.runs ?? 0) + a.runs;
       if (a.unpriced?.length) cur.partial = true;
       agents.set(k, cur);
     }
@@ -500,7 +511,7 @@ function costFor(s) {
   out.agents = [...agents.values()].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || b.tok - a.tok);
   const runs = out.agents.filter((a) => a.runs != null); out.runs = runs.length ? runs.reduce((n, a) => n + a.runs, 0) : null;
   const T = tasksOf(s), byId = new Map([...T.active, ...T.queued, ...T.done].map((t) => [t.id, t]));
-  for (const [id, v] of Object.entries(w.tasks || {})) { const t = byId.get(id); if (t && inView(t)) out.tasks.push({ text: t.text, role: t.role, tok: tokOf(v.usage), usd: v.usd ?? null, partial: !!v.unpriced?.length }); }
+  for (const [id, v] of Object.entries(w.tasks || {})) { const t = byId.get(id); if (t && inView(t)) out.tasks.push({ text: t.text, role: t.role, tok: freshOf(v), usd: v.usd ?? null, partial: !!v.unpriced?.length }); }
   out.tasks.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
   return out;
 }
@@ -525,6 +536,10 @@ function renderCost(s) {
   const label = period === "today" ? "today" : "last 7 days";
   $("c-total").textContent = c.usd == null ? "–" : "≈ " + fmtFloor(c.usd, c.partial);
   $("c-tok").textContent = fmtTok(c.tok); $("c-sub").textContent = "tokens"; $("c-runs").textContent = c.runs != null ? ` · ${c.runs} run${c.runs === 1 ? "" : "s"}` : "";
+  $("c-cached").hidden = !c.cached; $("c-cached").textContent = c.cached ? `+ ${fmtTok(c.cached)} cached reads (billed at about 1/10)` : "";
+  // "Tracking since": a main session that has runs but only recent history was not tracked before that day.
+  const mainRow = c.agents.find((a) => a.main && a.runs && a.since), cut = new Date(Date.now() - 7 * 864e5), cutDay = `${cut.getFullYear()}-${String(cut.getMonth() + 1).padStart(2, "0")}-${String(cut.getDate()).padStart(2, "0")}`;
+  const sinceEl = $("c-since"); sinceEl.hidden = !(mainRow && mainRow.since >= cutDay); sinceEl.textContent = sinceEl.hidden ? "" : `Main session tracked since ${mainRow.since}`;
   // Bars: the main session first (its share of the total), then the crew against its own biggest member.
   const main = c.agents.filter((a) => a.main), crew = c.agents.filter((a) => !a.main);
   const mUsd = sumUsd(main), cUsd = sumUsd(crew), mPart = main.some((a) => a.partial), cPart = crew.some((a) => a.partial), all = (mUsd ?? 0) + (cUsd ?? 0);
@@ -544,10 +559,10 @@ function renderCost(s) {
   $("c-bars").hidden = !items.length;
   $("c-details").hidden = !c.agents.length && !c.tasks.length;
   $("c-cap").textContent = `By agent, ${label} (estimated)`;
-  $("c-rows").replaceChildren(...c.agents.map((a) => { const r = tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), fmtFloor(a.usd, a.partial)], true); r.firstChild.title = nameOf(a.role); return r; }));
-  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), fmtFloor(c.usd, c.partial)])]);
+  $("c-rows").replaceChildren(...c.agents.map((a) => { const r = tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), fmtTok(a.cached), fmtFloor(a.usd, a.partial)], true); r.firstChild.title = nameOf(a.role); return r; }));
+  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), fmtTok(c.cached), fmtFloor(c.usd, c.partial)])]);
   $("c-task-cap").textContent = `By task, ${label} (estimated)`; $("c-task-table").hidden = !c.tasks.length;
-  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, shortOf(t.role), fmtFloor(t.usd, t.partial)]); r.firstChild.className = "tt"; r.children[1].title = nameOf(t.role); return r; }));
+  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, shortOf(t.role), fmtTok(t.tok), fmtFloor(t.usd, t.partial)]); r.firstChild.className = "tt"; r.children[1].title = nameOf(t.role); return r; }));
   // One sentence about what the number is; a floor note and the age only when they apply. The server's price note is not repeated.
   const note = $("c-note"); note.replaceChildren();
   note.append(document.createTextNode(`Estimated from token counts at Anthropic API list prices${prices.asOf ? " (" + prices.asOf + ")" : ""}. Not a bill: subscription plans aren't charged per token.`));
@@ -1172,7 +1187,7 @@ function rShowCard(id, p = "") {
   const nMgr = id === MGR && s === "working" ? tasksOf(last).active.filter((t) => inProj(t, p)).length : 0;
   const task = id === MGR && nMgr ? `Managing ${nMgr} task${nMgr === 1 ? "" : "s"}` : m.task || m.line;
   if (task && task !== state) rows.push(rel("p", "rc-task", task));
-  rows.push(rel("p", "rc-model", rModelLine(x)));
+  if (x.modelOverride || x.maxTurns) rows.push(rel("p", "rc-model", rModelLine(x)));   // model and effort are on the plate; the card keeps overrides and turn limits
   const nd = needList(last || {}).find((n) => roleId(n.role) === id && (!n.project || n.project === p));
   if (nd) rows.push(rel("p", "rc-need", nd.kind === "permission" ? "Waiting for your permission" : nd.kind === "idle" ? "Waiting for your reply" : "Waiting for you"));
   const cl = rCostLine(id, p); if (cl) rows.push(rel("p", "rc-cost num", cl));
