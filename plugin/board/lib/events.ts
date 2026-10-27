@@ -7,7 +7,50 @@ import { appendPrivate } from "./private-fs.ts";
 import { redactDeep } from "./redact.ts";
 
 export type EventKind = "agent-start" | "agent-stop" | "commit" | "pr" | "turn-end" | "session-start" | "session-end" | "ci" | "deploy" | "main-busy" | "assign"
-  | "task-queue" | "task-start" | "task-done" | "task-drop";   // board v2 tasks, see lib/tasks.ts
+  | "task-queue" | "task-start" | "task-done" | "task-drop"   // board v2 tasks, see lib/tasks.ts
+  | "usage"                                                   // cost ledger: cumulative numbers for one transcript
+  | "needs-you";                                              // the owner is the blocker (see lib/needs.ts)
+
+// Bookkeeping kinds, not history: kept out of the page's event list and out of task activity.
+export const QUIET_KINDS: ReadonlySet<EventKind> = new Set<EventKind>(["usage", "needs-you"]);
+
+// What someone is waiting for. The hook maps Claude Code's notification_type through this allow-list only.
+export type Need = "permission" | "input" | "idle" | "agent-input";
+// A Map, not an object literal, so "constructor" or "__proto__" can never look like a known type.
+export const NEED_OF: ReadonlyMap<string, Need> = new Map<string, Need>([
+  ["permission_prompt", "permission"], ["idle_prompt", "idle"],
+  ["elicitation_dialog", "input"], ["elicitation_url_dialog", "input"], ["agent_needs_input", "agent-input"],
+]);
+export const needOf = (type: unknown): Need | undefined => (typeof type === "string" ? NEED_OF.get(type) : undefined);
+// The only text a needs-you event carries: Claude Code's own message and title are never stored.
+export const NEED_TEXT: Readonly<Record<Need, string>> = {
+  permission: "Waiting for your permission", input: "Waiting for your answer", idle: "Waiting for your reply", "agent-input": "Waiting for your input",
+};
+
+// One usage row: cumulative numbers for one (model, speed, long-prompt) group of one transcript.
+// Short key names on purpose: redactDeep blanks any value whose key says token, session, secret and so on.
+export interface UsageRow {
+  model: string; speed: "standard" | "fast"; long: boolean;   // long: the prompt was over the long-prompt price tier
+  n: number;      // API responses
+  in: number;     // uncached input
+  out: number;    // output, thinking included
+  cw5m: number;   // cache writes, 5-minute TTL
+  cw1h: number;   // cache writes, 1-hour TTL
+  cr: number;     // cache reads
+  ws: number;     // web search requests
+  wf: number;     // web fetch requests
+}
+export const USAGE_NUMBERS = ["n", "in", "out", "cw5m", "cw1h", "cr", "ws", "wf"] as const;
+// A Claude model id, optionally with a two-letter region and Bedrock's "anthropic." prefix ("us.anthropic.claude-...").
+// Anything else is stored as "unknown", so no free text gets in.
+export const MODEL_ID = /^(?:[a-z]{2}\.)?(?:anthropic\.)?claude-[a-z0-9.-]{1,56}$/;
+// Agent identity from a hook payload or the log: a value that fails these is left out, never stored as free text.
+export const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+export const AGENT_TYPE = /^[A-Za-z0-9_.:-]{1,100}$/;
+export const agentIdOf = (v: unknown): string | undefined => (typeof v === "string" && AGENT_ID.test(v) ? v : undefined);
+export const agentTypeOf = (v: unknown): string | undefined => (typeof v === "string" && AGENT_TYPE.test(v) ? v : undefined);
+export const USAGE_TEXT = "Usage update";   // fixed: counts go in rows, never in text (redact() would mask long ones)
+const MAX_ROWS = 64;
 
 export interface BoardEvent {
   id: string;          // also the board's feed doc_id, so it uses only doc_id-safe characters
@@ -29,6 +72,42 @@ export interface BoardEvent {
   role?: string;       // task-queue: the role id the work is queued for
   priority?: "P0" | "P1" | "P2";   // task-queue
   taskId?: string;     // task-start/done/drop: which task ("t-<ms>-<hex>"; a queued or assign task's id is its event id with "t" for "e")
+  need?: Need;         // needs-you: what the owner is asked for
+  scope?: "main" | "agent";   // usage: the main session's transcript or one subagent's
+  final?: boolean;     // usage: that transcript is finished (SubagentStop, SessionEnd)
+  partial?: boolean;   // usage: a read budget stopped the sum early
+  rows?: UsageRow[];   // usage: cumulative for that transcript; the newest per (sid, agentId ?? "main") wins
+}
+
+// What lib/usage.ts readUsage(path, opts) returns: a ready-to-append usage event.
+export interface UsageEvent {
+  kind: "usage"; project: string; sid: string; agentId?: string; agentType?: string;
+  text: typeof USAGE_TEXT; scope: "main" | "agent"; final: boolean; partial: boolean; rows: UsageRow[];
+}
+export interface UsageOptions { scope: "main" | "agent"; agentId?: string; agentType?: string; project: string; sid: string; final: boolean }
+// The part of a reader's answer the hook keeps; usageFields() checks it. Identity comes from the hook payload.
+export type UsageFields = Pick<UsageEvent, "scope" | "final" | "partial" | "rows">;
+
+const count = (v: unknown) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : 0);
+
+// The hook's own allow-list over whatever the transcript reader returned: known keys only, counts that are
+// non-negative integers, a pattern-checked model id. No non-empty row means nothing to log (never zeros).
+export function usageFields(u: unknown): UsageFields | null {
+  if (!u || typeof u !== "object") return null;
+  const x = u as Record<string, unknown>;
+  if ((x.scope !== "main" && x.scope !== "agent") || !Array.isArray(x.rows)) return null;
+  const rows: UsageRow[] = [];
+  for (const r of x.rows.slice(0, MAX_ROWS)) {
+    if (!r || typeof r !== "object") continue;
+    const y = r as Record<string, unknown>;
+    const row: UsageRow = {
+      model: typeof y.model === "string" && MODEL_ID.test(y.model) ? y.model : "unknown", speed: y.speed === "fast" ? "fast" : "standard", long: y.long === true,
+      n: 0, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0,
+    };
+    for (const k of USAGE_NUMBERS) row[k] = count(y[k]);
+    if (USAGE_NUMBERS.some((k) => row[k] > 0)) rows.push(row);
+  }
+  return rows.length ? { scope: x.scope, final: x.final === true, partial: x.partial === true, rows } : null;
 }
 
 export function newId(at: Date): string {
@@ -42,13 +121,24 @@ export function appendEvent(e: Omit<BoardEvent, "id" | "ts">, at = new Date()): 
   return event;
 }
 
+// Fields every reader treats as strings: a line where any of them has another type is dropped, so one
+// hand-edited line can never throw inside /api/state.
+const STRING_FIELDS = ["id", "ts", "kind"] as const, OPTIONAL_STRING_FIELDS = ["agentId", "agentType"] as const;
+function isEvent(x: unknown): x is BoardEvent {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return false;
+  const r = x as Record<string, unknown>;
+  return STRING_FIELDS.every((k) => typeof r[k] === "string") && OPTIONAL_STRING_FIELDS.every((k) => r[k] === undefined || typeof r[k] === "string");
+}
+
 // Skips a torn or hand-edited line instead of failing the whole page.
 export function readEvents(file = EVENTS_FILE): BoardEvent[] {
   if (!existsSync(file)) return [];
   const out: BoardEvent[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
-    try { out.push(JSON.parse(line)); } catch { /* ignore a broken line */ }
+    let parsed: unknown;
+    try { parsed = JSON.parse(line); } catch { continue; }   // a torn line
+    if (isEvent(parsed)) out.push(parsed);
   }
   return out;
 }

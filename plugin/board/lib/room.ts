@@ -15,8 +15,9 @@ export interface RoomFeedItem { id: string; ts: string; project?: string; tone: 
 export interface RoomFact { label: string; value: string; tone?: "ok" | "bad" | "run" }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
-// "tom finished: Ran all suites" -> "Ran all suites"; empty when the agent gave no summary.
-const summary = (text: string) => { const i = text.indexOf(":"); return i < 0 ? "" : text.slice(i + 1).trim(); };
+// "toon-crew:tom finished: Ran all suites" -> "Ran all suites"; empty when the agent gave no summary.
+// Cut at "finished:", not the first colon: namespaced agent types ("toon-crew:tom") carry a colon too.
+const summary = (text: string) => text.match(/\bfinished:\s*(.*)$/s)?.[1].trim() ?? "";
 const refIn = (text: string) => text.match(/\b(?:feat|fix|chore|docs)\/[\w./-]+/)?.[0] ?? text.match(/(?:PR |#)(\d+)/)?.[0];
 // The main session is the manager's own chatter, and generic helpers say nothing about who did what.
 const isNoise = (e: BoardEvent) => e.agentType === "agent" || !e.agentType;

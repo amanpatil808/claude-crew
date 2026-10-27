@@ -6,13 +6,39 @@ import { redact, redactDeep } from "./redact.ts";
 import type { ProjectConfig } from "./project-config.ts";
 
 export interface CiRun { id: number; workflow: string; title: string; branch: string; status: string; conclusion: string; createdAt: string; updatedAt: string; url: string }
-export interface Pr { number: number; title: string; state: string; author: string; branch: string; updatedAt: string; url: string; draft: boolean }
+export type Checks = "pass" | "fail" | "pending" | "none";
+export type Review = "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "";
+// checks and review are enums only: check names, URLs and reviewer names are never kept.
+export interface Pr { number: number; title: string; state: string; author: string; branch: string; updatedAt: string; url: string; draft: boolean; checks: Checks; review: Review }
 export interface Commit { sha: string; short: string; author: string; at: string; subject: string }
 export interface AppError { service: string; at: string; level: string; msg: string }
 export interface Deploy { status: string; version: string; at: string; detail: string; raw: string; history: string[] }
 
 interface GhRun { databaseId: number; workflowName: string; displayTitle: string; headBranch: string; status: string; conclusion?: string; createdAt: string; updatedAt: string; url: string }
-interface GhPr { number: number; title: string; state: string; author?: { login?: string }; headRefName: string; updatedAt: string; url: string; isDraft?: boolean }
+interface GhPr { number: number; title: string; state: string; author?: { login?: string }; headRefName: string; updatedAt: string; url: string; isDraft?: boolean; reviewDecision?: string | null; statusCheckRollup?: unknown }
+
+// One PR list call, more rows than the old 10, so an older open PR stays in view (not a guarantee).
+export const PR_LIMIT = 20;
+const PR_FIELDS = "number,title,state,author,headRefName,updatedAt,url,isDraft,reviewDecision,statusCheckRollup";
+const FAILED = new Set(["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
+const PASSED = new Set(["SUCCESS", "NEUTRAL", "SKIPPED"]);
+
+// statusCheckRollup mixes CheckRun ({status, conclusion}) and StatusContext ({state}). Any failure fails;
+// anything not known to have passed (running, queued, stale, a value GitHub adds later) is pending, never pass.
+export function checksOf(rollup: unknown): Checks {
+  if (!Array.isArray(rollup) || !rollup.length) return "none";
+  let pending = false;
+  for (const c of rollup) {
+    const x: Record<string, unknown> = c && typeof c === "object" ? (c as Record<string, unknown>) : {};
+    const result = x.status === undefined && typeof x.state === "string" ? x.state : x.status === "COMPLETED" ? x.conclusion : "PENDING";
+    const r = typeof result === "string" ? result.toUpperCase() : "";
+    if (FAILED.has(r)) return "fail";
+    if (!PASSED.has(r)) pending = true;
+  }
+  return pending ? "pending" : "pass";
+}
+
+export const reviewOf = (v: unknown): Review => (v === "APPROVED" || v === "CHANGES_REQUESTED" || v === "REVIEW_REQUIRED" ? v : "");
 
 const parse = <T>(text: string, fallback: T): T => { try { return JSON.parse(text) as T; } catch { return fallback; } };
 
@@ -26,11 +52,11 @@ export async function ciRuns(repo: string, cwd?: string): Promise<CiRun[]> {
 }
 
 export async function pullRequests(repo: string, cwd?: string): Promise<Pr[]> {
-  const r = await run(["gh", "pr", "list", "-R", repo, "--state", "all", "-L", "10", "--json", "number,title,state,author,headRefName,updatedAt,url,isDraft"], 20_000, cwd);
+  const r = await run(["gh", "pr", "list", "-R", repo, "--state", "all", "-L", String(PR_LIMIT), "--json", PR_FIELDS], 20_000, cwd);
   if (!r.ok) throw new Error(`gh pr list: ${redact(r.err).slice(0, 200)}`);
   return parse<GhPr[]>(r.out, []).map((x) => redactDeep({
     number: x.number, title: x.title, state: x.state, author: x.author?.login ?? "", branch: x.headRefName,
-    updatedAt: x.updatedAt, url: x.url, draft: !!x.isDraft,
+    updatedAt: x.updatedAt, url: x.url, draft: !!x.isDraft, checks: checksOf(x.statusCheckRollup), review: reviewOf(x.reviewDecision),
   }));
 }
 

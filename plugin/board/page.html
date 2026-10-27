@@ -1,264 +1,108 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-tab="room">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Crew Room</title>
+<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Crect%20x%3D%222%22%20y%3D%221%22%20width%3D%229%22%20height%3D%2214%22%20fill%3D%22%23ff9ec7%22%20stroke%3D%22%232b2340%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
 <style>
-/* Page tokens: light-dark() follows the device. */
-:root {
-  color-scheme: light dark;
-  --bg: light-dark(#f3f4fb, #05060f);
-  --panel: light-dark(#ffffff, #0e1020);
-  --surface-2: light-dark(#f6f7fc, #13162a);
-  --fg: light-dark(#12142b, #eaf0ff);
-  --fg-2: light-dark(#575c82, #9aa0c8);
-  --fg-3: light-dark(#5f6488, #8a90bb);
-  --line: light-dark(#dcdfef, #20233f);
-  --accent: light-dark(#0891b2, #22d3ee);
-  --accent-2: light-dark(#6d4fd6, #a78bfa);
-  --ok: light-dark(#15803d, #4ade80);
-  --warn: light-dark(#a16207, #fbbf24);
-  --bad: light-dark(#be123c, #fb7185);
-  --grad: linear-gradient(120deg, #22d3ee, #a78bfa 55%, #f472b6);
-  --shadow: 0 1px 2px rgba(20, 24, 60, .05), 0 8px 24px -14px rgba(30, 30, 90, .16);
-  --r-lg: 22px; --r-md: 16px; --r-sm: 12px; --r-pill: 999px;
-  --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: ui-rounded, "SF Pro Rounded", ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-@media (prefers-color-scheme: dark) { :root { --shadow: 0 1px 0 rgba(255, 255, 255, .04) inset; } }
-* { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 var(--font); -webkit-text-size-adjust: 100%; }
-body { padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px)); }
-@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } }
-@keyframes fresh { from { background: color-mix(in srgb, var(--accent) 20%, transparent); } to { background: transparent; } }
-/* tab bar: shared by both views, follows whichever token set is active */
-.tabs { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; padding: 8px 16px; background: var(--bg); border-bottom: 2px solid var(--line); }
-.tabs button { flex: 1 1 0; max-width: 220px; min-height: 44px; font: 700 15px/1 var(--font); letter-spacing: .02em; color: var(--fg-2, var(--muted)); background: transparent; border: 2px solid var(--line); border-radius: 10px; cursor: pointer; }
-.tabs button[aria-selected="true"] { color: var(--fg, var(--ink)); border-color: var(--accent); box-shadow: inset 0 -4px 0 var(--accent); }
-.tabs button:focus-visible { outline: 2px dashed var(--accent); outline-offset: 2px; }
-[hidden] { display: none !important; }
-html[data-tab="room"] body { padding: 0; }
+/* One board. Tokens, the pixel crew and the layout all live in room.css; the server inlines it here so the page needs no other request. */
 /*ROOM_CSS*/
-#view-live {
-.wrap { max-width: 1180px; margin: 0 auto; }
-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 18px; }
-h1 { font: 700 clamp(24px, 4.2vw, 32px)/1.15 var(--font-display); margin: 0; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.live { display: inline-flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 13px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
-.dot.stale { background: var(--warn); animation: none; }
-
-@media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
-.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .span { grid-column: 1 / -1; } }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; }
-h2 { font: 650 19px/1.2 var(--font-display); margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-h2 small, h3 small { font: 400 13px var(--font); color: var(--fg-3); }
-h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-2); margin: 16px 0 6px; }
-.empty { color: var(--fg-3); font-size: 14px; margin: 4px 0; }
-.problem { font-size: 13px; color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: var(--r-sm); padding: 6px 10px; margin: 0 0 10px; overflow-wrap: anywhere; }
-.crew { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-.chip { border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; background: var(--surface-2); min-width: 0; }
-.chip[data-s="working"] { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
-.chip b { display: block; overflow-wrap: anywhere; }
-.chip .sub { font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; }
-.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--fg-3) 16%, transparent); color: var(--fg-2); white-space: nowrap; }
-.badge.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
-.badge.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
-.badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
-.badge.run { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-.list { list-style: none; margin: 0; padding: 0; max-height: 460px; overflow-y: auto; }
-.list li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 14px; }
-.list li:first-child { border-top: 0; }
-.list time { color: var(--fg-3); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 1px; }
-.list .txt { min-width: 0; overflow-wrap: anywhere; }
-.list .txt .badge { margin-right: 6px; }
-.list a { color: var(--accent); text-decoration: none; }
-.list a:hover { text-decoration: underline; }
-.list li.fresh { animation: fresh 2.4s ease-out; }
-
-.deploy { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
-.deploy b { font-size: 18px; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-footer { color: var(--fg-3); font-size: 13px; margin-top: 18px; overflow-wrap: anywhere; }
-
-}
 </style>
 </head>
 <body>
-<nav class="tabs" role="tablist" aria-label="Board views">
-  <button type="button" role="tab" id="tab-live" aria-controls="view-live" aria-selected="true">Live</button>
-  <button type="button" role="tab" id="tab-room" aria-controls="view-room" aria-selected="false">Crew Room</button>
-</nav>
-<main id="view-live" role="tabpanel" aria-labelledby="tab-live">
-<div class="wrap">
-  <header>
-    <h1>Crew Live Board</h1>
-    <span class="live" role="status"><span class="dot" id="dot"></span><span id="updated">Connecting…</span></span>
-  </header>
-  <nav class="pstrip" id="l-projects" aria-label="Projects" hidden></nav>
-  <div class="tkgrid" id="l-tasks"></div>
-  <div class="grid">
-    <section class="span" aria-labelledby="h-crew"><h2 id="h-crew">Crew</h2><div id="crew"></div></section>
-    <section aria-labelledby="h-log">
-      <h2 id="h-log">Agent log <small>India time</small></h2>
-      <ul class="list" id="log" aria-live="polite"></ul>
-    </section>
-    <section aria-labelledby="h-ops">
-      <h2 id="h-ops">Deploys and CI <small id="ops-at"></small></h2>
-      <div id="ops"></div>
-    </section>
-    <section class="span" aria-labelledby="h-err">
-      <h2 id="h-err">App errors <small id="err-at">your configured containers, redacted</small></h2>
-      <div id="errors"></div>
-    </section>
+<a class="skip" href="#log">Skip to the log</a>
+<!-- The one live region: new Needs-you items and connection lost / back are spoken here, nothing else. -->
+<div class="sr" id="announce" aria-live="polite" aria-atomic="true"></div>
+<div id="view-room">
+<header class="topbar">
+  <div class="wrap">
+    <h1 class="brand pxf"><span class="door" aria-hidden="true"></span>Crew Room</h1>
+    <nav class="projects" id="projects" aria-label="Projects" hidden></nav>
+    <span class="spacer"></span>
+    <span class="status" id="status" data-s="wait"><i aria-hidden="true"></i>Connecting&hellip;</span>
+    <button class="tbtn pxf" id="anim" type="button" aria-pressed="true"><span class="tick" aria-hidden="true"></span>Animation</button>
+    <button class="tbtn pxf" id="theme" type="button" aria-label="Switch light or dark theme">Theme</button>
   </div>
-  <footer>Local only. Updates every few seconds.</footer>
-</div>
-</main>
-<main id="view-room" role="tabpanel" aria-labelledby="tab-room" hidden>
-  <div class="rwrap">
-    <header class="hero panel">
-      <h1>Crew <b>Room</b> <span class="plug">&middot; toon-crew</span> <span class="sky" id="r-sky" aria-hidden="true"></span> <span class="caret" aria-hidden="true">&#9654; THE GANG</span></h1>
-      <div class="counts" id="r-facts" aria-label="Key facts"></div>
-      <button type="button" class="motion" id="r-motion" aria-pressed="true">MOTION ON</button>
-    </header>
-    <nav class="pstrip" id="r-projects" aria-label="Projects" hidden></nav>
-    <div class="tkgrid" id="r-tasks"></div>
-    <section class="sec" aria-label="Crew">
-      <h2>The crew</h2>
+</header>
+
+<div class="offband" id="offband" hidden></div>
+
+<section class="need" id="need" aria-labelledby="need-h" hidden>
+  <div class="wrap">
+    <h2 id="need-h">Needs you</h2>
+    <div id="need-items"></div>
+    <button class="need-more" id="need-more" type="button" hidden></button>
+  </div>
+</section>
+
+<main class="wrap" id="main">
+  <div class="main">
+    <section aria-labelledby="floor-h">
+      <div class="sec-head"><h2 id="floor-h">The floor</h2><span class="meta num" id="floor-meta"></span></div>
       <div class="hall" id="r-hall">
-        <span class="door gate" id="r-door" title="Anywhere Door" aria-hidden="true"></span>
-        <div class="rgroups" id="r-rooms"><p class="empty">Waiting for the crew...</p></div>
+        <span class="door gate" id="r-door" aria-hidden="true"></span>
+        <div class="rgroups" id="r-rooms"><p class="empty">Waiting for the crew&hellip;</p></div>
         <div class="walkers" id="r-walkers" aria-hidden="true"></div>
       </div>
     </section>
-    <section class="sec wallsec" aria-label="On the wall">
-      <div class="gallery" id="r-gallery" aria-label="Framed pictures of former crew" hidden></div>
+
+    <section class="logsec" id="log" aria-labelledby="log-h" tabindex="-1">
+      <div class="sec-head">
+        <h2 id="log-h">Log &middot; what the crew did</h2>
+        <span class="meta">times in IST</span>
+      </div>
+      <div class="card logbox" id="logbox"><p class="empty">Waiting for the board&hellip;</p></div>
     </section>
+
+    <aside class="rail" aria-label="Cost, tasks and shipping">
+      <section class="card cost" id="cost" data-state="loading" aria-labelledby="cost-h">
+        <div class="cost-top">
+          <h2 id="cost-h">Cost</h2>
+          <span class="est-badge" id="c-badge" hidden>estimate</span>
+          <div class="seg" role="group" aria-label="Period"><button type="button" aria-pressed="true" data-p="today">Today</button><button type="button" aria-pressed="false" data-p="7d">7 days</button></div>
+        </div>
+        <div class="cost-body" id="cost-body">
+          <div class="cost-hero" id="c-hero"><span class="big num" id="c-total">&ndash;</span><span class="tok"><b class="num" id="c-tok">&ndash;</b> <span id="c-sub">loading</span><span id="c-runs"></span></span></div>
+          <ul class="cbars" id="c-bars" aria-label="Estimated cost by agent"></ul>
+          <details id="c-details" hidden>
+            <summary>Per agent and task</summary>
+            <table>
+              <caption id="c-cap">By agent (estimated)</caption>
+              <thead><tr><th scope="col">Agent</th><th scope="col">Runs</th><th scope="col">Tokens</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <tbody id="c-rows"></tbody>
+              <tfoot id="c-foot"></tfoot>
+            </table>
+            <table id="c-task-table" class="by-task">
+              <caption id="c-task-cap">By task (estimated)</caption>
+              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <tbody id="c-task-rows"></tbody>
+            </table>
+          </details>
+          <p class="estimate"><span id="c-note">Waiting for the board.</span></p>
+        </div>
+      </section>
+
+      <section class="card tasks" aria-labelledby="tk-h">
+        <h2 class="sr" id="tk-h">Tasks</h2>
+        <div class="tk-sec"><div class="tk-h"><span class="pulse" id="run-pulse" aria-hidden="true"></span><h3>Running <b class="num" id="run-n">0</b></h3></div><div id="tk-run"></div></div>
+        <div class="tk-sec"><div class="tk-h"><h3>Queued <b class="num" id="q-n">0</b></h3></div><div id="tk-q"></div></div>
+      </section>
+
+      <section class="card" aria-labelledby="ship-h">
+        <div class="card-h"><h2 id="ship-h">Ship</h2><span class="meta" id="ship-meta"></span></div>
+        <div class="ship2" id="ship-rows"><p class="empty">Waiting for the board&hellip;</p></div>
+      </section>
+    </aside>
   </div>
+
+
+  <footer class="pgfoot"><span>Local only &middot; view only &middot; times in IST</span><span id="foot-need"></span></footer>
 </main>
+</div>
 <script>
 "use strict";
-// All data goes in with textContent: commit messages and log lines are never parsed as HTML.
-const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-const IST = { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false };
-const hm = (iso) => iso ? new Date(iso).toLocaleTimeString("en-GB", IST) : "";
-const day = (iso) => iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) : "";
-const ago = (iso) => { if (!iso) return ""; const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min ago` : `${Math.floor(m / 1440)} d ago`; };
-const dur = (a, b) => { const m = Math.round((new Date(b || Date.now()) - new Date(a)) / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
-const badge = (text, tone) => el("span", `badge ${tone || ""}`, text);
-const tone = (c) => c === "success" || c === "ok" ? "ok" : c === "failure" || c === "failed" || c === "rolled-back" || c === "error" || c === "fatal" ? "bad" : c === "warn" || c === "cancelled" || c === "skipped" ? "warn" : "run";
-const link = (href, text) => { const a = el("a", null, text); if (/^https:\/\/github\.com\//.test(href || "")) { a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; } return a; };
-
-const KIND_LABEL = { "agent-start": ["start", "run"], "agent-stop": ["done", "ok"], assign: ["task", "run"], "task-queue": ["queued", ""], "task-start": ["start", "run"], "task-done": ["done", "ok"], "task-drop": ["dropped", "warn"] };
-let seen = null, last = null;
-
-// The Live tab: crew chips come from the tasks (never from agent hooks), so their numbers agree with Active.
-function renderCrew(s) {
-  const T = tasksOf(s), roles = (s.room?.roles || []).filter((r) => r.id !== MGR && !(s.room.retired || []).some((x) => x.id === r.id));
-  const box = el("div", "crew");
-  for (const r of roles) {
-    const act = T.active.filter((t) => t.role === r.id && inView(t)), que = T.queued.filter((t) => t.role === r.id && inView(t));
-    const chip = el("div", "chip"); chip.dataset.s = act.length ? "working" : "free";
-    chip.append(el("b", null, r.mascot || r.id));
-    const sub = el("div", "sub", ""); sub.append(badge(act.length ? `${act.length} active` : "free", act.length ? "run" : "ok"));
-    if (que.length) sub.append(document.createTextNode(` · ${que.length} queued`));
-    chip.append(sub); if (act.length) chip.append(el("div", "sub", `working ${dur(act[0].startedAt)}, since ${hm(act[0].startedAt)}`));
-    box.append(chip);
-  }
-  $("crew").replaceChildren(roles.length ? box : el("p", "empty", "No crew found."));
-}
-
-// Agent log: who started, finished or was assigned what. Commits, PRs, CI and deploys are on the right, so they are not repeated here.
-function renderLog(s) {
-  const quiet = (e) => /^(general-purpose|agent)\b/.test(e.text) || /^main session/.test(e.text);
-  const items = s.events.filter((e) => KIND_LABEL[e.kind] && !quiet(e) && (rProj === "" || !e.project || e.project === rProj)).slice(0, 150);
-  if (!items.length) { $("log").replaceChildren(el("li", "empty", "Nothing logged yet.")); return; }
-  $("log").replaceChildren(...items.map((e) => {
-    const li = el("li"); if (seen && !seen.has(e.id)) li.classList.add("fresh");
-    const t = el("time", null, hm(e.ts)); t.dateTime = e.ts; t.title = `${day(e.ts)} ${hm(e.ts)} IST (${e.ts} UTC)`;
-    const txt = el("div", "txt");
-    const [label, tn] = KIND_LABEL[e.kind];
-    txt.append(badge(label, tn), document.createTextNode(e.text));
-    li.append(t, txt);
-    return li;
-  }));
-  seen = new Set(s.events.map((e) => e.id));
-}
-
-function renderOps(s0) {
-  const s = snapOf(s0), out = [];
-  if (s.problems?.box) out.push(el("p", "problem", `Box: ${s.problems.box}`));
-  if (s.problems?.ci || s.problems?.prs || s.problems?.git) out.push(el("p", "problem", [s.problems.ci, s.problems.prs, s.problems.git].filter(Boolean).join(" · ")));
-  out.push(el("h3", null, s.name ? `Last deploy (${s.name})` : "Last deploy"));
-  if (s.deploy) {
-    const d = el("div", "deploy");
-    d.append(badge(s.deploy.status, tone(s.deploy.status)), el("b", null, s.deploy.version || "?"), el("span", "sub", s.deploy.at ? `${day(s.deploy.at)} ${hm(s.deploy.at)} · ${ago(s.deploy.at)}` : ""));
-    if (s.deploy.detail) d.append(el("span", "sub", s.deploy.detail));
-    out.push(d);
-    if (s.deploy.history?.length) { const ul = el("ul", "list"); for (const h of s.deploy.history.slice(0, 5)) { const li = el("li"); li.append(el("time", null, ""), el("div", "txt mono", h)); ul.append(li); } out.push(ul); }
-  } else out.push(el("p", "empty", "No deploy result read yet."));
-  out.push(el("h3", null, "CI runs"));
-  if (s.ci.length) {
-    const ul = el("ul", "list");
-    for (const r of s.ci.slice(0, 8)) {
-      const li = el("li"), txt = el("div", "txt");
-      const t = el("time", null, hm(r.createdAt)); t.title = `${day(r.createdAt)} ${hm(r.createdAt)} IST`;
-      txt.append(badge(r.status === "completed" ? r.conclusion : r.status, tone(r.status === "completed" ? r.conclusion : "run")), link(r.url, `${r.workflow} · ${r.branch}`), el("div", "sub", r.title));
-      li.append(t, txt); ul.append(li);
-    }
-    out.push(ul);
-  } else out.push(el("p", "empty", "No CI runs read yet."));
-  out.push(el("h3", null, "Pull requests"));
-  if (s.prs.length) {
-    const ul = el("ul", "list");
-    for (const p of s.prs.slice(0, 6)) { const li = el("li"), txt = el("div", "txt"); txt.append(badge(p.draft ? "draft" : p.state.toLowerCase(), p.state === "MERGED" ? "ok" : p.state === "CLOSED" ? "" : "run"), link(p.url, `#${p.number} ${p.title}`)); li.append(el("time", null, hm(p.updatedAt)), txt); ul.append(li); }
-    out.push(ul);
-  } else out.push(el("p", "empty", "No pull requests read yet."));
-  for (const [branch, list] of Object.entries(s.commits || {})) {
-    out.push(el("h3", null, `Commits on ${branch}`));
-    const ul = el("ul", "list");
-    for (const c of list.slice(0, 5)) { const li = el("li"), txt = el("div", "txt"); txt.append(el("span", "mono", `${c.short} `), document.createTextNode(`${c.subject} `), el("small", "sub", `· ${c.author}`)); const t = el("time", null, hm(c.at)); t.title = `${day(c.at)} ${hm(c.at)} IST`; li.append(t, txt); ul.append(li); }
-    out.push(ul);
-  }
-  $("ops").replaceChildren(...out);
-  $("ops-at").textContent = s.polledAt?.github ? `read ${ago(s.polledAt.github)}` : "";
-}
-
-function renderErrors(s0) {
-  const s = snapOf(s0), out = [];
-  if (s.problems?.box) out.push(el("p", "problem", "Could not reach the box; showing the last errors read."));
-  if (!s.errors.length) out.push(el("p", "empty", "No warnings or errors in the last 500 log lines of your configured containers."));
-  else {
-    const ul = el("ul", "list");
-    for (const e of s.errors.slice(0, 60)) { const li = el("li"), txt = el("div", "txt"); txt.append(badge(e.level, tone(e.level)), el("b", null, `${e.service} `), document.createTextNode(e.msg)); const t = el("time", null, hm(e.at)); if (e.at) t.title = `${day(e.at)} ${hm(e.at)} IST`; li.append(t, txt); ul.append(li); }
-    out.push(ul);
-  }
-  $("errors").replaceChildren(...out);
-  $("err-at").textContent = `your configured containers, redacted${s.polledAt?.box ? ` · read ${ago(s.polledAt.box)}` : ""}`;
-}
-
-// The picked project's own snapshot (deploy, CI, PRs, commits, errors); "all projects" shows the focus project's.
-function snapOf(s) { const n = rProj || s.focus, sn = n && s.snapshots?.[n]; return sn ? { ...s, ...sn, name: n } : { ...s, name: n }; }
-function paintAll() {
-  pickInit(last); renderTasks(last);
-  renderCrew(last); renderLog(last); renderOps(last); renderErrors(last);
-  try { renderRoom(last); } catch (e) { console.error(e); }
-}
-async function tick() {
-  try {
-    const r = await fetch("/api/state", { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    last = await r.json();
-    paintAll();
-    $("dot").classList.remove("stale"); $("updated").textContent = `Live · ${hm(last.now)} IST`;
-  } catch { $("dot").classList.add("stale"); $("updated").textContent = "Server not answering; retrying…"; }
-}
-// Refresh every 2 s while the Crew Room is open (so walks follow events closely), every 4 s on the Live tab.
-(function loop() { tick().finally(() => setTimeout(loop, document.documentElement.dataset.tab === "room" ? 2000 : 4000)); })();
 /*ROOM_JS*/
 </script>
 </body>

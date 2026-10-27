@@ -2,4 +2,6 @@
 
 - When a test mixes fixed-date fixtures with code that stamps `new Date()`, put the whole file on one mocked clock (`mock.timers.enable({apis:["Date"]})`) rather than fixing the dates. Mixed clocks go stale as real time passes, as plugin/board/test/tasks.test.ts did on 2026-10-27. (seen 1) [crew]
 - A regression test for a clock bug should run the same scenario at a past and a future date. Here only the past one failed on the old code. (seen 1) [crew]
-- The toon-crew guard blocks inline file deletion and write-then-run in one Bash call. Use Edit/Write, then run in a separate call. (seen 1) [crew]
+- The toon-crew guard blocks inline file deletion and write-then-run in one Bash call. Use Edit/Write, then run in a separate call. Worktree agents also get compound `cd && git ...; python3 <<EOF` commands refused: keep Bash calls plain. (seen 2) [crew]
+- To test "file swapped after an inode check", create the replacement while the original still exists and rename it over. rm-then-write lets ext4 reuse the inode, so such a test passes on macOS and fails on Linux CI. Prove guard tests by mutating the guard, then restore with `git checkout <ref> -- <file>`. (seen 1) [crew]
+- Parse "X finished: summary" by the literal "finished:" marker, never the first colon: namespaced agent types ("toon-crew:kevin") contain colons. To prove a test fails on old code without git stash, copy the file aside, `git show HEAD:path > path`, run, copy back. (seen 1) [crew]

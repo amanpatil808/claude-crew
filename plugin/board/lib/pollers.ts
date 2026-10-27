@@ -9,7 +9,7 @@ import { writePrivate } from "./private-fs.ts";
 import { appendEvent, readEvents } from "./events.ts";
 import { configFor } from "./project-config.ts";
 import { projectKey, readRegistry, type Project } from "./projects.ts";
-import { box, ciRuns, commits, pullRequests, type AppError, type CiRun, type Commit, type Deploy, type Pr } from "./sources.ts";
+import { box, ciRuns, commits, PR_LIMIT, pullRequests, type AppError, type CiRun, type Commit, type Deploy, type Pr } from "./sources.ts";
 
 export interface Snapshot {
   polledAt: { github?: string; box?: string };
@@ -18,7 +18,9 @@ export interface Snapshot {
   problems: Record<string, string>;      // source -> last failure, shown on the page instead of silently stale data
 }
 
-interface Seen { ci: number[]; prs: string[]; commits: string[]; deploy: string; seeded: { github: boolean; box: boolean } }
+// prLimit: the PR window the `prs` memory was filled with. A wider window (10 -> 20) shows older PRs that
+// already happened, so the first poll after the change records them without announcing them.
+interface Seen { ci: number[]; prs: string[]; commits: string[]; deploy: string; seeded: { github: boolean; box: boolean }; prLimit?: number }
 
 export const emptySnapshot = (): Snapshot => ({ polledAt: {}, ci: [], prs: [], commits: {}, deploy: null, errors: [], problems: {} });
 
@@ -47,14 +49,16 @@ export async function pollGithub(p: Project): Promise<void> {
   });
   await step(snap, "prs", async () => {
     snap.prs = await pullRequests(repo, p.path);
+    const widened = (seen.prLimit ?? 10) < PR_LIMIT;
     for (const pr of snap.prs) {
       const key = `${pr.number}:${pr.state}`;
       if (seen.prs.includes(key)) continue;
       // A PR a hook already logged (opened or merged from a Claude session) is not repeated.
       const logged = mine().some((e) => e.kind === "pr" && (e.ref === pr.url || e.ref === `#${pr.number}`) && e.text.toLowerCase().includes(pr.state === "MERGED" ? "merged" : pr.state === "CLOSED" ? "closed" : "opened"));
-      if (emit && !logged) appendEvent({ project: p.name, kind: "pr", text: `PR #${pr.number} ${pr.state.toLowerCase()}: ${pr.title}`, ref: pr.url });
+      if (emit && !widened && !logged) appendEvent({ project: p.name, kind: "pr", text: `PR #${pr.number} ${pr.state.toLowerCase()}: ${pr.title}`, ref: pr.url });
       seen.prs.push(key);
     }
+    seen.prLimit = PR_LIMIT;
   });
   await step(snap, "git", async () => {
     snap.commits = await commits(p.path, cfg.branches);
