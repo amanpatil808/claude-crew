@@ -65,18 +65,20 @@
         </div>
         <div class="cost-body" id="cost-body">
           <div class="cost-hero" id="c-hero"><span class="big num" id="c-total">&ndash;</span><span class="tok"><b class="num" id="c-tok">&ndash;</b> <span id="c-sub">loading</span><span id="c-runs"></span></span></div>
+          <p class="cost-cached" id="c-cached" hidden></p>
+          <p class="cost-since" id="c-since" hidden></p>
           <ul class="cbars" id="c-bars" aria-label="Estimated cost by agent"></ul>
           <details id="c-details" hidden>
             <summary>Per agent and task</summary>
             <table>
               <caption id="c-cap">By agent (estimated)</caption>
-              <thead><tr><th scope="col">Agent</th><th scope="col">Runs</th><th scope="col">Tokens</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <thead><tr><th scope="col">Agent</th><th scope="col">Runs</th><th scope="col">Tokens (fresh)</th><th scope="col">Cached</th><th scope="col">&asymp; Cost</th></tr></thead>
               <tbody id="c-rows"></tbody>
               <tfoot id="c-foot"></tfoot>
             </table>
             <table id="c-task-table" class="by-task">
               <caption id="c-task-cap">By task (estimated)</caption>
-              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">Tokens (fresh)</th><th scope="col">&asymp; Cost</th></tr></thead>
               <tbody id="c-task-rows"></tbody>
             </table>
           </details>
