@@ -1,6 +1,6 @@
 # What toon-crew does and does not do
 
-For anyone deciding whether to install `toon-crew`, or checking what it will and will not touch. The README has the six most important limits ([Limits](../README.md#limits)); this page has the full list, then what the plugin keeps and sends. For the plugin's guard rules, see [guards.md](guards.md).
+For anyone deciding whether to install `toon-crew`, or checking what it will and will not touch. The README has the four most important limits ([Good to know](../README.md#good-to-know)); this page has the full list, then what the plugin keeps and sends. For the plugin's guard rules, see [guards.md](guards.md).
 
 ## What it does
 
