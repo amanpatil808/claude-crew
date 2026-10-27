@@ -97,7 +97,7 @@
     await st.arrive?.(w, dir);
   }
   async function tNear(w, path, st, dir) {
-    const L = rLen(path), ms = Math.max(350, Math.min(1000, (L / (st.speed || 560)) * 1000));
+    const L = rLen(path), ms = st.nearMs ? st.nearMs(L) : Math.max(350, Math.min(1000, (L / (st.speed || 560)) * 1000));
     tPlace(w, ...path[0]);
     await st.depart?.(w, dir, "near");
     await tLeg(w, path, legOf(st, st.nearLeg, L, ms, st.leg?.ease || easeIO));
@@ -108,12 +108,17 @@
 
   // ---- the crew: one style each ----
   const T = {};
-  T.doraemon = { id: "copter", air: true, speed: 620,
-    leg: { lift: (p) => 44 * Math.sin(Math.PI * p) },
-    exitLeg: { lift: (p) => 8 + 60 * p }, enterLeg: { lift: (p) => 68 * (1 - p) },
-    async depart(w) { w._hat = tProp(w, "copterhat"); w.style.setProperty("--lift", "0px"); await rSleep(220); },
+  // Doraemon's bamboo-copter: a gentle rise, a calm flight with a slight bob, a soft landing, then the copter tucked into his pocket (about 2.4-2.6 s a trip).
+  const tween = (w, ms, f) => new Promise((res) => { const t0 = performance.now(), s = (now) => { const p = Math.min(1, (now - t0) / ms); f(p); if (p < 1 && w.isConnected) requestAnimationFrame(s); else res(); }; requestAnimationFrame(s); });
+  const setLift = (w, px) => w.style.setProperty("--lift", -Math.round(px) + "px");
+  const bob = (p, n = 3) => 2.5 * Math.sin(Math.PI * n * p);
+  T.doraemon = { id: "copter", air: true, noCut: true, speed: 620,   // noCut: he flies the whole route in view and never vanishes; long routes get faster only up to the 1.5 s cap (a trip stays under about 2.7 s)
+    nearMs: (L) => Math.min(1500, 1000 + L * .9),
+    leg: { lift: (p) => 8 + 36 * Math.sin(Math.PI * p) + bob(p, 4) },
+    exitLeg: { lift: (p) => 8 + 60 * p + bob(p) }, enterLeg: { lift: (p) => 8 + 60 * (1 - p) + bob(p) * (1 - p) },
+    async depart(w) { w._hat = tProp(w, "copterhat"); setLift(w, 0); await rSleep(120); await tween(w, 330, (p) => setLift(w, 8 * easeIO(p))); },   // blade spins up, then he rises
     async vanish(w) { puff(up(w._p, 60), "smoke", 420); await rSleep(60); },
-    async arrive(w) { w._hat?.classList.add("stow"); await rSleep(240); w._hat?.remove(); },
+    async arrive(w) { await tween(w, 240, (p) => setLift(w, 8 * (1 - easeOut(p)))); setLift(w, 0); w._hat?.classList.add("stow"); await rSleep(420); w._hat?.remove(); },
   };
   T["miguel-rivera"] = { id: "marigold", air: true, speed: 520,
     leg: { lift: (p) => 22 * Math.sin(Math.PI * p), trail: { cls: "petal", every: 20, max: 8, ms: 900, z: -1, vars: (i) => ({ "--dx": (i % 2 ? 5 : -5) + "px", "--dy": "14px", "--r": (i % 2 ? 200 : -160) + "deg" }) }, stride: 15 },
@@ -241,7 +246,7 @@
     const path = st.air ? rDedupe([route[0], route.at(-1)]) : route, L = rLen(path);
     if (L < 2) return Promise.resolve();
     const dir = tDir(path.at(-1)[0] - path[0][0], path.at(-1)[1] - path[0][1]);
-    const near = !st.always && L <= NEAR;
+    const near = st.noCut || (!st.always && L <= NEAR);
     const face = toKind === "stand" ? (b && b.side > 0 ? "left" : "right") : "down";
     const st2 = { ...st, face };
     w._p = f; w.dataset.tv = st.id; live.add(w);

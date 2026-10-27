@@ -62,7 +62,7 @@
 #view-room .walker .tp { position: absolute; display: block; pointer-events: none; z-index: 4; }
 #view-room .walker .tp b { position: absolute; display: block; }
 #view-room .walker .tp.copterhat { left: 12px; top: -12px; width: 36px; height: 14px; }
-#view-room .walker .tp.copterhat.stow { animation: tpStow .25s ease-in forwards; }
+#view-room .walker .tp.copterhat.stow { animation: tpStow .4s ease-in-out forwards; }
 @keyframes tpStow { to { transform: translate(0, 46px) scale(.15); opacity: 0; } }
 #view-room .walker .tp.guitar { left: 36px; top: 38px; width: 12px; height: 30px; transform-origin: 50% 80%; transform: rotate(-50deg); }
 #view-room .walker .tp.guitar::before { content: ""; position: absolute; left: 4px; top: 0; width: 3px; height: 16px; background: #5a3a22; border: 1px solid var(--wall-ink); }

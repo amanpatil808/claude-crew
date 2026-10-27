@@ -247,7 +247,7 @@ function rTouches(key) {
   });
 }
 
-const STALE = "No word from this agent for 45+ min; the session may have closed.";
+const STALE = "No activity from this agent for a while; it may have been stopped.";
 const R_MODEL = /opus|sonnet|haiku|fable/;
 // ranOn is the model the run actually used (call > file > env > main); older payloads only have the file model.
 const rModelOf = (x) => (x.ranOn || x.modelOverride || x.model || "").toLowerCase().match(R_MODEL)?.[0];
@@ -357,7 +357,7 @@ let rNeed = new Set();                             // role@project keys whose pe
 function rDesk(role, m, i, showTeam, proj = "") {
   const k = rK(role.id, proj), waiting = rPending.has(k);          // assigned but Doraemon has not arrived yet: seated, waiting
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
-  const stale = m.stale === true && m.status === "idle" && !waiting;      // started, never stopped, silent for 45+ min
+  const stale = m.stale === true && m.status === "idle" && !waiting;      // started, never stopped, silent for a while
   const key = rKeyOf(role.id), nap = rNaps(key, m), need = rNeed.has(k), nc = waiting ? 1 : rCopiesOf(m);
   const vis = rHold[k] ? Math.max(1, rHold[k] - 1) : nc;      // the badge and the line wait for the copy light, like the twin
   const s = m.status === "idle" || nap ? "queued" : m.status;
@@ -395,7 +395,7 @@ function rDesk(role, m, i, showTeam, proj = "") {
   if (vis > 1) { const cb = rel("span", "cbadge", "×" + vis); cb.title = vis + " copies of " + stripPet(role.mascot) + " at work"; nm.append(cb); }
   nm.append(st);
   const span = m.since ? shortSpan(rMins(m.since)) : "";
-  const line = stale ? "Lost contact · 45+ min" : waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
+  const line = stale ? "Lost contact" : waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
   const task = rel("div", "plate-task", line); task.title = stale ? STALE : m.task || m.line || "";
   // Name, designation, model + effort chips, status: the same four lines on every plate so the rows line up.
   const px = { ...role, ...m }, ttl = rel("div", "plate-title", rTitle(px) || "Crew"); ttl.title = rTitleFull(px);
@@ -856,6 +856,7 @@ function rMembersFor(s, p) {
     }
     const own = mine.filter((x) => x.role === m.id), t = own[0];
     if (t && !m.stale) return { ...m, status: "working", line: t.text + (own.length > 1 ? ` (+${own.length - 1} more)` : ""), task: t.text, since: t.startedAt, project: t.project };
+    if (m.status === "working" && !m.stale && (rm || !m.project || m.project === p)) return m;   // the server says working (copies running) though no task is bound: trust it
     return m.status === "working" ? { ...m, status: "idle", line: "Idle", since: undefined, project: undefined } : m;
   });
 }
@@ -1123,6 +1124,7 @@ function rPlace(w, x, y) { w.style.transform = `translate3d(${Math.round(x)}px, 
 function rTick(ts) {
   const dt = Math.min(64, ts - (rPrev || ts)); rPrev = ts;
   for (const m of [...rMovers]) {
+    if (!m.w.isConnected) { rMovers.delete(m); m.res(); continue; }   // the Animation toggle cleared the walkers
     m.t += dt;
     const left = m.L - m.dist, k = Math.min(1, Math.max(.25, m.t / 120), Math.max(.25, left / (m.speed * .12)));   // ease in and out over 120 ms
     m.dist = Math.min(m.L, m.dist + (m.speed * k * dt) / 1000);
@@ -1156,6 +1158,7 @@ function rWalker(roleId, item, at) {
 // A trip: normally along the corridors. Over about 7 s even at 1.6x, the walker puts on a Bamboo-copter,
 // lifts off, flies over the hallway in a gentle arc at full size, lands near the destination and walks the last step.
 async function rTrip(w, a, b, spine, from, to) {
+  if (!rMotion()) return;                                     // Animation is off: nothing flies
   const pts = rRoute(a, b, spine, from, to);
   // Hook for per-character travel (travel.js): it may take over the whole trip by returning a Promise; undefined means "not mine", so the default walk runs.
   if (typeof window.crewTravel === "function") {
@@ -1251,8 +1254,9 @@ function rReveal(role, p, pop) {
 }
 async function rClone({ role, p, n, k, text }) {
   const g = rGeo(), tgt = rDeskEl(role, p), mgr = rDeskEl(MGR, p), layer = RSVG("r-walkers"), made = [];
-  if (!tgt) return;
-  for (let t = 0; mgr && rAway.has(rK(MGR, p)) && t < 9000; t += 250) await rSleep(250);   // Doraemon is out on a walk: let him sit down first, so the pocket gadget comes from his desk
+  if (!tgt || !rMotion()) return;
+  for (let t = 0; mgr && rAway.has(rK(MGR, p)) && t < 1200 && rMotion(); t += 200) await rSleep(200);   // wait a moment only; if he is still out, the copy light comes from the target's own desk
+  if (!rMotion()) return;   // Doraemon is out on a walk: let him sit down first, so the pocket gadget comes from his desk
   const put = (el, x, y) => { const pos = rel("div", "cl-pos"); pos.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`; pos.style.zIndex = 1000; pos.append(el); layer.append(pos); made.push(pos); return pos; };
   const b = rAccess(tgt, g), to = [b.seat[0], b.seat[1] - 82];       // the beam runs above the heads, the flash lands on the twin
   const mp = mgr && mgr !== tgt && !rAway.has(rK(MGR, p)) ? rAccess(mgr, g) : null;
@@ -1356,7 +1360,18 @@ addEventListener("keydown", (e) => { if (e.key === "Escape") rHideCard(); });
 addEventListener("click", () => rHideCard());
 addEventListener("scroll", () => rHideCard(), { passive: true });
 
-$("anim").onclick = () => { const on = rMotion(); rPut("crewMotion", on ? "off" : "on"); rSetMotion(on ? "off" : "on"); if (on) { RSVG("r-walkers").replaceChildren(); } };
+$("anim").onclick = () => { const on = rMotion(); rPut("crewMotion", on ? "off" : "on"); rSetMotion(on ? "off" : "on"); if (on) rStopAll(); };
+// Animation off: cancel queued and pending trips and the copy-light scene, clear the walkers, seat everyone, show the real copies at once.
+function rStopAll() {
+  for (const j of rWalkQ.splice(0)) clearTimeout(j.timer);
+  const pend = [...rPending]; rPending.clear(); rAway.clear();
+  RSVG("r-walkers").replaceChildren();
+  for (const k of Object.keys(rHold)) delete rHold[k];
+  for (const k of pend) { const d = document.querySelector(`#r-rooms .desk[data-k="${CSS.escape(k)}"]`); if (d) rRefreshDesk(d.dataset.id, d.dataset.p); }
+  document.querySelectorAll("#r-rooms .desk.away").forEach((d) => { d.classList.remove("away"); d.querySelectorAll(".pile").forEach((x) => { if (d.dataset.id === MGR) x.remove(); }); });
+  document.querySelectorAll("#r-rooms .desk .twin.pending").forEach((t) => { const d = t.closest(".desk"); if (d) rReveal(d.dataset.id, d.dataset.p, false); });
+  document.querySelectorAll("#r-rooms .desk .twin.pending").forEach((t) => t.classList.remove("pending"));
+}
 rSetMotion((() => { try { const v = localStorage.getItem("crewMotion"); return v === "on" || v === "off" ? v : ""; } catch { return ""; } })());
 
 // ---- Theme: follows the device, the toggle overrides it for this viewer ----
