@@ -8,7 +8,7 @@
 ![Claude Code 2.1.295+](https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange)
 ![Node 24.2+](https://img.shields.io/badge/Node-24.2%2B-green)
 
-[Quick start](#quick-start) · [Commands](#slash-commands) · [The crew](#the-crew) · [How it works](#how-it-works) · [Limits](#limits) · [Learn more](#learn-more)
+[Quick start](#quick-start) · [Commands](#slash-commands) · [The crew](#the-crew) · [How it works](#how-it-works) · [Memory](#where-memory-lives) · [Limits](#limits)
 
 </div>
 
@@ -17,9 +17,15 @@
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/crew-room-dark.png">
     <img src="docs/images/crew-room-light.png" alt="The Crew Room tab of the board: a pixel-art office with a desk for each crew member, grouped into team rooms, with counts for Working and Queued at the top and the Active and Queued task panels. The screenshot shows demo data." width="900">
   </picture>
-  <br>
-  <sub>Crew Room with demo data</sub>
 </p>
+
+## Why toon-crew?
+
+You talk to one manager; a whole crew does the work, and you can watch and trust it.
+
+| The crew | The Crew Room | The guard | Memory |
+|---|---|---|---|
+| A manager and 14 specialists in nine teams, one job each. | A local page: who is working, what is queued, what was handed back. | A hook that checks risky tool calls. It asks you or blocks. | Each agent keeps lessons for your project in your repo. |
 
 ## Quick start
 
@@ -33,13 +39,9 @@
 3. **Open the board.** Run `/toon-crew:board`. It prints `{"pid":..,"port":..,"startedAt":..}`; open `http://127.0.0.1:<port>`. Stop it with `/toon-crew:board stop`.
 4. **Ask for work.** Tell Doraemon what you need. On your first real request he writes `.claude/crew/project.md` for the project: read it before you commit it ([first run](docs/setup.md#what-happens-on-first-run)).
 
-## What you get
-
-| The crew | The Crew Room | The guard | Memory |
-|---|---|---|---|
-| A manager and 14 specialists in nine teams, one job each. | A local page: who is working, what is queued, what was handed back. | A hook that checks risky tool calls. It asks you or blocks. | Each agent keeps lessons for your project in your repo. |
-
 ## Slash commands
+
+Most of the time you just talk to Doraemon; these are the extras.
 
 | Command | What it does |
 |---|---|
@@ -49,36 +51,31 @@
 | `/toon-crew:forget [name or path]` | Lists registered projects, or removes one. You only. |
 | `/toon-crew:project-profile` | Writes or refreshes `.claude/crew/project.md`. Doraemon, or you. |
 | `/toon-crew:crew-lessons` | Collects `[crew]` lessons into one pull request on the crew repo. Repo owner only. |
-| `/toon-crew:security-backend` | Checklist for code that holds personal data, logins or secrets. Loaded by the backend and security roles. |
-| `/toon-crew:integrations` | Checklist for code that calls a third-party API. Loaded by the backend and security roles. |
+| `/toon-crew:security-backend`, `/toon-crew:integrations` | Checklists for code that holds personal data or calls a third-party API. Loaded by the backend and security roles. |
 
 ## The crew
 
-Tell Doraemon what you need and he picks, or call one directly as `toon-crew:<id>`. Models, colours and what each one does are in [docs/roster.md](docs/roster.md).
+Tell Doraemon what you need and he picks, or call one directly as `toon-crew:<id>`. Models, colours and jobs: [docs/roster.md](docs/roster.md).
 
-| Team | Members |
-|---|---|
-| Management | Doraemon (manager, main agent), Miguel Rivera |
-| Frontend | Nobita, Shinchan |
-| Backend | Kevin, Bob |
-| DevOps | Mike Wazowski, Sulley |
-| Security | Ninja Hattori |
-| QA | Joe Gardner, 22 |
-| Research | Dekisugi, Olaf |
-| Documentation | Shizuka |
-| Helpers | Stuart |
+| Team | Members | Team | Members |
+|---|---|---|---|
+| Management | Doraemon (manager, main agent), Miguel Rivera | Security | Ninja Hattori |
+| Frontend | Nobita, Shinchan | QA | Joe Gardner, 22 |
+| Backend | Kevin, Bob | Research | Dekisugi, Olaf |
+| DevOps | Mike Wazowski, Sulley | Documentation | Shizuka |
+| Helpers | Stuart | | |
 
 ## How it works
 
-You talk to Doraemon only. He plans, queues each piece on the board, briefs the right specialist and checks every hand-back. Only he commits; only the DevOps Team merges, after you approve the pull request. Green dotted lines are what the board records.
+You talk to Doraemon only. Green dotted lines are what the Crew Room board records.
 
 ```mermaid
 flowchart LR
-  OWN(["👤 You"]):::ext -->|"request"| DOR(["Doraemon<br/>plans waves, writes briefs"]):::mgmt
-  DOR -->|"brief per role"| TEAMS(["The crew<br/>specialists, one job each"]):::crew
-  TEAMS -->|"hand-back"| DOR
-  DOR -->|"checks, then commits<br/>and opens a PR"| PR["🔀 pull request"]:::ext
-  PR -->|"you approve"| MG(["DevOps Team merges<br/>(guard asks you)"]):::devops
+  OWN(["👤 You"]):::ext -->|"1 ask"| DOR(["Doraemon<br/>plans, writes briefs"]):::mgmt
+  DOR -->|"2 brief per role"| TEAMS(["The crew<br/>specialists, one job each"]):::crew
+  TEAMS -->|"3 hand-back"| DOR
+  DOR -->|"4 checks, commits,<br/>opens a PR"| PR["🔀 pull request"]:::ext
+  PR -->|"5 you approve"| MG(["DevOps Team merges<br/>(guard asks you)"]):::devops
   MG --> MAIN["main"]:::ext
   DOR -.->|"queue and assign"| BD["Crew Room board"]:::board
   TEAMS -.->|"start, stop, hand-back"| BD
@@ -91,7 +88,42 @@ flowchart LR
   linkStyle 6,7 stroke:#2da44e,stroke-width:2px
 ```
 
-**Guards.** A hook reads each risky tool call before it runs and answers allow, ask or block; if it cannot decide, it blocks. It is a seatbelt, not a sandbox: keep Claude Code's sandbox on for roles that have Bash. Every rule is in [docs/guards.md](docs/guards.md).
+1. **You ask.** Say what you need in plain words; you never brief anyone else.
+2. **Doraemon plans and briefs.** He queues each piece on the board and briefs the right specialist.
+3. **The crew builds and checks.** Each specialist does one job and hands back; Doraemon checks every hand-back.
+4. **Doraemon commits and opens the PR.** Only he commits. Only the DevOps Team merges, after you approve.
+
+> [!WARNING]
+> **Guards.** The guard is a seatbelt, not a sandbox. A hook reads each risky tool call and answers allow, ask or block (if it cannot decide, it blocks). Keep Claude Code's sandbox on for roles that have Bash. Every rule: [docs/guards.md](docs/guards.md).
+
+## Where memory lives
+
+The crew remembers per project, in plain files you can read, edit and commit.
+
+```mermaid
+flowchart LR
+  AG(["Doraemon and the crew<br/>after each hand-back"]):::mgmt -->|"lessons"| MEM[("Per-agent lessons<br/>.claude/agent-memory/<br/>toon-crew-name/<br/>MEMORY.md")]:::data
+  AG -->|"project facts"| PRJ[("Project profile<br/>.claude/crew/project.md")]:::data
+  HK(["Hooks"]):::board -->|"events, project list"| LOG[("Event log, registry<br/>plugin data folder")]:::board
+  MEM -->|"[crew] bullets only,<br/>owner-only lessons pass"| LES[("Shared crew lessons<br/>docs/lessons in this repo")]:::mgmt
+  SEC["Secrets and keys"]:::stop -.-x|"scan blocks"| MEM
+
+  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
+  classDef data fill:#9aa5b1,stroke:#57606a,color:#111,stroke-width:2px
+  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
+  classDef stop fill:#ff7b72,stroke:#cf222e,color:#111,stroke-width:2px
+  linkStyle 2 stroke:#2da44e,stroke-width:2px
+```
+
+| What | Where | Who sees it |
+|---|---|---|
+| Lessons for your project, one file per agent | `.claude/agent-memory/toon-crew-<name>/MEMORY.md` in your repo | The agent reads it first; your team sees it once you commit it |
+| Project facts: commands, docs per role, no-go areas | `.claude/crew/project.md` in your repo | Every agent reads it first; your team once you commit it |
+| Event log and project list | `events.jsonl`, `projects.json` in the plugin data folder | Only you, on this machine, through the board |
+| Shared crew lessons | `docs/lessons/` in this repo | The repo owner, who merges the pull request |
+
+> [!NOTE]
+> Memory is scanned for secrets. The guard blocks shell writes into agent-memory so the secret scan runs, and rejects Edit or Write calls whose text looks like a key, token, password or other personal data.
 
 ## Limits
 
@@ -101,8 +133,7 @@ flowchart LR
 - **Polling is off until you opt a project in** (GitHub through `gh`, one SSH deploy host).
 - **Projects never share memory.** Only `[crew]` rules move up, through a pull request the owner merges.
 - **Private and unlicensed.** It sends nothing by itself, and uninstalling deletes its data folder. Full list: [docs/faq.md](docs/faq.md).
-
-**Requirements:** Claude Code 2.1.295+, Node 24.2+ and git access to this private repo. Details: [docs/setup.md](docs/setup.md#requirements).
+- **Requirements:** Claude Code 2.1.295+, Node 24.2+ and git access to this private repo ([details](docs/setup.md#requirements)).
 
 ## Learn more
 
@@ -115,6 +146,5 @@ flowchart LR
 | [docs/guards.md](docs/guards.md) | Every guard rule and what it cannot see |
 | [docs/roster.md](docs/roster.md) | Every crew member: model, effort, colour |
 | [plugin/board/README.md](plugin/board/README.md) | Board API, data folders, task commands, `## Board` keys |
-| [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
-| [docs/cost-baseline.md](docs/cost-baseline.md) | What it costs to run the crew |
+| [CHANGELOG.md](CHANGELOG.md), [docs/cost-baseline.md](docs/cost-baseline.md) | What changed in each version; what the crew costs to run |
 | [plugin/evals/README.md](plugin/evals/README.md), [docs/planning/toon-crew-plan.md](docs/planning/toon-crew-plan.md) | The eval cases; why it was built this way |
