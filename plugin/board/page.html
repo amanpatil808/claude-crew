@@ -27,10 +27,13 @@
   </div>
 </header>
 
+<div class="offband" id="offband" hidden></div>
+
 <section class="need" id="need" aria-labelledby="need-h" hidden>
   <div class="wrap">
     <h2 id="need-h">Needs you</h2>
     <div id="need-items"></div>
+    <button class="need-more" id="need-more" type="button" hidden></button>
   </div>
 </section>
 
@@ -45,6 +48,14 @@
       </div>
     </section>
 
+    <section class="logsec" id="log" aria-labelledby="log-h" tabindex="-1">
+      <div class="sec-head">
+        <h2 id="log-h">Log &middot; what the crew did</h2>
+        <span class="meta">times in IST</span>
+      </div>
+      <div class="card logbox" id="logbox"><p class="empty">Waiting for the board&hellip;</p></div>
+    </section>
+
     <aside class="rail" aria-label="Cost, tasks and shipping">
       <section class="card cost" id="cost" data-state="loading" aria-labelledby="cost-h">
         <div class="cost-top">
@@ -53,7 +64,7 @@
           <div class="seg" role="group" aria-label="Period"><button type="button" aria-pressed="true" data-p="today">Today</button><button type="button" aria-pressed="false" data-p="7d">7 days</button></div>
         </div>
         <div class="cost-body" id="cost-body">
-          <div class="cost-hero"><span class="big num" id="c-total">&ndash;</span><span class="tok"><b class="num" id="c-tok">&ndash;</b> <span id="c-sub">loading</span><span id="c-runs"></span></span></div>
+          <div class="cost-hero" id="c-hero"><span class="big num" id="c-total">&ndash;</span><span class="tok"><b class="num" id="c-tok">&ndash;</b> <span id="c-sub">loading</span><span id="c-runs"></span></span></div>
           <ul class="cbars" id="c-bars" aria-label="Estimated cost by agent"></ul>
           <details id="c-details" hidden>
             <summary>Per agent and task</summary>
@@ -65,7 +76,7 @@
             </table>
             <table id="c-task-table" class="by-task">
               <caption id="c-task-cap">By task (estimated)</caption>
-              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">Tokens</th><th scope="col">&asymp; Cost</th></tr></thead>
+              <thead><tr><th scope="col">Task</th><th scope="col">Agent</th><th scope="col">&asymp; Cost</th></tr></thead>
               <tbody id="c-task-rows"></tbody>
             </table>
           </details>
@@ -86,18 +97,6 @@
     </aside>
   </div>
 
-  <section class="logsec" id="log" aria-labelledby="log-h" tabindex="-1">
-    <div class="sec-head">
-      <h2 id="log-h">Log &middot; what the crew did</h2>
-      <div class="fchips" role="group" aria-label="Log filter">
-        <button class="fchip" type="button" aria-pressed="true" data-f="all">All</button>
-        <button class="fchip" type="button" aria-pressed="false" data-f="back">Hand-backs</button>
-        <button class="fchip" type="button" aria-pressed="false" data-f="task">Tasks</button>
-      </div>
-      <span class="meta">times in IST</span>
-    </div>
-    <div class="card logbox" id="logbox"><p class="empty">Waiting for the board&hellip;</p></div>
-  </section>
 
   <footer class="pgfoot"><span>Local only &middot; view only &middot; times in IST</span><span id="foot-need"></span></footer>
 </main>

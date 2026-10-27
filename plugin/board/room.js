@@ -320,10 +320,14 @@ function handEl() {
 }
 
 // ---- Names: the data's display name; a short form where a desk plate is narrow ----
-const SHORT = { "miguel-rivera": "Miguel", "mike-wazowski": "Mike", "joe-gardner": "Joe", "ninja-hattori": "Ninja" };
+const SHORT = { "miguel-rivera": "Miguel", "mike-wazowski": "Mike", "joe-gardner": "Joe", "ninja-hattori": "Ninja", shinchan: "Shinchan" };
 const roleId = (x) => String(x || "").replace(/^.*:/, "");
-const nameOf = (id) => { const r = roleId(id); return rRoleName(r); };
-const plateName = (role) => SHORT[role.id] || role.mascot;
+// Pet names ("Shinchan + Shiro") show only in the hover card header; everywhere else the person's own name.
+const stripPet = (n) => String(n || "").replace(/\s*\+.*$/, "");
+const nameOf = (id) => { const r = roleId(id); return stripPet(rRoleName(r)); };
+const shortOf = (id) => { const r = roleId(id); return SHORT[r] || nameOf(r).split(" ")[0]; };
+const plateName = (role) => SHORT[role.id] || stripPet(role.mascot);
+const own = (o, k) => !!o && typeof o === "object" && Object.hasOwn(o, k) ? o[k] : undefined;   // keys come from the server: never walk the prototype
 
 let last = null, rProj = "", rPicked = false;     // rProj "" = all projects
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
@@ -341,14 +345,14 @@ function rDesk(role, m, i, showTeam, proj = "") {
   if (need) desk.dataset.need = "1";
   const hex = rColor(role); desk.style.setProperty("--c", hex); desk.style.setProperty("--c-edge", rLight(hex) ? "#7a5c00" : "var(--wall-ink)");
   if (rAway.has(k)) desk.classList.add("away");
-  desk.tabIndex = 0; desk.setAttribute("role", "button");
+  desk.tabIndex = 0; desk.setAttribute("role", "button"); desk.setAttribute("aria-describedby", "r-card");
   { const x = { ...role, ...m }, mod = rModelOf(x); desk.setAttribute("aria-label", `${role.mascot}, ${rTitle(x)}${rTeam(x) ? ", " + rTeam(x) : ""}: ${m.line}.${m.project && m.status === "working" ? " Project " + m.project + "." : ""}${mod ? " Model " + cap(mod) + "," : ""}${x.effort ? " " + x.effort + " effort." : ""}${need ? " Waiting for you." : ""} Show details`); }
   const pace = rel("span", "pace"), scale = rel("span", "scale"); scale.append(rAvatar(role.id, s, i)); pace.append(scale);
   const stage = rel("div", "stage"); stage.append(pace);
   if (s === "queued") stage.append(rel("span", "zzz", "z"));
   if (s === "working") { const g = rel("span", "gadget " + (R_GADGET[role.id] || "copter")); g.setAttribute("aria-hidden", "true"); stage.append(g); }
   if (s === "done") for (const c of ["spark a", "spark b"]) { const d = rel("span", c + " dorayaki"); d.setAttribute("aria-hidden", "true"); stage.append(d); }
-  if (need) { const h = handEl(); h.title = `${role.mascot} is waiting for you`; stage.append(h); }
+  if (need) { const h = handEl(); h.title = `${stripPet(role.mascot)} is waiting for you`; stage.append(h); }
   const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
   const seat = rel("div", "seat"); seat.append(stage, table, ...rTouches(key));
   // The plate keeps to a name and one status line: the full task text is in the Tasks card and the hover card.
@@ -356,7 +360,7 @@ function rDesk(role, m, i, showTeam, proj = "") {
   const sw = rel("i", "swatch"); sw.setAttribute("aria-hidden", "true");
   nm.append(sw, rel("b", null, plateName(role)), st);
   const span = m.since ? shortSpan(rMins(m.since)) : "";
-  const line = waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
+  const line = waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
   const task = rel("div", "plate-task", line); task.title = m.task || m.line || ""; plate.append(nm, task);
   desk.append(seat, plate);
   if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
@@ -393,10 +397,12 @@ function pick(p) {
 function renderProjects(s) {
   const names = rProjNames(s), T = tasksOf(s), n = (p) => T.active.filter((t) => !p || t.project === p).length;
   const nav = $("projects"); nav.hidden = !names.length;
-  if (!changed("projects", [names, rProj, names.map(n), n("")])) return;
+  const nd = (p) => needList(s).some((x) => !p || x.project === p);
+  if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd("")])) return;
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
-    b.append(document.createTextNode(text + " "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working`);
+    if (nd(p)) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
+    b.append(document.createTextNode(text + " "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
   nav.replaceChildren(...names.map((p) => chip(p, p)), chip("", "All"));
@@ -404,32 +410,51 @@ function renderProjects(s) {
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
 const NEED_ICON = { permission: "lock", input: "hand", idle: "hand", "agent-input": "hand", pr: "pr" };
-const NEED_HINT = { permission: "Answer the prompt in your {p} Claude Code session.", input: "Reply in your {p} Claude Code session.", idle: "Claude is waiting for your reply in {p}.", "agent-input": "An agent needs an answer in your {p} Claude Code session." };
+const NEED_HINT = { permission: "Answer the prompt in your {p} Claude Code session.", input: "Reply in your {p} Claude Code session.", idle: "Reply in your {p} Claude Code session.", "agent-input": "An agent needs an answer in your {p} Claude Code session." };
 // `code` spans in the text become <code>; everything else stays text.
 function richText(box, text) {
   String(text || "").split("`").forEach((part, i) => { if (!part) return; box.append(i % 2 ? rel("code", null, part) : document.createTextNode(part)); });
   return box;
 }
 const needList = (s) => (Array.isArray(s.needsYou) ? s.needsYou.filter((x) => x && typeof x === "object") : []);
+// The copy is built here from the kind, the role and the snapshot; the server's own text is only the fallback.
+function needCopy(x, s, who) {
+  if (x.kind === "pr") {
+    const pr = (own(s.snapshots, x.project)?.prs || []).find((p) => p.number === x.number);
+    return { text: x.number != null ? `PR #${x.number}${pr?.title ? ` "${pr.title}"` : ""} is ready for your review` : x.text, green: pr ? pr.checks === "pass" : /checks green/i.test(x.text || "") };
+  }
+  if (x.kind === "permission") return { text: `${who} is waiting for your permission` };
+  if (x.kind === "idle") return { text: `${who} is waiting for your reply` };
+  return { text: x.text };
+}
 function renderNeed(s) {
-  const list = needList(s), box = $("need"), now = Date.now();
-  box.hidden = !list.length;
-  if (!changed("need", [list, Math.floor(now / 60000)])) return;
-  if (!list.length) { $("need-items").replaceChildren(); return; }
+  const all = needList(s), list = rProj ? all.filter((x) => !x.project || x.project === rProj) : all, box = $("need"), now = Date.now();
+  box.hidden = !all.length;
+  if (!changed("need", [all, rProj, Math.floor(now / 60000), s.snapshots])) return;
+  const more = $("need-more");
+  if (!all.length) { $("need-items").replaceChildren(); more.hidden = true; return; }
   $("need-h").textContent = `Needs you · ${list.length}`;
   $("need-items").replaceChildren(...list.map((x) => {
     const row = rel("div", "nitem"); row.dataset.kind = x.kind;
-    const rid = roleId(x.role), body = rel("div"), nt = rel("div", "nt");
+    const rid = roleId(x.role), body = rel("div"), nt = rel("div", "nt"), who = rid ? nameOf(rid) : "Claude", cp = needCopy(x, s, who);
     row.append(icon(NEED_ICON[x.kind] || "hand", 2));
     if (rid) { const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(rid, "working", 0)); row.append(w); } else row.append(rel("span"));
-    richText(nt, x.text); body.append(nt);
-    const meta = [x.project, rid ? nameOf(rid) : "", x.since ? agoOf(x.since) : ""].filter(Boolean).join(" · ") + (x.stale ? " · may be old" : "");
+    richText(nt, cp.text); body.append(nt);
+    const meta = [x.project, cp.green && "checks green", x.since ? agoOf(x.since) : ""].filter(Boolean).join(" · ") + (x.stale ? " · may be old" : "");
     body.append(rel("div", "nm", meta)); row.append(body);
     if (x.kind === "pr") {
       const r = rel("div", "nr"); const a = link(x.ref, "Open on GitHub ↗"); if (!a.href) a.removeAttribute("target"); r.append(a); row.append(r);
     } else row.append(rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")));
     return row;
   }));
+  if (!list.length) $("need-items").replaceChildren(rel("p", "need-none", "Nothing is waiting in " + rProj + "."));
+  // Waiting somewhere else: one button that goes there (or to All when it is several projects).
+  const rest = all.filter((x) => !list.includes(x)), ps = [...new Set(rest.map((x) => x.project).filter(Boolean))];
+  more.hidden = !rest.length;
+  if (rest.length) {
+    const one = ps.length === 1;
+    more.textContent = "+" + rest.length + " waiting in " + (one ? ps[0] : "other projects") + " ▸"; more.onclick = () => pick(one ? ps[0] : "");
+  }
 }
 
 // ---- Floor header ----
@@ -445,16 +470,18 @@ const tokOf = (u) => u ? num(u.in) + num(u.out) + num(u.cw5m) + num(u.cw1h) + nu
 const fmtTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(n);
 const fmtUsd = (v) => v == null ? "–" : v > 0 && v < 0.005 ? "<$0.01" : v >= 100 ? "$" + Math.round(v) : "$" + v.toFixed(2);
 const fmtApprox = (v) => v == null ? "–" : "≈ " + fmtUsd(v);
+// A total that leaves out an unpriced model is a floor: it always carries the "+".
+const fmtFloor = (v, partial) => v == null ? "–" : fmtUsd(v) + (partial ? "+" : "");
 function costFor(s) {
-  const c = s.cost, w = c && typeof c === "object" ? c.windows?.[period] : null;
+  const c = s.cost, w = c && typeof c === "object" ? own(c.windows, period) : null;
   if (!w) return null;
   const names = rProj ? [rProj] : [...new Set([...Object.keys(w.rooms || {}), ...Object.keys(w.agents || {})])];
   const out = { usd: null, tok: 0, runs: null, partial: false, agents: [], tasks: [] };
   const agents = new Map();
   for (const p of names) {
-    const r = w.rooms?.[p];
+    const r = own(w.rooms, p);
     if (r) { out.tok += tokOf(r.usage); if (r.usd != null) out.usd = (out.usd ?? 0) + r.usd; if (r.partial || r.unpriced?.length) out.partial = true; }
-    for (const a of w.agents?.[p] || []) {
+    for (const a of own(w.agents, p) || []) {
       const k = a.role + (a.main ? "#main" : ""), cur = agents.get(k) || { role: a.role, main: !!a.main, runs: null, tok: 0, usd: null, partial: false };
       cur.tok += tokOf(a.usage); if (a.usd != null) cur.usd = (cur.usd ?? 0) + a.usd; if (a.runs != null) cur.runs = (cur.runs ?? 0) + a.runs;
       if (a.unpriced?.length) cur.partial = true;
@@ -464,12 +491,13 @@ function costFor(s) {
   out.agents = [...agents.values()].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || b.tok - a.tok);
   const runs = out.agents.filter((a) => a.runs != null); out.runs = runs.length ? runs.reduce((n, a) => n + a.runs, 0) : null;
   const T = tasksOf(s), byId = new Map([...T.active, ...T.queued, ...T.done].map((t) => [t.id, t]));
-  for (const [id, v] of Object.entries(w.tasks || {})) { const t = byId.get(id); if (t && inView(t)) out.tasks.push({ text: t.text, role: t.role, tok: tokOf(v.usage), usd: v.usd ?? null }); }
+  for (const [id, v] of Object.entries(w.tasks || {})) { const t = byId.get(id); if (t && inView(t)) out.tasks.push({ text: t.text, role: t.role, tok: tokOf(v.usage), usd: v.usd ?? null, partial: !!v.unpriced?.length }); }
   out.tasks.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
   return out;
 }
-const agentLabel = (a) => nameOf(a.role) + (a.main ? " (main)" : "");
+const agentLabel = (a) => shortOf(a.role) + (a.main ? " (main)" : "");
 const tr = (cells, th) => { const r = rel("tr"); cells.forEach((c, i) => r.append(rel(th && i === 0 ? "th" : "td", null, String(c)))); if (th) r.firstChild.scope = "row"; return r; };
+const sumUsd = (l) => l.some((a) => a.usd != null) ? l.reduce((n, a) => n + (a.usd ?? 0), 0) : null;
 function renderCost(s) {
   const card = $("cost"), c = costFor(s), tracked = !!c, body = $("cost-body");
   card.dataset.state = !last ? "loading" : tracked ? "ok" : "none";
@@ -477,34 +505,44 @@ function renderCost(s) {
   const prices = s.cost?.prices || {};
   if (!changed("cost", [c, period, rProj, prices, s.cost?.updatedAt ? Math.floor(Date.now() / 60000) : 0, !!last])) return;
   if (!tracked) {
+    $("c-hero").hidden = !!last;                       // untracked: no big dash, just the sentence
     $("c-total").textContent = "–"; $("c-tok").textContent = "–"; $("c-runs").textContent = "";
-    $("c-sub").textContent = last ? "not tracked yet" : "loading";
+    $("c-sub").textContent = "loading";
     $("c-bars").replaceChildren(); $("c-rows").replaceChildren(); $("c-task-rows").replaceChildren(); $("c-details").hidden = true;
-    $("c-note").textContent = last ? "Cost shows here once the board server records token usage. Nothing is hidden: it is not tracked yet, so there is no total, not a zero." : "Waiting for the board.";
+    $("c-note").textContent = last ? "Cost isn't tracked yet. It appears here once the board records token usage." : "Waiting for the board.";
     $("c-badge").hidden = true; return;
   }
+  $("c-hero").hidden = false;
   const label = period === "today" ? "today" : "last 7 days";
-  $("c-total").textContent = c.usd == null ? "–" : (c.partial ? "≈ " + fmtUsd(c.usd) + "+" : "≈ " + fmtUsd(c.usd));
+  $("c-total").textContent = c.usd == null ? "–" : "≈ " + fmtFloor(c.usd, c.partial);
   $("c-tok").textContent = fmtTok(c.tok); $("c-sub").textContent = "tokens"; $("c-runs").textContent = c.runs != null ? ` · ${c.runs} run${c.runs === 1 ? "" : "s"}` : "";
-  const top = c.agents.slice(0, 4), rest = c.agents.slice(4), max = Math.max(0.0001, ...c.agents.map((a) => a.usd ?? 0));
-  const rows = top.map((a) => ({ n: nameOf(a.role) + (a.main ? " (main)" : ""), v: a.usd })).concat(rest.length ? [{ n: "Others", v: rest.some((a) => a.usd != null) ? rest.reduce((n, a) => n + (a.usd ?? 0), 0) : null, note: `${rest.length} agent${rest.length === 1 ? "" : "s"}` }] : []);
-  $("c-bars").replaceChildren(...rows.map(({ n, v, note }) => {
-    const li = rel("li", "cbar" + (note ? " oth" : "")), trk = rel("span", "trk"), fill = rel("i");
-    if (v == null) fill.hidden = true; else fill.style.width = (v / max * 100) + "%";
-    trk.append(fill); li.append(rel("span", "who", n), trk, rel("span", "val", v == null ? "–" : fmtUsd(v)));
-    li.title = note ? `${n}: ${note}` : `${n}: ${fmtApprox(v)}`; return li;
+  // Bars: the main session first (its share of the total), then the crew against its own biggest member.
+  const main = c.agents.filter((a) => a.main), crew = c.agents.filter((a) => !a.main);
+  const mUsd = sumUsd(main), cUsd = sumUsd(crew), mPart = main.some((a) => a.partial), cPart = crew.some((a) => a.partial), all = (mUsd ?? 0) + (cUsd ?? 0);
+  const top = crew.slice(0, 4), rest = crew.slice(4), max = Math.max(0.0001, ...crew.map((a) => a.usd ?? 0));
+  const items = [];
+  if (main.length) items.push({ n: "Main session", full: "Doraemon's own session", v: mUsd, part: mPart, pct: mUsd != null && all > 0 ? mUsd / all * 100 : 0, cls: " me" });
+  if (crew.length) items.push({ head: "Crew ≈ " + fmtFloor(cUsd, cPart) });
+  for (const a of top) items.push({ n: shortOf(a.role), full: nameOf(a.role), v: a.usd, part: a.partial, pct: a.usd != null ? a.usd / max * 100 : 0, cls: "" });
+  if (rest.length) items.push({ n: "Others", full: `Others: ${rest.length} agent${rest.length === 1 ? "" : "s"}`, v: sumUsd(rest), part: rest.some((a) => a.partial), pct: sumUsd(rest) != null ? sumUsd(rest) / max * 100 : 0, cls: " oth" });
+  $("c-bars").replaceChildren(...items.map((it) => {
+    if (it.head) return rel("li", "chead", it.head);
+    const li = rel("li", "cbar" + it.cls), trk = rel("span", "trk"), fill = rel("i");
+    if (it.v == null) fill.hidden = true; else fill.style.width = Math.min(100, it.pct) + "%";
+    trk.append(fill); li.append(rel("span", "who", it.n), trk, rel("span", "val", fmtFloor(it.v, it.part)));
+    li.title = `${it.full}: ${it.v == null ? "–" : "≈ " + fmtFloor(it.v, it.part)}`; return li;
   }));
-  $("c-bars").hidden = !rows.length;
+  $("c-bars").hidden = !items.length;
   $("c-details").hidden = !c.agents.length && !c.tasks.length;
   $("c-cap").textContent = `By agent, ${label} (estimated)`;
-  $("c-rows").replaceChildren(...c.agents.map((a) => tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), a.usd == null ? "–" : fmtApprox(a.usd)], true)));
-  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), c.usd == null ? "–" : fmtApprox(c.usd)])]);
+  $("c-rows").replaceChildren(...c.agents.map((a) => { const r = tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), fmtFloor(a.usd, a.partial)], true); r.firstChild.title = nameOf(a.role); return r; }));
+  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), fmtFloor(c.usd, c.partial)])]);
   $("c-task-cap").textContent = `By task, ${label} (estimated)`; $("c-task-table").hidden = !c.tasks.length;
-  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, nameOf(t.role), fmtTok(t.tok), t.usd == null ? "–" : fmtApprox(t.usd)]); r.firstChild.className = "tt"; r.firstChild.title = t.text; return r; }));
+  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, shortOf(t.role), fmtFloor(t.usd, t.partial)]); r.firstChild.className = "tt"; r.children[1].title = nameOf(t.role); return r; }));
+  // One sentence about what the number is; a floor note and the age only when they apply. The server's price note is not repeated.
   const note = $("c-note"); note.replaceChildren();
-  note.append(document.createTextNode(`Token counts × list prices${prices.asOf ? ", prices as of " + prices.asOf : ""}. Not your bill.`));
+  note.append(document.createTextNode(`Estimated from token counts at Anthropic API list prices${prices.asOf ? " (" + prices.asOf + ")" : ""}. Not a bill: subscription plans aren't charged per token.`));
   if (c.partial) note.append(document.createTextNode(" Some models have no price, so the total is a floor."));
-  if (prices.note) note.append(document.createTextNode(" " + prices.note));
   if (prices.stale) { note.append(document.createTextNode(" "), rel("span", "stale-warn", "Prices may be out of date.")); }
   if (s.cost.updatedAt) note.append(document.createTextNode(` Updated ${agoOf(s.cost.updatedAt)}.`));
   const b = $("c-badge"); b.hidden = false; b.textContent = prices.stale ? "estimate · stale prices" : "estimate"; b.dataset.stale = prices.stale ? "1" : "";
@@ -519,7 +557,8 @@ function taskList(rows, kind, running) {
   if (!rows.length) ul.append(rel("li", "tk-empty", running ? (rProj ? `Nobody is working on ${rProj} right now.` : "Nobody is working right now.") : "Nothing queued."));
   shown.forEach((t, k) => {
     const li = rel("li"), iso = running ? t.startedAt : t.queuedAt, mins = iso ? rMins(iso) : 0;
-    const chip = rel("span", "pc " + (t.priority ? t.priority.toLowerCase() : "p-"), t.priority || ""); if (t.priority) chip.title = R_PRIO[t.priority];
+    const pr = Object.hasOwn(R_PRIO, t.priority) ? t.priority : "";
+    const chip = rel("span", "pc " + (pr ? pr.toLowerCase() : "pn"), pr || "–"); chip.title = pr ? R_PRIO[pr] : "No priority set";
     const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(t.role, running ? "working" : "queued", k));
     const tx = rel("div", "tx2"), nm = rel("b", null, nameOf(t.role)); if (!rProj) nm.append(rel("small", null, " · " + t.project));
     const text = rel("span", null, t.text); tx.title = t.text; tx.append(nm, text);
@@ -543,7 +582,7 @@ function renderTasks(s) {
 }
 
 // ---- Ship: the picked project's snapshot (deploy, CI, PRs, commits, app errors); All projects shows the focus project's. Rows expand in place. ----
-function snapOf(s) { const n = rProj || s.focus, sn = n && s.snapshots?.[n]; return sn ? { ...s, ...sn, name: n } : { ...s, name: n, ci: [], prs: [], commits: {}, deploy: null, errors: [], problems: {}, polledAt: {} }; }
+function snapOf(s) { const n = rProj || s.focus, sn = n && own(s.snapshots, n); return sn ? { ...s, ...sn, name: n } : { ...s, name: n, ci: [], prs: [], commits: {}, deploy: null, errors: [], problems: {}, polledAt: {} }; }
 const shipOpen = new Set();
 const tone = (c) => c === "success" || c === "ok" ? "ok" : c === "failure" || c === "failed" || c === "rolled-back" || c === "error" || c === "fatal" ? "bad" : "";
 function shipRow(key, ic, icTone, title, when, items, emptyText) {
@@ -597,40 +636,52 @@ function renderShip(s0) {
     const e = errs.filter((x) => x.level === "error" || x.level === "fatal").length, w = errs.length - e;
     out.push(shipRow("errors", errs.length ? "warn" : "check", errs.length ? (e ? "bad" : "") : "ok", errs.length ? `${e} error${e === 1 ? "" : "s"} · ${w} warning${w === 1 ? "" : "s"}` : "No app errors", "app log", errs.length ? errs.slice(0, 8).map((x) => li2(whenOf(x.at), txt(x.level + " ", tone(x.level) || "warn"), rel("b", null, x.service + ": "), txt(x.msg))) : null));
   } else out.push(shipRow("errors", "dot", "", "App errors", "not read yet", null));
+  if (out.every((el) => el.classList?.contains("none"))) {   // nothing read at all: one line, not five identical ones
+    const p = rel("p", "empty"); p.append(document.createTextNode("Nothing read yet. "), rel("code", null, "docs/setup.md"), document.createTextNode(" shows how to connect GitHub, CI and your deploy log."));
+    holder.replaceChildren(p); return;
+  }
   holder.replaceChildren(...out);
 }
 
-// ---- Log: what the crew did. Hand-backs, assignments and dropped tasks; commits, PRs, CI and deploys are in Ship. Rows are kept by event id and only the difference is applied. ----
-let logFilter = "all", logAll = false, logSeen = null;
+// ---- Log: one row per finished task (what was done, the hand-back summary, how long and what it cost) and per dropped task. Assignments, commits, PRs, CI and deploys are elsewhere. ----
+// Rows are kept by id and only the difference is applied.
+let logAll = false, logSeen = null;
 const logNodes = new Map();
-const quietType = (t) => !t || /^(general-purpose|agent)$/.test(roleId(t));
+const HAND_JOIN_MS = 90000;                        // a hand-back belongs to the task that finished within 90 s of it, same role and project
+const spanOf = (a, b) => { const m = Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 60000)); return m < 1 ? "<1 min" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60 ? m % 60 + " min" : ""}`.trim(); };
 function logEntries(s) {
-  const out = [];
-  for (const e of s.events || []) {
+  const out = [], ev = s.events || [], tc = own(s.cost?.windows, "7d")?.tasks;
+  const stops = ev.filter((e) => e.kind === "agent-stop" && e.agentType);
+  for (const t of tasksOf(s).done) {
+    if (!inView(t) || !t.doneAt) continue;
+    const near = stops.filter((e) => roleId(e.agentType) === t.role && e.project === t.project && Math.abs(Date.parse(e.ts) - Date.parse(t.doneAt)) <= HAND_JOIN_MS)
+      .sort((a, b) => Math.abs(Date.parse(a.ts) - Date.parse(t.doneAt)) - Math.abs(Date.parse(b.ts) - Date.parse(t.doneAt)))[0];
+    const sub = (near?.text.match(/\bfinished:\s*(.*)$/s)?.[1] || "").trim();
+    const cv = own(tc, t.id), meta = [t.startedAt ? spanOf(t.startedAt, t.doneAt) : "", cv ? "≈ " + fmtFloor(cv.usd ?? null, !!cv.unpriced?.length) : ""].filter(Boolean).join(" · ");
+    out.push({ id: "d:" + t.id, ts: t.doneAt, ic: "check", tone: "ok", title: `${nameOf(t.role)}: ${t.text}`, sub, meta });
+  }
+  for (const e of ev) {
     if (rProj && e.project && e.project !== rProj) continue;
-    if (e.kind === "agent-stop" && !quietType(e.agentType)) {
-      const sum = (e.text.match(/\bfinished:\s*(.*)$/s)?.[1] || "").trim(), who = nameOf(e.agentType);
-      out.push({ id: e.id, ts: e.ts, f: "back", ic: "check", tone: "ok", text: `${who} handed back${sum ? ": " + sum : "."}` });
-    } else if (e.kind === "assign" && e.to && !quietType(e.to)) out.push({ id: e.id, ts: e.ts, f: "task", ic: "arrow", tone: "", text: `${nameOf(e.from || MGR)} gave ${nameOf(e.to)}: ${e.text}` });
-    else if (e.kind === "task-drop") out.push({ id: e.id, ts: e.ts, f: "task", ic: "x", tone: "bad", text: `Task dropped: ${e.text}${e.role ? " (" + nameOf(e.role) + ")" : ""}` });
+    if (e.kind === "task-drop") out.push({ id: e.id, ts: e.ts, ic: "x", tone: "bad", title: `Task dropped: ${e.text}${e.role ? " (" + nameOf(e.role) + ")" : ""}`, sub: "", meta: "" });
   }
   return out;
 }
 function logRow(en, fresh) {
-  const r = rel("div", "lrow"); r.dataset.f = en.f; r.dataset.id = en.id; if (fresh) r.classList.add("fresh");
+  const r = rel("div", "lrow"); r.dataset.id = en.id; r.dataset.sig = JSON.stringify([en.title, en.sub, en.meta]); if (fresh) r.classList.add("fresh");
   const t = rel("time", null, hm(en.ts)); t.dateTime = en.ts; t.title = `${day(en.ts)} ${hm(en.ts)} IST`;
-  r.append(t, icon(en.ic, 1.5, en.tone), rel("div", "tx", en.text)); return r;
+  const tx = rel("div", "tx"); tx.append(rel("div", "lt", en.title)); if (en.sub) tx.append(rel("div", "ls", en.sub));
+  r.append(t, icon(en.ic, 1.5, en.tone), tx, rel("div", "lm num", en.meta)); return r;
 }
 const dayLabel = (iso) => { const d = day(iso); return d === day(new Date().toISOString()) ? "Today" : d === day(new Date(Date.now() - 86400000).toISOString()) ? "Yesterday" : dayName(iso); };
 function renderLog(s) {
-  const all = logEntries(s).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 150);
-  const list = all.filter((e) => logFilter === "all" || e.f === logFilter), cap = logAll ? list.length : 12, shown = list.slice(0, cap);
+  const list = logEntries(s).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 150), cap = logAll ? list.length : 12, shown = list.slice(0, cap);
   const box = $("logbox"), want = [];
   let lastDay = "";
   for (const e of shown) {
     const dl = dayLabel(e.ts);
     if (dl !== lastDay) { lastDay = dl; const k = "day:" + dl; let n = logNodes.get(k); if (!n) { n = rel("div", "day", dl); logNodes.set(k, n); } want.push([k, n]); }
-    let n = logNodes.get(e.id); if (!n) { n = logRow(e, logSeen && !logSeen.has(e.id)); logNodes.set(e.id, n); } want.push([e.id, n]);
+    let n = logNodes.get(e.id); if (n && n.dataset.sig !== JSON.stringify([e.title, e.sub, e.meta])) { n.remove(); n = null; }
+    if (!n) { n = logRow(e, logSeen && !logSeen.has(e.id)); logNodes.set(e.id, n); } want.push([e.id, n]);
   }
   const keep = new Set(want.map(([k]) => k));
   for (const [k, n] of logNodes) if (!keep.has(k)) { n.remove(); logNodes.delete(k); }
@@ -638,15 +689,14 @@ function renderLog(s) {
   while (ref && !(ref.classList && (ref.classList.contains("lrow") || ref.classList.contains("day")))) ref = ref.nextSibling;   // skip the empty-state / button nodes
   for (const [, n] of want) { if (n === ref) ref = ref.nextSibling; else box.insertBefore(n, ref); }
   const empty = box.querySelector(".empty"), more = box.querySelector(".more");
-  if (!want.length) { if (!empty) box.append(rel("p", "empty", all.length ? "Nothing matches this filter." : "Nothing logged yet.")); else empty.textContent = all.length ? "Nothing matches this filter." : "Nothing logged yet."; } else empty?.remove();
+  if (!want.length) { if (!empty) box.append(rel("p", "empty", "Nothing finished yet.")); } else empty?.remove();
   if (list.length > cap || (logAll && list.length > 12)) {
     const label = logAll ? "Show fewer ▾" : `Show ${list.length - cap} more ▸`;
     if (more) { more.textContent = label; more.setAttribute("aria-expanded", String(logAll)); }
     else { const b = rel("button", "more", label); b.type = "button"; b.setAttribute("aria-expanded", String(logAll)); b.onclick = () => { logAll = !logAll; renderLog(last); }; box.append(b); }
   } else more?.remove();
-  logSeen = new Set((s.events || []).map((e) => e.id));
+  logSeen = new Set(list.map((e) => e.id));
 }
-for (const b of document.querySelectorAll(".fchip")) b.onclick = () => { logFilter = b.dataset.f; for (const x of document.querySelectorAll(".fchip")) x.setAttribute("aria-pressed", String(x === b)); if (last) renderLog(last); };
 
 // ---- Header: connection, clock, title, favicon, announcer ----
 const announceEl = $("announce");
@@ -664,11 +714,24 @@ function renderHead(s) {
   const f = $("foot-need");
   f.textContent = Array.isArray(s.needsYou) ? "Needs you shows: permission asks, replies, PR reviews. Not yet: merge asks." : "Needs you: not tracked yet. It starts when the board server sends it.";
 }
+// Offline is told in two steps: nothing at all for the first failed poll, then a quiet pill; after two minutes a band says what to do.
+const pageStart = Date.now(); let lastOk = 0;
+const hmAt = (ms) => hm(new Date(ms).toISOString());
 function setConn(ok, s) {
-  const st = $("status"), next = ok ? "ok" : "lost";
-  if (ok) st.replaceChildren(rel("i"), document.createTextNode("Live · "), rel("span", "num", hm(s.now)), document.createTextNode(" IST"));
-  else st.replaceChildren(rel("i"), document.createTextNode("Offline · retrying"));
-  st.dataset.s = next; document.documentElement.dataset.conn = next;
+  const st = $("status"), band = $("offband");
+  if (ok) {
+    lastOk = Date.now(); band.hidden = true;
+    st.replaceChildren(rel("i"), document.createTextNode("Live · "), rel("span", "num", hm(s.now)), document.createTextNode(" IST"));
+    st.dataset.s = "ok";
+  } else {
+    if (fails < 2) return;                                   // one miss is just a slow poll
+    const base = lastOk || pageStart;
+    st.replaceChildren(document.createTextNode("◐ " + (lastOk ? "Last update " + hmAt(lastOk) : "No update yet") + " · retrying")); st.dataset.s = "lost";
+    if (Date.now() - base >= 120000) {
+      band.replaceChildren(); richText(band, `The board stopped updating at ${hmAt(base)}. It may have been stopped. Run \`/toon-crew:board status\` to check.`); band.hidden = false;
+    }
+  }
+  const next = ok ? "ok" : "lost"; document.documentElement.dataset.conn = next;
   if (conn && conn !== next) announce(ok ? "Board connection is back." : "Board connection lost. Showing the last data.");
   conn = next;
 }
@@ -689,7 +752,7 @@ for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { pe
 // else room.members filtered by project. Desks follow the tasks of that project (a role with an active task there is working).
 const inProj = (t, p) => !p || t.project === p;
 function rMembersFor(s, p) {
-  const T = tasksOf(s), rm = p && s.rooms && s.rooms[p], mine = T.active.filter((t) => inProj(t, p));
+  const T = tasksOf(s), rm = p && own(s.rooms, p), mine = T.active.filter((t) => inProj(t, p));
   return (rm?.members || s.room.members).map((m) => {
     if (m.id === MGR) {                              // the lead is the session itself, never a task
       if (rm || !p) return m;
@@ -706,10 +769,10 @@ const rOpen = {};                                    // project -> the viewer's 
 function rGroupsOf(s) {
   const names = rProjNames(s), T = tasksOf(s);
   if (!names.length) return [{ p: "", head: false, open: true, w: 0, q: 0 }];
-  const stat = (p) => ({ p, head: !rProj, w: T.active.filter((t) => t.project === p).length, q: T.queued.filter((t) => t.project === p).length, mb: !!(s.rooms && s.rooms[p]?.managerBusy) });
+  const stat = (p) => ({ p, head: !rProj, w: T.active.filter((t) => t.project === p).length, q: T.queued.filter((t) => t.project === p).length, mb: !!own(s.rooms, p)?.managerBusy, who: [...new Set(T.active.filter((t) => t.project === p).map((t) => t.role))] });
   const list = (rProj ? [rProj] : names).map(stat).map((g, i) => ({ ...g, i }));
   list.sort((a, b) => (b.w + (b.mb ? 1 : 0) - a.w - (a.mb ? 1 : 0)) || b.q - a.q || a.i - b.i);
-  for (const g of list) g.open = !g.head || (g.p in rOpen ? rOpen[g.p] : g.w > 0 || g.mb);
+  list.forEach((g, k) => { g.open = !g.head || (g.p in rOpen ? rOpen[g.p] : k === 0); });   // in All only the busiest floor opens by itself
   return list;
 }
 let rSig = "", rFeedSeen = null, rState = null, rShown = [];   // rShown: projects whose room is on screen
@@ -717,10 +780,10 @@ const rMemOf = (id, p) => rState?.byProj?.[p || ""]?.find((x) => x.id === id) ||
 function renderRoom(s) {
   if (!s.room) return;
   const groups = rGroupsOf(s), byProj = Object.fromEntries(groups.map((g) => [g.p, rMembersFor(s, g.p)]));
-  const r = { ...s.room, members: byProj[groups[0].p], byProj, groups, mgrOn: Object.fromEntries(groups.map((g) => [g.p, g.p && s.rooms?.[g.p] ? !!s.rooms[g.p].managerActive : !!s.room.managerActive])) }, T = tasksOf(s);
+  const r = { ...s.room, members: byProj[groups[0].p], byProj, groups, mgrOn: Object.fromEntries(groups.map((g) => [g.p, g.p && own(s.rooms, g.p) ? !!own(s.rooms, g.p).managerActive : !!s.room.managerActive])) }, T = tasksOf(s);
   rShown = groups.filter((g) => g.open).map((g) => g.p);
   // Rooms: only rebuilt when something changed, so the pop-in and pacing do not restart every poll.
-  const sig = JSON.stringify([r.roles, rProj, groups.map((g) => [g.p, g.head, g.open, g.w, g.q]), groups.map((g) => byProj[g.p].map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])), T.active.map((t) => [t.id, t.project]), [...rNeed]]);
+  const sig = JSON.stringify([r.roles, rProj, groups.map((g) => [g.p, g.head, g.open, g.w, g.q, g.who]), groups.map((g) => byProj[g.p].map((m) => [m.id, m.status, m.line, m.ref, m.project, m.team, m.title, rNaps(rKeyOf(m.id), m)])), T.active.map((t) => [t.id, t.project]), [...rNeed]]);
   if (sig !== rSig) {
     rSig = sig;
     const retired = new Set(Object.keys(R_RETIRED_KIND));
@@ -751,7 +814,14 @@ function renderRoom(s) {
       if (g.head) {
         const h = rel("button", "pg-head"); h.type = "button"; h.setAttribute("aria-expanded", String(g.open));
         const chev = rel("span", "pg-chev", g.open ? "\u25be" : "\u25b8"); chev.setAttribute("aria-hidden", "true");
-        h.append(chev, rel("b", "pg-name", g.p), rel("span", "pg-n", `${g.w} working \u00b7 ${g.q} queued`));
+        h.append(chev, rel("b", "pg-name", g.p));
+        if (!g.open && g.who.length) {                       // a closed floor still shows who is at work
+          const row = rel("span", "pg-who"); row.setAttribute("aria-hidden", "true");
+          g.who.slice(0, 6).forEach((id, k) => { const w = rel("span", "av-w"); w.append(rMini(id, "working", k)); row.append(w); });
+          if (g.who.length > 6) row.append(rel("span", "pg-more", "+" + (g.who.length - 6)));
+          h.append(row);
+        }
+        h.append(rel("span", "pg-n", `${g.w} working \u00b7 ${g.q} queued`));
         h.setAttribute("aria-label", `${g.p}: ${g.w} working, ${g.q} queued. ${g.open ? "Collapse" : "Expand"}`);
         h.onclick = () => { rOpen[g.p] = !g.open; rSig = ""; if (last) renderRoom(last); };
         sec.append(h);
@@ -921,7 +991,7 @@ function rAccess(el, g) {
   const L = t.left - g.hb.left, R = t.right - g.hb.left, top = t.top - g.hb.top, dx = (L + R) / 2;
   const tx = tb.left - g.hb.left + tb.width / 2, ty = tb.top - g.hb.top + tb.height;     // feet on the table line
   const side = R - tx >= tx - L ? 1 : -1, sx = Math.max(L + 34, Math.min(R - 34, tx + side * CHAR_W));   // stand one body width aside, where there is more room
-  const lane = top + 46, cy = top - g.corr / 2;
+  const pl = el.querySelector(".plate")?.getBoundingClientRect(), lane = pl ? pl.bottom - g.hb.top + 8 : top + 46, cy = top - g.corr / 2;
   return { room: el.closest(".team"), seat: [tx, ty], stand: [sx, ty], side, sx, lane, dx, cy, out: [[tx, ty], [sx, ty], [sx, lane], [dx, lane], [dx, cy]] };
 }
 const rDedupe = (p) => p.filter((q, i) => !i || Math.hypot(q[0] - p[i - 1][0], q[1] - p[i - 1][1]) > 1);
@@ -1068,9 +1138,17 @@ function rStaticBubble(desk, text) { if (!text) return; const b = rel("div", "sb
 let rCardId = null, rPinned = null;
 const rMins = (iso) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000));
 const rSpan = (m) => m < 1 ? "under a minute" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
-function rCardEl() { let c = $("r-card"); if (!c) { c = rel("div", "rcard"); c.id = "r-card"; c.hidden = true; c.setAttribute("role", "status"); RSVG("view-room").append(c); } return c; }
+function rCardEl() { let c = $("r-card"); if (!c) { c = rel("div", "rcard"); c.id = "r-card"; c.hidden = true; RSVG("view-room").append(c); } return c; }
 function rHideCard() { rCardId = rPinned = null; rCardEl().hidden = true; }
 function rRefreshCard() { if (!rCardId) return; const at = rCardId.indexOf("@"), id = rCardId.slice(0, at), p = rCardId.slice(at + 1); if (rDeskEl(id, p)) rShowCard(id, p); else rHideCard(); }
+// Today's spend for one person in one room: "≈ $0.42 today · 1 run". Empty when the board has no figure for them.
+function rCostLine(id, p) {
+  const w = own(last?.cost?.windows, "today"); if (!w) return "";
+  const rows = (p ? [own(w.agents, p)] : Object.values(w.agents || {})).flat().filter((a) => a && a.role === id);
+  if (!rows.length) return "";
+  const usd = sumUsd(rows), runs = rows.some((a) => a.runs != null) ? rows.reduce((n, a) => n + (a.runs ?? 0), 0) : null;
+  return `${usd == null ? "–" : "≈ " + fmtFloor(usd, rows.some((a) => a.unpriced?.length))} today${runs != null ? ` · ${runs} run${runs === 1 ? "" : "s"}` : ""}`;
+}
 function rShowCard(id, p = "") {
   const role = rState?.roles.find((x) => x.id === id), m = rMemOf(id, p), desk = rDeskEl(id, p); if (!role || !m || !desk) return;
   rCardId = rK(id, p);
@@ -1078,12 +1156,19 @@ function rShowCard(id, p = "") {
   const hand = m.lastHandback && typeof m.lastHandback === "object" ? m.lastHandback.text : m.lastHandback;   // may be ""
   const state = s === "working" ? (m.since ? `Working for ${rSpan(rMins(m.since))}` : "Working now") : s === "done" ? (m.since ? `Done ${rSpan(rMins(m.since))} ago` : "Done") : "Idle";
   const head = rel("div", "rc-head"), who = rel("div", "rc-who");
-  who.append(rel("b", null, role.mascot), rel("span", null, [rTitleFull({ ...role, ...m }), rTeam({ ...role, ...m })].filter(Boolean).join(" \u00b7 ")));
+  who.append(rel("b", null, role.mascot), rel("span", null, [rTitleFull({ ...role, ...m }), rTeam({ ...role, ...m })].filter(Boolean).join(" · ")));   // the full name, pet and all, lives only here
   head.append(rMini(id, s, 0), who);
-  const x = { ...role, ...m }, rows = [head, rel("div", "rc-state", state), rel("p", "rc-task", m.task || m.line), rel("p", "rc-model", rModelLine(x))];
+  const x = { ...role, ...m }, rows = [head, rel("div", "rc-state", state)];
+  const nMgr = id === MGR && s === "working" ? tasksOf(last).active.filter((t) => inProj(t, p)).length : 0;
+  const task = id === MGR && nMgr ? `Managing ${nMgr} task${nMgr === 1 ? "" : "s"}` : m.task || m.line;
+  if (task && task !== state) rows.push(rel("p", "rc-task", task));
+  rows.push(rel("p", "rc-model", rModelLine(x)));
+  const nd = needList(last || {}).find((n) => roleId(n.role) === id && (!n.project || n.project === p));
+  if (nd) rows.push(rel("p", "rc-need", nd.kind === "permission" ? "Waiting for your permission" : nd.kind === "idle" ? "Waiting for your reply" : "Waiting for you"));
+  const cl = rCostLine(id, p); if (cl) rows.push(rel("p", "rc-cost num", cl));
   if (hand && hand !== m.line) rows.push(rel("p", "rc-hand", "Last hand-back: " + hand));
   else if (s === "done" && m.line) rows.push(rel("p", "rc-hand", "Handed back: " + m.line));
-  if (p) rows.push(rel("p", "rc-ref", "Project: " + p));
+  if (p && !rProj) rows.push(rel("p", "rc-ref", "Project: " + p));    // only in All: in one project the page already says which
   if (m.ref) rows.push(rel("p", "rc-ref", m.ref));
   c.replaceChildren(...rows); c.hidden = false;
   const b = desk.getBoundingClientRect(), w = c.offsetWidth, h = c.offsetHeight;
@@ -1128,7 +1213,7 @@ async function tick() {
     if (!r.ok) throw new Error(String(r.status));
     last = await r.json(); fails = 0;
     setConn(true, last); paintAll();
-  } catch (e) { fails++; setConn(false); if (!last) $("status").dataset.s = "lost"; }
+  } catch (e) { fails++; setConn(false); }
   finally { polling = false; schedule(); }
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(pollT); else tick(); });
