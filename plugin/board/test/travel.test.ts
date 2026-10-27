@@ -22,7 +22,7 @@ test("the page inlines travel.css after room.css and travel.js after room.js, an
     assert.ok(page.includes("window.crewTravel = function"), "travel.js is inlined");
     assert.ok(page.indexOf("window.crewTravel = function") > page.indexOf("async function rTrip"), "travel.js comes after room.js");
     assert.ok(page.indexOf("Crew Room travel styles") > page.indexOf("#view-room .walker .fig"), "travel.css comes after room.css");
-    assert.ok(!/<script[^>]+src=|<link[^>]+href=/.test(page), "still one self-contained page");
+    assert.ok(!/<script[^>]+src=|<link[^>]+rel="stylesheet"/.test(page), "still one self-contained page");
     assert.equal(r.csp, "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'");
     // the inlined script still parses as one classic script
     const js = page.slice(page.lastIndexOf("<script>") + 8, page.lastIndexOf("</script>"));

@@ -9,10 +9,12 @@
   const side = (dir) => (dir === "left" ? -1 : 1);
 
   // ---- one-shot effect at a feet point, in the walkers layer (the Animation toggle clears it with the walkers) ----
-  const BUDGET = 24;
+  const BUDGET = 24, live = new Set();   // live: walkers on a trip now
   function tFx(cls, at, ms, o = {}) {
     const layer = W(); if (!layer) return null;
-    if (o.extra && layer.querySelectorAll(".tfx").length >= BUDGET) return null;
+    if (![...live].some((w) => w.isConnected)) return null;   // the Animation toggle cleared the walkers mid-trip: no new effects
+    const n = layer.querySelectorAll(".tfx").length;
+    if (n >= BUDGET || (o.extra && n >= BUDGET - 4)) return null;   // trail and burst bits leave headroom, so a cover (puff, door, flare) always draws
     const e = rel("i", "tfx " + cls); e.setAttribute("aria-hidden", "true");
     for (let i = 0; i < (o.kids || 0); i++) e.append(rel("b"));
     for (const [k, v] of Object.entries(o.vars || {})) e.style.setProperty(k, v);
@@ -242,10 +244,11 @@
     const near = !st.always && L <= NEAR;
     const face = toKind === "stand" ? (b && b.side > 0 ? "left" : "right") : "down";
     const st2 = { ...st, face };
-    w._p = f; w.dataset.tv = st.id;
+    w._p = f; w.dataset.tv = st.id; live.add(w);
     return (async () => {
       try { await (near ? tNear : tCut)(w, path, st2, dir); }
       finally {
+        live.delete(w);
         w.style.visibility = ""; w.style.setProperty("--lift", "0px"); delete w.dataset.tv;
         const d = w.querySelector(".dog"); if (d) { d.style.visibility = ""; d.classList.remove("ball"); }
         // the same walker makes the way back: leave it clean
