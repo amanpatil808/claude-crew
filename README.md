@@ -54,6 +54,12 @@ flowchart LR
 2. **Doraemon plans,** queues each piece on the board and briefs the right specialist.
 3. **The crew does the work,** and Doraemon checks every result.
 4. **Doraemon opens a pull request.** The DevOps Team merges it after you approve.
+
+**Parallel work, kept cheap:**
+- **Waves of 2-4 crew at once.** More in parallel costs many times the tokens.
+- **A second copy of one role.** When a role has more work, Doraemon starts a twin (two Shinchans, say) on separate files, so they never overwrite each other.
+- **The whole plan is queued up front.** The board's Queued list shows what is coming; each copy takes the oldest queued task for its role.
+- **On the Crew Room (being built):** a "Crew 3 / 4" meter shows how many are running. When Doraemon starts a copy, he uses his copy-light gadget and a twin appears at the desk with a ×2 badge.
 ## Memory
 Plain files, per project. The guard blocks any lesson that looks like a key, token or password.
 
