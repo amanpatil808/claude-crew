@@ -110,7 +110,7 @@ footer { color: var(--fg-3); font-size: 13px; margin-top: 18px; overflow-wrap: a
       <div id="ops"></div>
     </section>
     <section class="span" aria-labelledby="h-err">
-      <h2 id="h-err">App errors <small id="err-at">api and worker, redacted</small></h2>
+      <h2 id="h-err">App errors <small id="err-at">your configured containers, redacted</small></h2>
       <div id="errors"></div>
     </section>
   </div>
@@ -231,14 +231,14 @@ function renderOps(s0) {
 function renderErrors(s0) {
   const s = snapOf(s0), out = [];
   if (s.problems?.box) out.push(el("p", "problem", "Could not reach the box; showing the last errors read."));
-  if (!s.errors.length) out.push(el("p", "empty", "No warnings or errors in the last 500 log lines of api and worker."));
+  if (!s.errors.length) out.push(el("p", "empty", "No warnings or errors in the last 500 log lines of your configured containers."));
   else {
     const ul = el("ul", "list");
     for (const e of s.errors.slice(0, 60)) { const li = el("li"), txt = el("div", "txt"); txt.append(badge(e.level, tone(e.level)), el("b", null, `${e.service} `), document.createTextNode(e.msg)); const t = el("time", null, hm(e.at)); if (e.at) t.title = `${day(e.at)} ${hm(e.at)} IST`; li.append(t, txt); ul.append(li); }
     out.push(ul);
   }
   $("errors").replaceChildren(...out);
-  $("err-at").textContent = `api and worker, redacted${s.polledAt?.box ? ` · read ${ago(s.polledAt.box)}` : ""}`;
+  $("err-at").textContent = `your configured containers, redacted${s.polledAt?.box ? ` · read ${ago(s.polledAt.box)}` : ""}`;
 }
 
 // The picked project's own snapshot (deploy, CI, PRs, commits, errors); "all projects" shows the focus project's.

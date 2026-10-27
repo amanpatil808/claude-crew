@@ -62,9 +62,20 @@ if (hooksFile) {
       if (!h.async && (typeof h.timeout !== 'number' || h.timeout <= 0)) fail(`hooks.json: ${ev} hook needs a timeout in seconds`);
       const m = h.command.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/);
       if (!h.command.includes('${CLAUDE_PLUGIN_ROOT}')) fail(`hooks.json: ${ev} command must use \${CLAUDE_PLUGIN_ROOT}`);
-      // board/hook.ts is owned by the board work and may not exist yet on a partial branch.
-      else if (m && !m[1].startsWith('board/') && !fs.existsSync(path.join(root, m[1]))) fail(`hooks.json: ${ev} script not found (${m[1]})`);
+      else if (m && !fs.existsSync(path.join(root, m[1]))) fail(`hooks.json: ${ev} script not found (${m[1]})`);
     }
+  }
+}
+
+// One version, three places: plugin.json, the README badge and the top CHANGELOG heading.
+if (plugin?.version) {
+  const read = (f) => { try { return fs.readFileSync(path.join(repo, f), 'utf8'); } catch (e) { fail(`${f}: ${e.message}`); return ''; } };
+  const badge = read('README.md').match(/img\.shields\.io\/badge\/version-([^-\s"')]+)-blue/)?.[1];
+  const top = read('CHANGELOG.md').match(/^## (\S+)/m)?.[1];
+  if (!badge) fail('README.md: no version badge (img.shields.io/badge/version-<semver>-blue)');
+  if (!top) fail('CHANGELOG.md: no "## <version>" heading');
+  if (badge && top && (badge !== plugin.version || top !== plugin.version)) {
+    fail(`version mismatch: plugin.json=${plugin.version}, README badge=${badge}, CHANGELOG top heading=${top}`);
   }
 }
 

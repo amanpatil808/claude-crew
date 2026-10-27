@@ -1,8 +1,8 @@
 // The crew as the board knows it: display name, job and desk order per agent file. Model, effort, colour,
-// turns and the "(v0.2, training)" tag come from the agent file's frontmatter, never from here.
+// turns and any version or stage tag come from the agent file's frontmatter, never from here.
 export interface RosterEntry { id: string; mascot: string; name: string; show: string; role: string; team: string; title: string; order: number; color: string }
 
-// Source of truth: docs/planning/cast-v2.md. `mascot` and `name` are the same text; `role` repeats `title` for older readers.
+// The agent files under plugin/agents are the source of truth. `mascot` and `name` are the same text; `role` repeats `title` for older readers.
 const cast = (order: number, id: string, name: string, show: string, team: string, title: string, color: string): RosterEntry =>
   ({ id, mascot: name, name, show, role: title, team, title, order, color });
 

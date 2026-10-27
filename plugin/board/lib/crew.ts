@@ -50,7 +50,7 @@ export function crewFrom(events: BoardEvent[], roles: Map<string, Role>): CrewMe
   return [...byAgent.values()].sort((a, b) => (a.status === b.status ? (b.finishedAt ?? b.startedAt ?? "").localeCompare(a.finishedAt ?? a.startedAt ?? "") : a.status === "working" ? -1 : 1));
 }
 
-// The agent file is the single source of truth for model, effort, colour, turns and the "(v0.2, training)" tag.
+// The agent file is the single source of truth for model, effort, colour, turns and the optional version/stage tag.
 export interface AgentInfo { model?: string; effort?: string; color?: string; maxTurns?: number; version?: string; stage?: string }
 const MODELS = ["opus", "sonnet", "haiku", "fable"];
 const modelWord = (s: unknown) => MODELS.find((m) => String(s ?? "").toLowerCase().includes(m));

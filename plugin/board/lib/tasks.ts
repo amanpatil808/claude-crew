@@ -1,5 +1,4 @@
 // Board tasks (queued / active / done / dropped), derived from the event log: nothing else is stored.
-// Contract: docs/planning/board-v2-contract.md.
 import type { BoardEvent } from "./events.ts";
 import { loadRoles, roleFor, typesById, type Role } from "./crew.ts";
 import { isOverride, normalizeModel } from "./model.ts";
