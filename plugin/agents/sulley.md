@@ -1,6 +1,6 @@
 ---
 name: sulley
-description: SRE, DevOps Team: deploys, rollouts and rollbacks, backups and restores, monitoring and incidents, zero-data-loss upgrades; failure modes first, never deletes data. Not for CI, builds or the local stack: that is the DevOps Engineer (mike-wazowski). (v0.4)
+description: SRE, DevOps Team: deploys, rollouts and rollbacks, backups and restores, monitoring and incidents, zero-data-loss upgrades; failure modes first, never deletes data. Not for CI, builds or the local stack: that is the DevOps Engineer (mike-wazowski).
 model: sonnet
 effort: high
 color: purple

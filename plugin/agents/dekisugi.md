@@ -1,6 +1,6 @@
 ---
 name: dekisugi
-description: Research Lead, Research Team: product, UX and technical research before features or tool choices - competitors, user needs, published evidence, where each fact belongs; ranked recommendations, every source cited and dated. Leads olaf. Not for building: that is the Frontend or Backend Team. (v0.4)
+description: Research Lead, Research Team: product, UX and technical research before features or tool choices - competitors, user needs, published evidence, where each fact belongs; ranked recommendations, every source cited and dated. Leads olaf. Not for building: that is the Frontend or Backend Team.
 model: opus
 effort: high
 color: orange

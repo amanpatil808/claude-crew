@@ -1,6 +1,6 @@
 ---
 name: kevin
-description: Backend Lead, Backend Team: security-critical backend work - data models and migrations, auth and sessions, secrets, APIs, third-party integrations, guardrails and background jobs. Not for well-specified modules or routes: that is the Backend Developer (bob). (v0.4)
+description: Backend Lead, Backend Team: security-critical backend work - data models and migrations, auth and sessions, secrets, APIs, third-party integrations, guardrails and background jobs. Not for well-specified modules or routes: that is the Backend Developer (bob).
 model: opus
 effort: high
 color: yellow

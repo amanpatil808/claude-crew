@@ -1,6 +1,6 @@
 ---
 name: nobita
-description: UX & Design Lead, Frontend Team: reviews real user journeys before release (ranked findings with exact fixes; copy, accessibility, phone and desktop, light and dark) and sets design direction. Reviews only. Not for building screens: that is the Frontend Developer (shinchan). (v0.4)
+description: UX & Design Lead, Frontend Team: reviews real user journeys before release (ranked findings with exact fixes; copy, accessibility, phone and desktop, light and dark) and sets design direction. Reviews only. Not for building screens: that is the Frontend Developer (shinchan).
 model: opus
 effort: high
 color: yellow

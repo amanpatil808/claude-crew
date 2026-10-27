@@ -1,7 +1,7 @@
 # toon-crew evals
 
 21 small cases for `claude plugin eval` (format: [Plugin evals](https://code.claude.com/docs/en/plugin-evals), read
-2026-10-23). Each case comes from a real incident in `docs/lessons/2026-10-23-harvest.md` or a rule in an agent prompt,
+2026-10-23). Each case comes from a real incident in `docs/lessons/2026-10-23-crew-lessons.md` or a rule in an agent prompt,
 and runs against `fixtures/tiny-shop/`: a tiny Node repo with no dependencies, no network and no secrets.
 
 ## Run
@@ -88,7 +88,7 @@ evals/
 | hattori-proof-fails-before-fix | 1.00 | $0.93 |
 | cost-general-purpose-leak (run twice, without and with `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`) | 1.00 / 1.00 | $0.15 / $0.20 |
 
-These runs used the v0.3 names (tom, chip-and-dale, scooby-doo); the cases were renamed for cast v2 and not re-run. The other cases load but have not been run yet. Costs and findings are in `docs/cost-baseline.md`.
+These runs used the old (pre-0.2.0) names (tom, chip-and-dale, scooby-doo); the cases were renamed for cast v2 and not re-run. The other cases load but have not been run yet. Costs and findings are in `docs/cost-baseline.md`.
 
 ## Known limits
 
