@@ -6,11 +6,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildCost, type CostEvent } from "../lib/cost.ts";
-import { appendEvent, readEvents, type BoardEvent } from "../lib/events.ts";
+import { buildCost } from "../lib/cost.ts";
+import { appendEvent, readEvents, type BoardEvent, type UsageEvent, type UsageRow } from "../lib/events.ts";
 import { EVENTS_FILE } from "../lib/paths.ts";
 import { PRICES_AS_OF } from "../lib/prices.ts";
-import { readUsage, type UsageEvent, type UsageRow } from "../lib/usage.ts";
+import { readUsage } from "../lib/usage.ts";
 
 const M = 1_000_000;
 const NOW = Date.parse("2026-10-27T18:00:00Z");
@@ -18,16 +18,16 @@ const utcDay = (now: number) => now - (now % 86_400_000);   // fixed "today" so 
 
 let seq = 0;
 const row = (model: string, f: Partial<UsageRow> = {}): UsageRow => ({ model, speed: "standard", long: false, n: 1, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0, ...f });
-const usage = (ts: string, project: string, sid: string, agent: { id: string; type?: string } | null, rows: UsageRow[], partial = false): CostEvent => ({
+const usage = (ts: string, project: string, sid: string, agent: { id: string; type?: string } | null, rows: UsageRow[], partial = false): BoardEvent => ({
   id: `e-${Date.parse(ts)}-${(seq++).toString(16).padStart(6, "0")}`, ts, kind: "usage", text: "Usage update", project, sid,
   ...(agent ? { scope: "agent", agentId: agent.id, ...(agent.type ? { agentType: agent.type } : {}) } : { scope: "main" }),
   final: false, partial, rows,
 });
-const other = (ts: string, f: Partial<BoardEvent> & Pick<BoardEvent, "kind">): CostEvent => ({ id: `e-${Date.parse(ts)}-ffffff`, ts, text: "x", ...f });
+const other = (ts: string, f: Partial<BoardEvent> & Pick<BoardEvent, "kind">): BoardEvent => ({ id: `e-${Date.parse(ts)}-ffffff`, ts, text: "x", ...f });
 
 // shop: the manager across midnight, two Kevin runs (one only typed by its agent-start), a generic agent on an
 // unpriced model, and a future event. lab: an old partial main run and a Bob run inside the 7 days.
-const EVENTS: CostEvent[] = [
+const EVENTS: BoardEvent[] = [
   usage("2026-10-15T09:00:00Z", "lab", "s2", null, [row("claude-haiku-5-5", { in: M })], true),
   usage("2026-10-22T09:00:00Z", "lab", "s2", { id: "a-b", type: "toon-crew:bob" }, [row("claude-opus-5-5", { speed: "fast", in: M })]),
   usage("2026-10-26T23:00:00Z", "shop", "s1", null, [row("claude-opus-5-5", { n: 2, in: M })]),
@@ -119,18 +119,20 @@ test("an empty log gives empty rollups, not zeros for rooms that never ran", () 
 });
 
 test("rows from the log are re-checked: bad numbers become 0, rows without a model and events without a scope are skipped", () => {
-  const bad: CostEvent[] = [
+  // A hand-edited log: wrong types on purpose, so they go through a real file and readEvents, as they would.
+  const bad = [
     { ...usage("2026-10-27T09:00:00Z", "shop", "s3", null, []), rows: [{ model: "claude-opus-5-5", in: "1000000", out: -5, cr: M, n: 1.7 }, { in: 5 }, "x", null] },
     { ...usage("2026-10-27T09:00:00Z", "shop", "s4", null, [row("claude-opus-5-5", { in: M })]), scope: "weird" },
     { ...usage("2026-10-27T09:00:00Z", "shop", "s5", null, [row("claude-opus-5-5", { in: M })]), ts: "not a time" },
     { ...usage("2026-10-27T09:00:00Z", "shop", "s6", null, [row("claude-opus-5-5", { in: M })]), scope: "agent" },   // agent without an id
   ];
-  const r = buildCost(bad, NOW, { dayStart: utcDay }).rooms.shop;
+  const file = join(mkdtempSync(join(tmpdir(), "crew-cost-bad-")), "events.jsonl");
+  writeFileSync(file, bad.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  const r = buildCost(readEvents(file), NOW, { dayStart: utcDay }).rooms.shop;
   assert.deepEqual([r.usage.n, r.usage.in, r.usage.out, r.usage.cr, r.usd], [1, 0, 0, M, 0.2]);
 });
 
-// MERGE: drop this widening once lib/events.ts has the `usage` kind (contract C1).
-const append = (e: UsageEvent, at: string) => appendEvent(e as unknown as Omit<BoardEvent, "id" | "ts">, new Date(at));
+const append = (e: UsageEvent, at: string) => appendEvent(e, new Date(at));
 
 test("end to end: transcript -> readUsage -> appendEvent -> readEvents -> buildCost keeps every number", () => {
   rmSync(EVENTS_FILE, { force: true });

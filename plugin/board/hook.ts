@@ -1,9 +1,10 @@
-// Claude Code hook entry: reads the hook's JSON from stdin and appends at most one event.
+// Claude Code hook entry: reads the hook's JSON from stdin and appends at most one event, plus one usage
+// event at Stop / SubagentStop / SessionEnd.
 // It always exits 0 and prints nothing, so a logging failure can never block or change a session.
 import { existsSync, readFileSync } from "node:fs";
 import { writePrivate } from "./lib/private-fs.ts";
 import { join } from "node:path";
-import { appendEvent, readEvents, type BoardEvent } from "./lib/events.ts";
+import { appendEvent, needOf, NEED_TEXT, readEvents, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
 import { AGENTS_DIR, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
@@ -11,13 +12,17 @@ import { readAgentInfo, slug } from "./lib/crew.ts";
 import { ALIASES } from "./lib/roster.ts";
 import { resolveModel } from "./lib/model.ts";
 
-// The fields of a hook payload this file reads; anything else is ignored.
+// The fields of a hook payload this file reads; anything else is ignored. Notification's `message` and
+// `title` are deliberately absent: they are Claude Code's free text and are never read or stored.
 interface HookInput {
   hook_event_name?: string; session_id?: string; cwd?: string;
   agent_id?: string; agent_type?: string; last_assistant_message?: string; source?: string; reason?: string;
   tool_name?: string; tool_input?: Record<string, unknown>; tool_response?: unknown;
+  notification_type?: string; transcript_path?: string; agent_transcript_path?: string;
 }
 type Draft = Omit<BoardEvent, "id" | "ts">;
+// lib/usage.ts readUsage(path, opts). Its result is untrusted here: usageFields() allow-lists it.
+export type ReadUsage = (path: string, opts: UsageOptions) => unknown;
 
 const clip = (s: unknown, n = 160) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -103,6 +108,11 @@ export function toEvent(input: HookInput, due: () => boolean = () => heartbeatDu
       return { ...base, kind: "session-start", text: `Session started (${clip(input.source, 20) || "startup"})` };
     case "SessionEnd":
       return { ...base, kind: "session-end", text: `Session ended (${clip(input.reason, 30) || "other"})` };
+    case "Notification": {
+      // Allow-listed types only, and a fixed line per need: the notification's own words never reach the log.
+      const need = needOf(input.notification_type);
+      return need ? { ...base, kind: "needs-you", need, text: NEED_TEXT[need] } : null;
+    }
     case "PostToolUse": {
       if (input.tool_name === "Agent" || input.tool_name === "Task" || input.tool_name === "SendMessage") {
         const a = assignEvent(input, lookup, env);
@@ -129,12 +139,45 @@ function heartbeatDue(now = Date.now()): boolean {
   return true;
 }
 
+// Cost ledger: the transcript that just finished a turn (main) or ended (a subagent's own file).
+// Only numbers come back; the path is handed to readUsage, which checks it, and is never stored.
+export async function toUsage(input: HookInput, read: ReadUsage, lookup: (id: string) => string | undefined = typeOfAgent, env: Record<string, string | undefined> = process.env): Promise<Draft | null> {
+  const ev = input.hook_event_name, agent = ev === "SubagentStop";
+  if (ev !== "Stop" && ev !== "SessionEnd" && !agent) return null;
+  const path = agent ? input.agent_transcript_path : input.transcript_path;
+  if (typeof path !== "string" || !path || (agent && !input.agent_id)) return null;
+  const project = projectName(env.CLAUDE_PROJECT_DIR || input.cwd), sid = clip(input.session_id, 8) || undefined;
+  const agentType = agent ? input.agent_type || lookup(input.agent_id ?? "") : undefined;
+  const who = agent ? { agentId: input.agent_id, ...(agentType ? { agentType } : {}) } : {};
+  // readUsage wants both as strings; the event below leaves out what the payload did not give.
+  const opts: UsageOptions = { scope: agent ? "agent" : "main", final: ev !== "Stop", ...who, project: project ?? "", sid: sid ?? "" };
+  let got: unknown;
+  try { got = await read(path, opts); } catch { return null; }
+  // Whatever the reader returns, the event's identity comes from the payload, its numbers from usageFields().
+  const u = usageFields(got);
+  if (!u || u.scope !== opts.scope) return null;
+  return { ...(project ? { project } : {}), sid, ...who, kind: "usage", text: USAGE_TEXT, ...u };
+}
+
+// lib/usage.ts is optional: a missing or broken module means no usage events, never a failed hook.
+export async function loadReadUsage(): Promise<ReadUsage | null> {
+  try {
+    const m: Record<string, unknown> = await import("./lib/usage.ts");
+    const fn = m.readUsage;
+    return typeof fn === "function" ? (path, opts) => fn(path, opts) : null;
+  } catch { return null; }
+}
+
 async function main() {
   try {
     let raw = "";
     for await (const chunk of process.stdin) raw += chunk;
-    const e = toEvent(JSON.parse(raw));
+    const input: HookInput = JSON.parse(raw);
+    const e = toEvent(input);
     if (e) appendEvent(e);
+    const read = input.hook_event_name === "Stop" || input.hook_event_name === "SubagentStop" || input.hook_event_name === "SessionEnd" ? await loadReadUsage() : null;
+    const u = read ? await toUsage(input, read, (id) => (id === e?.agentId ? e.agentType : undefined) ?? typeOfAgent(id)) : null;
+    if (u) appendEvent(u);
   } catch { /* never fail the session over a log line */ }
   process.exit(0);
 }
