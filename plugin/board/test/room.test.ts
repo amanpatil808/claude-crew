@@ -99,6 +99,13 @@ test("agent files give model, effort, colour, turns, version and stage", () => {
   assert.deepEqual(readAgentInfo("/nonexistent/x.md"), {});
 });
 
+test("an agent file with no version tag gives no version or stage", () => {
+  const plain = "---\nname: joe-gardner\ndescription: Tester who runs every check.\nmodel: haiku\n---\nbody";
+  const joe = listRoles(agentsFolder({ "joe-gardner": plain })).find((r) => r.id === "joe-gardner");
+  assert.equal(joe?.model, "haiku");
+  assert.deepEqual([joe?.version, joe?.stage], [undefined, undefined]);
+});
+
 test("members carry role info, last contact and model override; manager activity follows the heartbeat", () => {
   const roles = loadRoles(), now = Date.now(), at = (s: number) => new Date(now - s * 1000).toISOString();
   const events = [
