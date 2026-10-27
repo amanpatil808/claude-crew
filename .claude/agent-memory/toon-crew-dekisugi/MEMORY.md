@@ -1,0 +1,10 @@
+# Dekisugi memory
+
+- Re-derive every file:line from the current file before citing a doc's line refs, including your own earlier reports. Why: docs written against a working copy drift; docs/how-it-works.md room.js refs were off by 40+ lines, and half of an inventory's stale list was fixed a day later. (seen 2) [crew]
+- For a "what it does NOT do" list, grep plans for "later/planned", read CHANGELOG "unreleased" entries and the code's own header comments (limits are stated there). Why: cheapest reliable source of non-goals and not-built items. (seen 1) [crew]
+- Check minimum-version claims in the official docs (Claude Code hooks/plugins reference, Node API "Added in" lines). Why: a single API (import.meta.main) can raise the real minimum above what a README says. (seen 2) [crew]
+- Trust plugin/hooks/hooks.json (matcher) and the constants at the top of plugin/hooks/guard.mjs over README guard tables. Why: README lagged the code (Read/Grep matched, push-to-main refused for non-DevOps). (seen 1) [project]
+- The plugin's settings.json sets Doraemon as main agent wherever the plugin is enabled; skill text saying "opt-in per project" is stale. Why: Claude Code applies plugin settings.json `agent` while enabled; project-profile SKILL.md still says otherwise. (seen 2) [project]
+- With no shell, list tracked files by running Grep with `-o` and a path regex over `.git/index`; it prints every tracked path. Why: Glob can't tell tracked from untracked or ignored, and `git ls-files` needs Bash. (seen 1) [crew]
+- Never recommend moving a plugin's evals out of the plugin folder: `claude plugin eval` reads `evals/` (or a relative dir with no `..`) inside the plugin, so they ship with installs. Why: plugin-evals docs, checked 2026-10-27. (seen 1) [crew]
+- In this repo the crew list lives in 5 places (README, how-it-works §2, roster.md, crew-room.md team diagram, planning/cast-v2.md) and the `(v0.4)` description tag is shown on board hover cards (room.js rStageLine); check all of them when a crew fact or version changes. Why: they drift independently. (seen 1) [project]

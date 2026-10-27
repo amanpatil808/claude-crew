@@ -1,0 +1,6 @@
+- An empty `node --test` glob exits 0 and prints "# tests 0 ... # fail 0 # skipped 0 # todo 0", so grep-only guards pass. Also require `^# pass [1-9][0-9]*$`. Why: removing an "if files exist" skip alone does not make an empty glob fail. (seen 1) [crew]
+- Without `shell: bash` (pipefail), `cmd | tee file` in a `run:` hides cmd's exit code. Set `defaults.run.shell: bash`. (seen 1) [crew]
+- Local npm 12 blocks dependency postinstall scripts; CI's node 24 npm 11 runs them. To test a native-binary package locally, run its install.cjs by hand. (seen 1) [crew]
+- Tests that stamp fixtures with a fixed clock while the CLI uses the real clock are time bombs. Prove it with a `--import` preload that patches Date. Board tasks.test.ts was fixed by mocking Date for the whole file (2026-10-27). (seen 1) [project]
+- A worktree is based on main, not the working branch. Before reporting a failure, check whether the branch already fixed it (the tasks.test.ts fix was already on the branch). (seen 1) [crew]
+- Worktree-isolated shells refuse some compound commands, `bash script` and `$pipestatus`. Run executable scripts by absolute path, one plain command per call. (seen 1) [crew]

@@ -13,5 +13,5 @@ CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/boa
 Replace `start` with `stop` or `status` when asked. The action given to the skill is: $ARGUMENTS
 
 Notes for the reply:
-- `start` prints `{"pid":..,"port":..}`. Tell the user to open `http://127.0.0.1:<port>`.
+- `start` prints `{"pid":..,"port":..,"startedAt":..}`. Tell the user to open `http://127.0.0.1:<port>`.
 - The hooks and this command use the same data folder (`${CLAUDE_PLUGIN_DATA}`), so events show up. Always start the board with this command, not by hand.

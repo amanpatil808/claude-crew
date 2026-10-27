@@ -1,6 +1,6 @@
 // Board tasks: queued / active / done / dropped, derived from the event log, plus the `task` CLI.
 import "./env.ts";
-import { beforeEach, test } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { rmSync, statSync } from "node:fs";
 import { appendEvent, readEvents, type BoardEvent } from "../lib/events.ts";
@@ -9,20 +9,41 @@ import { buildState } from "../lib/state.ts";
 import { deriveTasks } from "../lib/tasks.ts";
 import { run } from "../task.ts";
 
-let clock = Date.parse("2026-10-26T10:00:00Z");
-const tick = () => new Date((clock += 1000));
+// The whole file runs on one fake clock, so the CLI (which stamps events with `new Date()`) and the fixtures agree
+// on "now" whatever the real date is. A fixture on a fixed date next to real-clock events broke on 2026-10-27.
+const START = Date.parse("2026-10-26T10:00:00Z");
+let clock = START;
+const setClock = (ms: number) => { clock = ms; mock.timers.setTime(ms); };
+const tick = () => { setClock(clock + 1000); return new Date(clock); };
 const log = (e: Omit<BoardEvent, "id" | "ts">) => appendEvent(e, tick());
 const assign = (to: string, project: string, text = "do the thing") => log({ kind: "assign", from: "doraemon", to: `toon-crew:${to}`, text, project });
 // A stop is followed by a quiet 10 s, so the next assign is a new job, not a foreground call reporting late.
-const stop = (type: string, project: string) => { const e = log({ kind: "agent-stop", agentId: `a-${type}`, agentType: `toon-crew:${type}`, text: `${type} finished`, project }); clock += 10_000; return e; };
+const stop = (type: string, project: string) => { const e = log({ kind: "agent-stop", agentId: `a-${type}`, agentType: `toon-crew:${type}`, text: `${type} finished`, project }); setClock(clock + 10_000); return e; };
 // The CLI stamps events with the real clock; keep its tasks apart from the fixed one by using these envs.
 const cli = (project: string, ...argv: string[]) => run(argv, { CLAUDE_PROJECT_DIR: `/work/${project}` });
 const idOf = (out: string) => out.trim().split(" ")[1];
-// buildState uses the wall clock for staleness; these fixtures sit at fixed past times, so state is read "as of" the newest event.
+// buildState takes its reference time as an argument; read state "as of" the newest event.
 const bs = (now = Math.max(0, ...readEvents().map((e) => Date.parse(e.ts)))) => buildState(now);
 const state = () => deriveTasks(bs().events.slice().reverse());
 
-beforeEach(() => rmSync(EVENTS_FILE, { force: true }));
+beforeEach(() => {
+  rmSync(EVENTS_FILE, { force: true });
+  mock.timers.enable({ apis: ["Date"], now: START });
+  clock = START;
+});
+afterEach(() => mock.timers.reset());
+
+// The same scenario on dates far from the real one: it must not depend on today's date.
+for (const start of ["2020-01-01T00:00:00Z", "2040-01-01T00:00:00Z"]) test(`queue, assign, stop gives the same result when the clock reads ${start.slice(0, 4)}`, () => {
+  setClock(Date.parse(start));
+  const id = idOf(cli("shop", "add", "--role", "bob", "Build the thing").out);
+  assert.deepEqual(bs().tasks.queued.map((x) => x.id), [id]);
+  assign("bob", "shop");
+  assert.deepEqual(bs().tasks.active.map((x) => [x.id, x.stale]), [[id, undefined]]);
+  stop("bob", "shop");
+  assert.deepEqual(bs().tasks.done.map((x) => [x.id, x.stale]), [[id, undefined]]);
+  assert.equal(bs().tasks.active.length, 0);
+});
 
 test("queue, assign promotes it, the agent's stop finishes it", () => {
   const q = cli("shop", "add", "--role", "bob", "--priority", "P1", "--ref", "feat/x", "Build the thing");
