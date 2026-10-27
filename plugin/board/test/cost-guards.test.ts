@@ -7,11 +7,11 @@ import { loadRoles } from "../lib/crew.ts";
 import { MODEL_ID, type BoardEvent, type UsageRow } from "../lib/events.ts";
 
 const NOW = Date.parse("2026-10-27T12:00:00Z");
-const row = (out: number, model = "claude-sonnet-5-5"): UsageRow => ({ model, speed: "standard", long: false, n: 1, in: 0, out, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 });
+const row = (out: number, model = "claude-sonnet-5-5"): UsageRow => ({ model, speed: "standard", long: false, day: "2026-10-27", n: 1, in: 0, out, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 });
 let k = 0;
 const usage = (min: number, e: Partial<BoardEvent>): BoardEvent =>
   ({ id: `e-${++k}-aaaaaa`, ts: new Date(NOW - min * 60_000).toISOString(), kind: "usage", text: "Usage update", sid: "s1aaaaaa", scope: "main", final: false, partial: false, ...e });
-const opts = { roles: new Map(), dayStart: () => NOW - 3_600_000 };
+const opts = { roles: new Map(), dayOf: (ms: number) => new Date(ms).toISOString().slice(0, 10) };
 
 test("[L3] a room, its agents and a task named __proto__ keep their cost in the JSON the page gets", () => {
   const events = [

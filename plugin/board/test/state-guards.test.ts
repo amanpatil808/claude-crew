@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
-import { appendEvent, readEvents, type BoardEvent } from "../lib/events.ts";
+import { appendEvent, localDay, readEvents, type BoardEvent } from "../lib/events.ts";
 import { EVENTS_FILE, REGISTRY_FILE } from "../lib/paths.ts";
 import { buildState } from "../lib/state.ts";
 import { taskIdOf } from "../lib/tasks.ts";
@@ -47,13 +47,14 @@ test("[L3] a registered project named __proto__ keeps its snapshot and facts in 
 
 test("[I5] cost.tasks and its windows list only active, queued and recently done tasks", () => {
   const N = Date.parse("2026-10-27T12:00:00Z"), DAY = 86_400_000, MIN = 60_000;
-  const row = { model: "claude-sonnet-5-5", speed: "standard" as const, long: false, n: 1, in: 1, out: 1, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 };
+  // The board's default day is the machine's local day, so the rows carry that day of their own time.
+  const row = (ms: number) => ({ model: "claude-sonnet-5-5", speed: "standard" as const, long: false, day: localDay(ms), n: 1, in: 1, out: 1, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 });
   const add = (ms: number, e: Partial<BoardEvent> & Pick<BoardEvent, "kind">) => appendEvent({ text: "x", project: "shop", sid: "s1aaaaaa", ...e }, new Date(ms));
   // One agent run: assigned, started, used tokens, and (unless still running) stopped.
   const run = (ms: number, type: string, agentId: string, stop = true) => {
     const a = add(ms, { kind: "assign", from: "doraemon", to: type });
     add(ms + MIN, { kind: "agent-start", agentId, agentType: type });
-    add(ms + 2 * MIN, { kind: "usage", scope: "agent", agentId, agentType: type, final: stop, partial: false, rows: [row] });
+    add(ms + 2 * MIN, { kind: "usage", scope: "agent", agentId, agentType: type, final: stop, partial: false, rows: [row(ms + 2 * MIN)] });
     if (stop) add(ms + 3 * MIN, { kind: "agent-stop", agentId, agentType: type });
     return taskIdOf(a.id);
   };

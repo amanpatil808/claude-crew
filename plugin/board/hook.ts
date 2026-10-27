@@ -1,12 +1,12 @@
 // Claude Code hook entry: reads the hook's JSON from stdin and appends at most one event, plus one usage
 // event at Stop / SubagentStop / SessionEnd.
 // It always exits 0 and prints nothing, so a logging failure can never block or change a session.
-import { existsSync, readFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { writePrivate } from "./lib/private-fs.ts";
 import { join } from "node:path";
 import { agentIdOf, agentTypeOf, appendEvent, needOf, NEED_TEXT, readEvents, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
-import { AGENTS_DIR, LOG_DIR } from "./lib/paths.ts";
+import { AGENTS_DIR, EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
 import { readAgentInfo, slug } from "./lib/crew.ts";
 import { ALIASES } from "./lib/roster.ts";
@@ -162,6 +162,47 @@ export async function toUsage(input: HookInput, read: ReadUsage, lookup: (id: st
   return { ...(project ? { project } : {}), sid, ...who, kind: "usage", text: USAGE_TEXT, ...u };
 }
 
+export const USAGE_TAIL_BYTES = 256 * 1024;
+
+// The log's last `tailBytes` only, never the whole file; a first line cut by the start is dropped.
+function tail(file: string, tailBytes: number): string {
+  const fd = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK);
+  try {
+    const size = fstatSync(fd).size, start = Math.max(0, size - tailBytes), buf = Buffer.alloc(size - start);
+    const text = buf.subarray(0, readSync(fd, buf, 0, buf.length, start)).toString("utf8");
+    return start > 0 ? text.slice(text.indexOf("\n") + 1) : text;
+  } finally { closeSync(fd); }
+}
+
+// True only when the newest usage event for the same (sid, agent, scope) in the log's tail has the same rows,
+// partial flag and since: writing it again would add bytes and no information. Anything unsure (no such event in
+// the tail, a read error, an odd line) is false, so the event is written.
+export function repeatsLastUsage(u: Draft, file = EVENTS_FILE, tailBytes = USAGE_TAIL_BYTES): boolean {
+  try {
+    const lines = tail(file, tailBytes).split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (!lines[i].includes('"usage"')) continue;
+      let parsed: unknown;
+      try { parsed = JSON.parse(lines[i]); } catch { continue; }
+      if (!parsed || typeof parsed !== "object") continue;
+      const x = parsed as Record<string, unknown>;
+      if (x.kind !== "usage" || x.sid !== u.sid || x.agentId !== u.agentId || x.scope !== u.scope) continue;
+      // Through the same allow-list as the new event, so both sides have one shape and key order.
+      const before = usageFields(x);
+      return !!before && before.partial === (u.partial === true) && (before.since ?? "") === (u.since ?? "")
+        && JSON.stringify(before.rows) === JSON.stringify(u.rows);
+    }
+    return false;
+  } catch { return false; }
+}
+
+// Appends a usage event unless it repeats the last one for its transcript; true when it was written.
+export function logUsage(u: Draft): boolean {
+  if (repeatsLastUsage(u, EVENTS_FILE)) return false;
+  appendEvent(u);
+  return true;
+}
+
 // lib/usage.ts is optional: a missing or broken module means no usage events, never a failed hook.
 export async function loadReadUsage(): Promise<ReadUsage | null> {
   try {
@@ -180,7 +221,7 @@ async function main() {
     if (e) appendEvent(e);
     const read = input.hook_event_name === "Stop" || input.hook_event_name === "SubagentStop" || input.hook_event_name === "SessionEnd" ? await loadReadUsage() : null;
     const u = read ? await toUsage(input, read, (id) => (id === e?.agentId ? e.agentType : undefined) ?? typeOfAgent(id)) : null;
-    if (u) appendEvent(u);
+    if (u) logUsage(u);
   } catch { /* never fail the session over a log line */ }
   process.exit(0);
 }
