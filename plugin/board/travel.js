@@ -67,7 +67,7 @@
         tPlace(w, a[0] + dx * k, a[1] + dy * k);
         if (!o.keepDir) w.dataset.dir = tDir(dx, dy);
         w.style.setProperty("--lift", -Math.round(o.lift ? o.lift(p) : 0) + "px");
-        w.dataset.frame = o.stride ? String(Math.floor(d0 / o.stride) % 4) : "s";
+        if (!o.stride) w.dataset.frame = "s"; else if (now - (w._ft || 0) >= 260) { w._ft = now; w.dataset.frame = String(((+w.dataset.frame || 0) + 1) % 4); }   // at most about 4 step-frame changes a second
         const tr = o.trail;
         while (tr && d0 >= next && n < (tr.max || 0)) { if (!(tr.flat && Math.abs(dy) > Math.abs(dx))) tFx("bit " + tr.cls, up(w._p, tr.y || 0), tr.ms || 800, { extra: true, kids: 1, z: tr.z ?? -2, vars: tr.vars ? tr.vars(n) : {} }); n++; next += tr.every; }
         if (p < 1) requestAnimationFrame(f); else { if (o.go) w.classList.remove(o.go); w.dataset.frame = "s"; res(); }
@@ -165,7 +165,7 @@
     async depart(w, dir) { tFx("peel", [w._p[0] + side(dir) * 16, w._p[1]], 300, { kids: 1, z: -1 }); await rSleep(300); w._pl = tProp(w, "peel"); },
     async vanish(w) { puff(w._p, "dust", 420); await rSleep(80); },
     async appear(w) { puff(w._p, "dust", 420); await rSleep(80); },
-    async arrive(w, dir) { w.classList.add("p-spin"); await rSleep(250); w._pl?.remove(); tFx("bit peelfly", w._p, 600, { kids: 1, z: 3, vars: { "--dx": side(dir) * 18 + "px" } }); await rSleep(260); w.classList.remove("p-spin"); },
+    async arrive(w, dir) { w.classList.add("p-spin"); await rSleep(380); w._pl?.remove(); tFx("bit peelfly", w._p, 600, { kids: 1, z: 3, vars: { "--dx": side(dir) * 18 + "px" } }); await rSleep(380); w.classList.remove("p-spin"); },
   };
   const doorStyle = (colour, wpx, hpx, duck) => ({ id: duck ? "door-duck" : "door-wink", teleport: true, always: true, gap: 60,
     async depart(w) { door(w._p, colour, wpx, hpx, 900); await rSleep(240); w.dataset.dir = "up"; if (duck) w.classList.add("p-duck"); w.classList.add("p-in"); await tLeg(w, [w._p, up(w._p, 8)], { ms: 200, keepDir: true, stride: 4 }); },

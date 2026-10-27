@@ -88,7 +88,7 @@
 @keyframes tpOut { to { transform: scale(0); opacity: 0; } }
 /* Shiro curls into a cotton ball (his own trick) and rolls behind */
 #view-room .walker .dog.ball svg { visibility: hidden; }
-#view-room .walker .dog.ball::before { content: ""; position: absolute; left: 5px; bottom: 0; width: 17px; height: 17px; border-radius: 50%; border: var(--bw) solid var(--wall-ink); background: radial-gradient(circle at 35% 30%, #fff 0 4px, #eef0f6 5px); animation: roll .3s linear infinite; }
+#view-room .walker .dog.ball::before { content: ""; position: absolute; left: 5px; bottom: 0; width: 17px; height: 17px; border-radius: 50%; border: var(--bw) solid var(--wall-ink); background: radial-gradient(circle at 35% 30%, #fff 0 4px, #eef0f6 5px); animation: roll .7s linear infinite; }
 #view-room .walker .dog.ball::after { content: ""; position: absolute; left: 9px; bottom: 8px; width: 3px; height: 3px; border-radius: 50%; background: #1b1b24; box-shadow: 6px 0 0 #1b1b24; }
 @keyframes roll { to { transform: rotate(360deg); } }
 
@@ -100,15 +100,15 @@
 #view-room .walker.tv-soul .av .foot { display: none; }
 
 /* ---- poses on .tv (one keyframe each) ---- */
-#view-room .walker.go-run .tv { animation: lean10 .16s ease-in-out infinite alternate; }
+#view-room .walker.go-run .tv { animation: lean10 .3s ease-in-out infinite alternate; }
 @keyframes lean10 { from { transform: rotate(8deg); } to { transform: rotate(12deg) translateY(-2px); } }
-#view-room .walker.go-wiggle .tv { animation: wiggle2 .16s ease-in-out infinite alternate; }
+#view-room .walker.go-wiggle .tv { animation: wiggle2 .3s ease-in-out infinite alternate; }
 @keyframes wiggle2 { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
-#view-room .walker.go-scurry .tv { animation: scurry .1s steps(2) infinite; }
+#view-room .walker.go-scurry .tv { animation: scurry .5s steps(2) infinite; }
 @keyframes scurry { 50% { transform: translateY(-3px); } }
-#view-room .walker.go-slide .tv { animation: slideLean .18s ease-in-out infinite alternate; }
+#view-room .walker.go-slide .tv { animation: slideLean .3s ease-in-out infinite alternate; }
 @keyframes slideLean { from { transform: rotate(-10deg); } to { transform: rotate(-17deg); } }
-#view-room .walker.go-sprint .tv { animation: sprint .14s ease-in-out infinite alternate; }
+#view-room .walker.go-sprint .tv { animation: sprint .3s ease-in-out infinite alternate; }
 @keyframes sprint { from { transform: rotate(6deg); } to { transform: rotate(6deg) translateY(-2px); } }
 #view-room .walker.go-glide .tv { transform: rotate(7deg); }
 #view-room .walker.go-pogo .tv { animation: pogo var(--hop, .35s) linear infinite; }
@@ -118,6 +118,8 @@
 #view-room .walker.go-flip .tv { transform-origin: 50% 55%; animation: flip var(--leg, .6s) ease-in-out 1 both; }
 @keyframes flip { to { transform: rotate(360deg); } }
 #view-room .walker.go-skip .tv { animation: skipSway .3s ease-in-out infinite alternate; }
+/* calmer blade: about 3.6 changes a second (room.css draws it at about 16) */
+#view-room .walker .tp.copterhat::before { animation-duration: .55s; }
 @keyframes skipSway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
 
 #view-room .walker.p-trip .tv { animation: trip .7s ease-out 1 both; }
@@ -130,8 +132,8 @@
 @keyframes squash { 50% { transform: scale(1.12, .86); } }
 #view-room .walker.p-hug .tv { animation: hug .5s ease-out 1 both; }
 @keyframes hug { 30% { transform: scale(1.12, .88); } 60% { transform: scale(.95, 1.06); } }
-#view-room .walker.p-spin .tv { transform-origin: 50% 60%; animation: spin .5s ease-out 1 both; }
-@keyframes spin { 50% { transform: translateY(-8px) rotate(200deg); } 100% { transform: rotate(360deg); } }
+#view-room .walker.p-spin .tv { transform-origin: 50% 60%; animation: spin .75s ease-in-out 1 both; }
+@keyframes spin { 50% { transform: translateY(-6px) rotate(180deg); } 100% { transform: rotate(360deg); } }
 #view-room .walker.p-bow .tv { animation: bow .65s ease-in-out 1 both; }
 @keyframes bow { 30%, 70% { transform: rotate(26deg); } }
 #view-room .walker.p-curtsey .tv { animation: curtsey .45s ease-in-out 1 both; }
