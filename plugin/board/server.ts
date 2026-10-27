@@ -11,8 +11,8 @@ import { buildState } from "./lib/state.ts";
 const DIR = import.meta.dirname;
 // The page is one file for the browser (strict CSP, no extra requests): the Crew Room css and js are inlined here.
 const readPage = () => readFileSync(join(DIR, "page.html"), "utf8")
-  .replace("/*ROOM_CSS*/", () => readFileSync(join(DIR, "room.css"), "utf8"))
-  .replace("/*ROOM_JS*/", () => readFileSync(join(DIR, "room.js"), "utf8"));
+  .replace("/*ROOM_CSS*/", () => readFileSync(join(DIR, "room.css"), "utf8") + "\n" + readFileSync(join(DIR, "travel.css"), "utf8"))
+  .replace("/*ROOM_JS*/", () => readFileSync(join(DIR, "room.js"), "utf8") + "\n" + readFileSync(join(DIR, "travel.js"), "utf8"));
 const BASE = Number(process.env.BOARD_PORT) || 8811;
 const PORTS = Array.from({ length: 10 }, (_, i) => BASE + i);
 
