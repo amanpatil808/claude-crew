@@ -25,19 +25,32 @@ const ev = (min, e) => {
 let agentNo = 0;
 const aid = () => `a${String(++agentNo).padStart(4, '0')}demo${agentNo.toString(16)}`;
 
-// Usage rows use the board's neutral keys: n calls, in/out tokens, cw5m/cw1h cache writes, cr cache reads, ws/wf web search/fetch.
+// Usage rows use the board's neutral keys: n calls, in/out tokens, cw5m/cw1h cache writes, cr cache reads, ws/wf web search/fetch,
+// and `day`, the local calendar day of those calls ("YYYY-MM-DD"), which the board's Today and 7 days windows sum.
 const MODEL = { opus: 'claude-opus-4-7', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-4-5' };
-const row = (model, n, out, cw5m, cw1h, cr, ws = 0, wf = 0) => ({ model, speed: 'standard', long: false, n, in: n * 2, out, cw5m, cw1h, cr, ws, wf });
+const pad2 = (x) => String(x).padStart(2, '0');
+const localDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const daysAgo = (k) => { const d = new Date(now); d.setDate(d.getDate() - k); return localDay(d); };
+const row = (day, model, n, out, cw5m, cw1h, cr, ws = 0, wf = 0) => ({ model, speed: 'standard', long: false, day, n, in: n * 2, out, cw5m, cw1h, cr, ws, wf });
 const SIZE = { dekisugi: ['opus', 1.2], kevin: ['sonnet', 1], 'ninja-hattori': ['sonnet', 0.6], shizuka: ['haiku', 0.8], 'joe-gardner': ['haiku', 0.7], bob: ['sonnet', 1.1], 'mike-wazowski': ['sonnet', 0.5], olaf: ['sonnet', 0.9], nobita: ['opus', 1], shinchan: ['sonnet', 1.3], stuart: ['haiku', 0.2] };
 // Cumulative usage for one agent run; `final` is true once it has stopped, like the SubagentStop snapshot.
 const usage = (project, min, { agentId, agentType, role, final }) => {
   const [m, k] = SIZE[role] ?? ['sonnet', 1], search = role === 'dekisugi';
   ev(min, { project, kind: 'usage', sid: project === SHOP ? 'demo0001' : 'demo0002', agentId, agentType, text: 'Usage update', scope: 'agent', final, partial: false,
-    rows: [row(MODEL[m], Math.round(24 * k), Math.round(13000 * k), Math.round(59000 * k), 0, Math.round(1_040_000 * k), search ? 3 : 0, search ? 5 : 0)] });
+    rows: [row(localDay(ago(min)), MODEL[m], Math.round(24 * k), Math.round(13000 * k), Math.round(59000 * k), 0, Math.round(1_040_000 * k), search ? 3 : 0, search ? 5 : 0)] });
 };
-// The manager's own session usage, one row per model it used.
-const mainUsage = (project, min, sid) => ev(min, { project, kind: 'usage', sid, text: 'Usage update', scope: 'main', final: false, partial: false,
-  rows: [row(MODEL.opus, 190, 140_000, 0, 396_000, 40_700_000), row(MODEL.haiku, 12, 2_400, 18_000, 0, 150_000)] });
+// The manager's own session: a long-lived one, so its cumulative total holds today's calls and earlier days'. Like the
+// reader, days older than the newest 8 sit in day "" and `since` keeps the first day. The board's Today counts only
+// today's rows, 7 days the last seven, all-time every row.
+const mainUsage = (project, min, sid, k = 1) => ev(min, { project, kind: 'usage', sid, text: 'Usage update', scope: 'main', final: false, partial: false,
+  since: daysAgo(12),
+  rows: [
+    row(daysAgo(0), MODEL.opus, Math.round(190 * k), Math.round(140_000 * k), 0, Math.round(396_000 * k), Math.round(40_700_000 * k)),
+    row(daysAgo(0), MODEL.haiku, 12, 2_400, 18_000, 0, 150_000),
+    row(daysAgo(1), MODEL.opus, Math.round(260 * k), Math.round(180_000 * k), 0, Math.round(520_000 * k), Math.round(55_000_000 * k)),
+    row(daysAgo(3), MODEL.opus, Math.round(120 * k), Math.round(90_000 * k), 0, Math.round(240_000 * k), Math.round(26_000_000 * k)),
+    row('', MODEL.opus, Math.round(300 * k), Math.round(210_000 * k), 0, Math.round(610_000 * k), Math.round(64_000_000 * k)),
+  ] });
 let bobId;
 
 // A task: optionally queued, assigned by Doraemon, picked up by an agent; stopped when `doneMin` is given.
@@ -89,7 +102,7 @@ job(RECIPE, 'stuart', 'Find every use of the old Card component', { startMin: 15
 queued(RECIPE, 'joe-gardner', 'P1', 'Visual regression pass on recipe cards', 20);
 queued(RECIPE, 'kevin', 'P2', 'Add a favourites endpoint', 18);
 ev(1.5, { project: RECIPE, kind: 'main-busy', text: 'Manager at work', sid: 'demo0002' });
-mainUsage(RECIPE, 1.2, 'demo0002');
+mainUsage(RECIPE, 1.2, 'demo0002', 0.4);
 // The manager's turn ended and he waits for the owner's reply (an idle item).
 ev(0.8, { project: RECIPE, kind: 'needs-you', sid: 'demo0002', need: 'idle', text: 'Waiting for your reply' });
 

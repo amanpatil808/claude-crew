@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
-import { appendEvent, readEvents, type UsageEvent, type UsageOptions } from "../lib/events.ts";
+import { appendEvent, localDay, readEvents, USAGE_MAX_DAYS, USAGE_MAX_ROWS, usageFields, type UsageEvent, type UsageOptions } from "../lib/events.ts";
 import { EVENTS_FILE } from "../lib/paths.ts";
 import { redactDeep } from "../lib/redact.ts";
 import { readUsage, safeTranscript, sumTranscript, type ReadLimits } from "../lib/usage.ts";
@@ -16,7 +16,9 @@ const root = join(base, "projects");                 // stands in for ~/.claude/
 const outside = join(base, "elsewhere");
 mkdirSync(join(root, "-work-shop", "s1", "subagents"), { recursive: true });
 mkdirSync(outside, { recursive: true });
-const L: ReadLimits = { root };
+const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);   // fixed zone, so no test depends on the machine's
+const L: ReadLimits = { root, dayOf: utcDay };
+const TS = "2026-10-27T09:00:00.000Z";
 const MAIN: UsageOptions = { scope: "main", project: "shop", sid: "s1aaaaaa", final: false };
 const AGENT: UsageOptions = { scope: "agent", agentId: "a0123456789abcdef", agentType: "toon-crew:kevin", project: "shop", sid: "s1aaaaaa", final: true };
 
@@ -29,8 +31,9 @@ const usage = (u: U) => ({
   server_tool_use: { web_search_requests: u.ws ?? 0, web_fetch_requests: u.wf ?? 0 },
   iterations: [{ input_tokens: u.in ?? 0, output_tokens: u.out ?? 0 }],
 });
-const asst = (id: string, u: U, model = "claude-sonnet-5-5", text = "hello") => JSON.stringify({
-  parentUuid: "p", isSidechain: false, type: "assistant", requestId: `req_${id}`, version: "2.1.310",
+// The line shape follows a real transcript's key names (CLI 2.1.310): `timestamp` is top-level ISO UTC.
+const asst = (id: string, u: U, model = "claude-sonnet-5-5", text = "hello", timestamp: unknown = TS) => JSON.stringify({
+  parentUuid: "p", isSidechain: false, type: "assistant", requestId: `req_${id}`, version: "2.1.310", timestamp,
   message: { id, type: "message", role: "assistant", model, content: [{ type: "text", text }], usage: usage(u) },
 });
 const user = (text: string) => JSON.stringify({ type: "user", message: { role: "user", content: text } });
@@ -52,7 +55,7 @@ test("one response written as several lines counts once; user and quoted lines a
   ]);
   const e = readUsage(p, MAIN, L);
   assert.ok(e);
-  assert.deepEqual(e.rows, [{ model: "claude-sonnet-5-5", speed: "standard", long: false, n: 2, in: 30, out: 300, cw5m: 300, cw1h: 1000, cr: 11000, ws: 0, wf: 0 }]);
+  assert.deepEqual(e.rows, [{ model: "claude-sonnet-5-5", speed: "standard", long: false, day: "2026-10-27", n: 2, in: 30, out: 300, cw5m: 300, cw1h: 1000, cr: 11000, ws: 0, wf: 0 }]);
 });
 
 test("dedupe keeps the last line of a response, also when its lines are not adjacent", () => {
@@ -98,8 +101,9 @@ test("only numbers leave the transcript: planted secrets, paths and odd model id
   for (const s of [...secrets, root, base, "leak.jsonl"]) assert.ok(!json.includes(s), `leaks ${s}`);
   assert.deepEqual(e.rows.map((r) => [r.model, r.n]), [["claude-sonnet-5-5", 1], ["unknown", 2]]);
   // Allow-listed keys only, at both levels.
-  assert.deepEqual(Object.keys(e).sort(), ["final", "kind", "partial", "project", "rows", "scope", "sid", "text"]);
-  for (const r of e.rows) assert.deepEqual(Object.keys(r).sort(), ["cr", "cw1h", "cw5m", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
+  assert.deepEqual(Object.keys(e).sort(), ["final", "kind", "partial", "project", "rows", "scope", "sid", "since", "text"]);
+  assert.equal(e.since, "2026-10-27");
+  for (const r of e.rows) assert.deepEqual(Object.keys(r).sort(), ["cr", "cw1h", "cw5m", "day", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
 });
 
 test("refused without a read: symlinks, paths outside the root, traversal, non-.jsonl and devices", () => {
@@ -179,7 +183,7 @@ test("an over-long line is dropped and marks the read partial; the lines around 
 test("chunk size never changes the result (lines cut across chunks, multi-byte text)", () => {
   const p = write("-work-shop/chunks.jsonl", [asst("m1", { in: 3, out: 9 }, undefined, "naïve café ✓ 日本"), user("ü"), asst("m2", { in: 4, out: 1 })]);
   const want = readUsage(p, MAIN, L);
-  for (const chunkBytes of [1, 7, 64, 4096]) assert.deepEqual(readUsage(p, MAIN, { root, chunkBytes }), want, `chunk ${chunkBytes}`);
+  for (const chunkBytes of [1, 7, 64, 4096]) assert.deepEqual(readUsage(p, MAIN, { ...L, chunkBytes }), want, `chunk ${chunkBytes}`);
 });
 
 test("a torn last line is skipped; a whole last line without a newline counts", () => {
@@ -206,16 +210,81 @@ test("scope: main carries no agent fields; agent needs a clean id; the text is f
   assert.equal(readUsage(p, { ...AGENT, agentType: "kevin says hi" }, L)?.agentType, undefined);
 });
 
+test("each response is bucketed by the day of its own line; a missing or bad time goes to day \"\"", () => {
+  const p = write("-work-shop/days.jsonl", [
+    asst("m1", { out: 1 }, undefined, undefined, "2026-10-20T23:59:59.999Z"),
+    asst("m2", { out: 2 }, undefined, undefined, "2026-10-21T00:00:00.000Z"),
+    asst("m3", { out: 4 }, undefined, undefined, "2026-10-21T08:00:00Z"),
+    JSON.stringify({ ...JSON.parse(asst("m4", { out: 8 })), timestamp: undefined }),   // no timestamp key at all
+    asst("m5", { out: 16 }, undefined, undefined, "yesterday"),
+    asst("m6", { out: 32 }, undefined, undefined, 1792929600000),            // a number, not ISO text
+    asst("m7", { out: 64 }, undefined, undefined, "2026-02-30T10:00:00Z"),   // not a real date
+    asst("m8", { out: 128 }, undefined, undefined, "2026-10-21"),            // a date without a time
+    // One response written as several lines: the last line's time wins, like its numbers.
+    asst("m9", { out: 256 }, undefined, "a", "2026-10-19T10:00:00Z"), asst("m9", { out: 256 }, undefined, "b", "2026-10-21T10:00:00Z"),
+  ]);
+  const e = readUsage(p, MAIN, L);
+  assert.deepEqual(e?.rows.map((r) => [r.day, r.n, r.out]), [["2026-10-21", 3, 262], ["2026-10-20", 1, 1], ["", 5, 248]]);
+});
+
+test("the day is the injected zone's calendar day, the machine's local day by default", () => {
+  const p = write("-work-shop/zone.jsonl", [asst("m1", { out: 1 }, undefined, undefined, "2026-10-27T20:00:00Z")]);
+  const ist = (ms: number) => utcDay(ms + 5.5 * 3_600_000);   // UTC+05:30: 20:00 UTC is 01:30 the next day
+  assert.equal(readUsage(p, MAIN, { root, dayOf: ist })?.rows[0].day, "2026-10-28");
+  assert.equal(readUsage(p, MAIN, L)?.rows[0].day, "2026-10-27");
+  assert.equal(readUsage(p, MAIN, { root })?.rows[0].day, localDay(Date.parse("2026-10-27T20:00:00Z")));
+  // A day function that gives no real day puts the response in "", never free text.
+  assert.equal(readUsage(p, MAIN, { root, dayOf: () => "<b>x</b>" })?.rows[0].day, "");
+});
+
+test("row cap: only the newest days keep their own rows; older days fold into \"\" and no number is lost", () => {
+  // 40 days, two models a day: 80 dated rows before the cap.
+  const lines = [];
+  for (let i = 0; i < 40; i++) {
+    const ts = `${utcDay(Date.parse("2026-10-27T10:00:00Z") - i * 86_400_000)}T10:00:00Z`;
+    lines.push(asst(`a${i}`, { out: 1, cr: 10 }, "claude-opus-5-5", "x", ts), asst(`b${i}`, { out: 2 }, "claude-haiku-5-5", "x", ts));
+  }
+  const p = write("-work-shop/cap.jsonl", lines);
+  const total = (e: UsageEvent | null) => e?.rows.reduce((a, r) => [a[0] + r.n, a[1] + r.out, a[2] + r.cr], [0, 0, 0]);
+  const e = readUsage(p, MAIN, L);
+  assert.ok(e);
+  assert.equal(USAGE_MAX_DAYS, 8);
+  assert.equal(new Set(e.rows.map((r) => r.day).filter(Boolean)).size, 8);
+  assert.equal(e.rows.length, 18, "8 days x 2 models + one \"\" row per model");
+  assert.deepEqual(e.rows.filter((r) => r.day === "").map((r) => [r.model, r.n]), [["claude-haiku-5-5", 32], ["claude-opus-5-5", 32]]);
+  assert.equal(e.rows.some((r) => r.day !== "" && r.day < "2026-10-20"), false, "the oldest kept day is 7 days before the newest");
+  assert.deepEqual([total(e), e.partial], [[80, 120, 400], false]);
+  assert.equal(e.since, "2026-09-18", "since is the earliest day seen, folded or not");
+  // Too many rows: more days fold until the event fits, still with every number.
+  const small = readUsage(p, MAIN, { ...L, maxRows: 11 });
+  assert.ok(small && small.rows.length <= 11);
+  assert.deepEqual([small.rows.filter((r) => r.day).length, total(small), small.partial], [8, [80, 120, 400], false]);
+  // Only when even day "" cannot fit are rows cut, and the read is then marked partial.
+  const cut = readUsage(p, MAIN, { ...L, maxRows: 1 });
+  assert.deepEqual([cut?.rows.length, cut?.rows[0].day, cut?.partial], [1, "", true]);
+  // The hook's and the ledger's own row caps take a full event.
+  assert.deepEqual([usageFields(e)?.rows.length, usageFields(e)?.since], [18, "2026-09-18"]);
+  assert.ok(USAGE_MAX_ROWS >= USAGE_MAX_DAYS * 8);
+});
+
 const append = (e: UsageEvent) => appendEvent(e, new Date("2026-10-27T16:40:00Z"));
 
 test("the event survives appendEvent / redactDeep with every number intact", () => {
   // Counts that look like a phone (10 digits) or a Luhn-valid card (16 digits) would be masked inside text.
+  // Days too: "2026-10-27" must stay a day, not turn into a masked number.
   const p = write("-work-shop/s1/subagents/agent-a0123456789abcdef.jsonl", [
     asst("m1", { in: 9_876_543_210, out: 4_111_111_111_111_111, w5: 59124, cr: 1_036_895, ws: 2 }),
     asst("m2", { in: 48, out: 13072 }, "claude-opus-5-5"),
+    asst("m3", { in: 9_876_543_210, cr: 4_111_111_111_111_111 }, "claude-opus-5-5", "x", "2026-10-01T10:00:00Z"),
+    asst("m4", { out: 7 }, "claude-opus-5-5", "x", null),
   ]);
   const e = readUsage(p, AGENT, L);
   assert.ok(e);
+  assert.deepEqual(e.rows.map((r) => [r.model, r.long, r.day, r.in, r.out, r.cr]), [
+    ["claude-opus-5-5", false, "2026-10-27", 48, 13072, 0], ["claude-opus-5-5", false, "", 0, 7, 0],
+    ["claude-opus-5-5", true, "2026-10-01", 9_876_543_210, 0, 4_111_111_111_111_111],
+    ["claude-sonnet-5-5", true, "2026-10-27", 9_876_543_210, 4_111_111_111_111_111, 1_036_895],
+  ]);
   assert.deepEqual(redactDeep(e), e);
   const written = append(e);
   const back = readEvents().find((x) => x.id === written.id);

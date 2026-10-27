@@ -3,10 +3,11 @@
 import "./env.ts";
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadReadUsage, toEvent, toUsage, type ReadUsage } from "../hook.ts";
-import { appendEvent, QUIET_KINDS, readEvents, USAGE_NUMBERS, usageFields, type BoardEvent, type UsageOptions, type UsageRow } from "../lib/events.ts";
+import { loadReadUsage, logUsage, repeatsLastUsage, toEvent, toUsage, type ReadUsage } from "../hook.ts";
+import { appendEvent, QUIET_KINDS, readEvents, USAGE_MAX_ROWS, USAGE_NUMBERS, usageFields, type BoardEvent, type UsageOptions, type UsageRow } from "../lib/events.ts";
 import { loadRoles } from "../lib/crew.ts";
 import { EVENTS_FILE } from "../lib/paths.ts";
 import { costOf, loadBuildCost } from "../lib/state.ts";
@@ -16,7 +17,7 @@ import { deriveTasks, taskOfAgent } from "../lib/tasks.ts";
 const ENV = { CLAUDE_PROJECT_DIR: "/work/acme" };
 const PATH = "/home/someone/.claude/projects/-work-acme/5e55a0f1-unique-path-marker.jsonl";
 const SUB = "/home/someone/.claude/projects/-work-acme/5e55a0f1/subagents/agent-a1-unique-path-marker.jsonl";
-const row = (over: Partial<UsageRow> = {}): UsageRow => ({ model: "claude-sonnet-5-5", speed: "standard", long: false, n: 23, in: 48, out: 13072, cw5m: 59124, cw1h: 0, cr: 1036895, ws: 0, wf: 0, ...over });
+const row = (over: Partial<UsageRow> = {}): UsageRow => ({ model: "claude-sonnet-5-5", speed: "standard", long: false, day: "2026-10-27", n: 23, in: 48, out: 13072, cw5m: 59124, cw1h: 0, cr: 1036895, ws: 0, wf: 0, ...over });
 const base = { session_id: "5e55a0f1-0000", cwd: "/tmp", transcript_path: PATH };
 
 // A fake readUsage that records its calls and echoes the scope it was asked for.
@@ -83,15 +84,78 @@ test("the hook keeps only allow-listed usage fields: no text, paths, secrets or 
   const e = await usage({ ...base, hook_event_name: "Stop" }, reader(answer).read);
   assert.deepEqual(e, {
     project: "acme", sid: "5e55a0f1", kind: "usage", text: "Usage update", scope: "main", final: false, partial: false,
-    rows: [{ model: "unknown", speed: "standard", long: false, n: 23, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 3, wf: 0 }],
+    rows: [{ model: "unknown", speed: "standard", long: false, day: "2026-10-27", n: 23, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 3, wf: 0 }],
   });
   assert.ok(!JSON.stringify(e).includes("unique-path-marker"));
-  assert.deepEqual(Object.keys(e?.rows?.[0] ?? {}).sort(), ["cr", "cw1h", "cw5m", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
+  assert.deepEqual(Object.keys(e?.rows?.[0] ?? {}).sort(), ["cr", "cw1h", "cw5m", "day", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
 });
 
-test("usageFields caps the number of rows", () => {
-  const many = Array.from({ length: 500 }, (_, i) => row({ model: `m-${i}` }));
-  assert.equal(usageFields({ scope: "main", rows: many })?.rows.length, 64);
+test("the hook allow-lists the day: a real YYYY-MM-DD date or \"\", anything else becomes \"\" with its numbers kept", async () => {
+  const days: unknown[] = ["2026-10-27", "", "2026-02-29", "2028-02-29", "2026-13-01", "2026-10-27T00:00:00Z", " 2026-10-27", "2026-1-7", 20261027, null, undefined,
+    { toString: () => "2026-10-27" }, "sk-ant-" + "api03-PLANTED", "../../etc", "9876543210"];
+  const answer = () => ({ scope: "main", rows: days.map((day, i) => ({ ...row({ n: i + 1 }), day })) });
+  const e = await usage({ ...base, hook_event_name: "Stop" }, reader(answer).read);
+  assert.deepEqual(e?.rows?.map((r) => [r.n, r.day]), [[1, "2026-10-27"], [2, ""], [3, ""], [4, "2028-02-29"], ...days.slice(4).map((_, i) => [i + 5, ""])]);
+});
+
+test("usageFields caps the number of rows at the shared cap", () => {
+  const many = Array.from({ length: 2000 }, (_, i) => row({ model: `m-${i}` }));
+  assert.equal(usageFields({ scope: "main", rows: many })?.rows.length, USAGE_MAX_ROWS);
+  assert.equal(USAGE_MAX_ROWS, 512);
+});
+
+test("the hook keeps a real since day and drops anything else", async () => {
+  for (const [since, want] of [["2026-09-01", "2026-09-01"], ["2026-02-30", undefined], ["sk-ant-" + "x", undefined], [20260901, undefined]] as const) {
+    const e = await usage({ ...base, hook_event_name: "Stop" }, reader((o) => ({ scope: o.scope, rows: [row()], since })).read);
+    assert.equal(e?.since, want, String(since));
+  }
+});
+
+// What toUsage hands main(): a ready usage draft for one transcript.
+const draft = (over: Partial<BoardEvent> = {}): Omit<BoardEvent, "id" | "ts"> =>
+  ({ project: "acme", sid: "5e55a0f1", kind: "usage", text: "Usage update", scope: "main", final: false, partial: false, rows: [row()], since: "2026-10-20", ...over });
+const usageCount = () => readEvents().filter((e) => e.kind === "usage").length;
+
+test("a usage event that repeats the last one for its (sid, agent) is not written again", () => {
+  assert.equal(logUsage(draft()), true, "the first is written");
+  assert.equal(logUsage(draft({ final: true })), false, "same rows at SessionEnd: skipped");
+  assert.equal(usageCount(), 1);
+  // Anything that changes what the board shows is written.
+  assert.equal(logUsage(draft({ rows: [row({ out: 13073 })] })), true, "new numbers");
+  assert.equal(logUsage(draft({ rows: [row({ out: 13073 })], partial: true })), true, "the partial flag changed");
+  assert.equal(logUsage(draft({ rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), true, "since changed");
+  assert.equal(logUsage(draft({ rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), false);
+  // Compared only with the newest event of the same transcript: other sessions, agents and kinds in between do not count.
+  appendEvent({ kind: "commit", text: "Committed abc", project: "acme" });
+  assert.equal(logUsage(draft({ sid: "other000", rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), true, "another session");
+  assert.equal(logUsage(draft({ scope: "agent", agentId: "a1", rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), true, "an agent of the same session");
+  assert.equal(logUsage(draft({ scope: "agent", agentId: "a2", rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), true, "another agent, same numbers");
+  assert.equal(logUsage(draft({ rows: [row({ out: 13073 })], partial: true, since: "2026-10-01" })), false, "the main session again: still a repeat");
+  assert.equal(logUsage(draft({ rows: [row()] })), true, "back to the first numbers: compared with the newest, not any older one");
+  assert.equal(usageCount(), 8);
+});
+
+test("the repeat check reads only the log's tail and writes the event whenever it is unsure", () => {
+  const dir = mkdtempSync(join(tmpdir(), "crew-usage-tail-")), file = join(dir, "events.jsonl");
+  const line = (over: Partial<BoardEvent> = {}) => JSON.stringify({ id: "e-1-aaaaaa", ts: "2026-10-27T10:00:00.000Z", ...draft(), ...over }) + "\n";
+  assert.equal(repeatsLastUsage(draft(), join(dir, "missing.jsonl")), false, "no log yet");
+  mkdirSync(join(dir, "folder.jsonl"));
+  assert.equal(repeatsLastUsage(draft(), join(dir, "folder.jsonl")), false, "a read error");
+  writeFileSync(file, line());
+  assert.equal(repeatsLastUsage(draft(), file), true, "control: the same event is a repeat");
+  // The matching event sits before the tail: not seen, so not a repeat.
+  appendFileSync(file, line({ kind: "commit", text: "x".repeat(2000), rows: undefined }));
+  assert.equal(repeatsLastUsage(draft(), file, 4096), true);
+  assert.equal(repeatsLastUsage(draft(), file, 1500), false, "outside the tail");
+  // A tail that starts 10 bytes into the matching line drops that line rather than parsing what is left of it.
+  assert.equal(repeatsLastUsage(draft(), file, statSync(file).size - 10), false, "cut line dropped");
+  // A torn last line, an old event without days, and an odd line are never a match.
+  writeFileSync(file, line() + line().slice(0, 40));
+  assert.equal(repeatsLastUsage(draft(), file), true, "the torn line is skipped, the whole one before it still matches");
+  writeFileSync(file, line({ rows: [{ ...row(), day: undefined } as unknown as UsageRow] }));
+  assert.equal(repeatsLastUsage(draft(), file), false, "old rows without a day differ from day rows");
+  writeFileSync(file, '{"kind":"usage","sid":"5e55a0f1","scope":"main","rows":"x"}\n');
+  assert.equal(repeatsLastUsage(draft(), file), false);
 });
 
 test("usage rows survive appendEvent and readEvents unchanged: no key is blanked, no count is masked", () => {
