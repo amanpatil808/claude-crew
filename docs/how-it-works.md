@@ -115,6 +115,18 @@ Words used here:
 
 Sources: `plugin/agents/doraemon.md` ("When invoked", "Assigning work", "Worktrees", "Verifying hand-backs", "Committing and PRs", "Memory duty"), `plugin/skills/task/SKILL.md`, `plugin/board/hook.ts` (commit and PR events).
 
+### Parallel work: waves and copies
+
+Doraemon runs the crew in waves, and he can run two copies of one role. The rules are in `plugin/agents/doraemon.md`.
+
+- **Waves are 2-4 crew wide.** Several agents at once cost many times the tokens of one chat, so he keeps each wave small. No two tasks in a wave write the same file.
+- **A role can have a second copy.** If the right role is busy, Doraemon queues the task or starts a second copy of that role on different files, for example two Shinchans on two screens. He never gives the task to a different role just because it is idle. Because the files are different, the copies never overwrite each other.
+- **The whole plan is queued up front.** Every piece of every wave, plus reviews, QA runs and the merge step, goes on the board with `toon-crew:task` before work starts. The Queued list shows what is coming.
+- **Each copy takes the oldest queued task for its role.** When an agent starts, the board moves that role's oldest queued task to Running. When the agent stops, the task is done. If the plan changes, Doraemon drops the task so nothing stale stays queued.
+- **On the Crew Room (being built, not in the current release):** a "Crew 3 / 4" meter shows how many agents are running. When Doraemon starts a copy, he uses his copy-light gadget: a twin appears at the desk with a ×2 badge. See [the Crew Room guide](crew-room.md).
+
+Sources: `plugin/agents/doraemon.md` (step 6 "queue the whole plan", "Assigning work", "Cost rules"), `plugin/board/lib/tasks.ts` (an assign takes the role's oldest queued task).
+
 ## 2. Teams and roles
 
 Fifteen agents in nine teams, one job each. Every agent reads the project's `CLAUDE.md` and `.claude/crew/project.md` first. The agent files in `plugin/agents/` are the source of truth; the table shows their settings. Model tier is the `model` field.
