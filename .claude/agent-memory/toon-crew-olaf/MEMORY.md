@@ -1,0 +1,3 @@
+- GitHub README pages via WebFetch show no last-commit date or releases; fetch api.github.com/repos/<owner>/<repo> for stars, forks, pushed_at, license. Why: summaries drop dates. (seen 1) [crew]
+- For repo comparisons read the source files (hooks, settings.json, CLAUDE.md, a plugin dir) not just the README; README counts often disagree with directories. (seen 1) [crew]
+- Scratchpad deliverables for comparisons are fine under the session scratchpad path the brief names; hand-back needs path + short summary. (seen 1) [crew]
