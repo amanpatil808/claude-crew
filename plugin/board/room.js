@@ -263,7 +263,7 @@ function rChips(x) {
   if (eff && R_EFFORT[eff]) {          // quiet outlined chip with 1 to 4 bars, so levels compare at a glance
     const c = rel("span", "echip"), bars = rel("span", "bars"); bars.setAttribute("aria-hidden", "true");
     for (let i = 1; i <= 4; i++) bars.append(rel("i", i <= R_EFFORT[eff] ? "on" : ""));
-    c.append(bars, document.createTextNode(eff.toUpperCase())); row.append(c);
+    c.append(bars, document.createTextNode(eff === "medium" ? "MED" : eff.toUpperCase())); c.title = eff + " effort"; row.append(c);
   }
   return row.childElementCount ? row : null;
 }
@@ -362,7 +362,11 @@ function rDesk(role, m, i, showTeam, proj = "") {
   nm.append(sw, rel("b", null, plateName(role)), st);
   const span = m.since ? shortSpan(rMins(m.since)) : "";
   const line = waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
-  const task = rel("div", "plate-task", line); task.title = m.task || m.line || ""; plate.append(nm, task);
+  const task = rel("div", "plate-task", line); task.title = m.task || m.line || "";
+  // Name, designation, model + effort chips, status: the same four lines on every plate so the rows line up.
+  const px = { ...role, ...m }, ttl = rel("div", "plate-title", rTitle(px) || "Crew"); ttl.title = rTitleFull(px);
+  const chips = rChips(px) || rel("div", "chips", ""); if (!chips.childElementCount) chips.append(rel("span", "mchip m-none", "INHERIT"));
+  plate.append(nm, ttl, chips, task);
   desk.append(seat, plate);
   if (waiting) { const w = rel("div", "wait", "…"); w.setAttribute("aria-hidden", "true"); desk.append(w); }
   rWireCard(desk, role.id, proj);
@@ -399,14 +403,17 @@ function renderProjects(s) {
   const names = rProjNames(s), T = tasksOf(s), n = (p) => T.active.filter((t) => !p || t.project === p).length;
   const nav = $("projects"); nav.hidden = !names.length;
   const nd = (p) => needList(s).some((x) => !p || x.project === p);
-  if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd("")])) return;
+  if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd(""), (T.queued || []).map((t) => t.project)])) return;
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
     if (nd(p)) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
     b.title = text; b.append(rel("span", "pn-t", text), document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
-  nav.replaceChildren(...names.map((p) => chip(p, p)), chip("", "All"));
+  // All first, then the picked project, then projects with working or queued tasks (most first), then the quiet ones.
+  const Q = T.queued || [], load = (p) => n(p) + Q.filter((t) => t.project === p).length;
+  const order = names.map((p, i) => ({ p, i, l: load(p) })).sort((a, b) => (b.p === rProj) - (a.p === rProj) || b.l - a.l || a.i - b.i);
+  nav.replaceChildren(chip("", "All"), ...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
 }
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
@@ -1180,7 +1187,7 @@ function rShowCard(id, p = "") {
   const nMgr = id === MGR && s === "working" ? tasksOf(last).active.filter((t) => inProj(t, p)).length : 0;
   const task = id === MGR && nMgr ? `Managing ${nMgr} task${nMgr === 1 ? "" : "s"}` : m.task || m.line;
   if (task && task !== state) rows.push(rel("p", "rc-task", task));
-  rows.push(rel("p", "rc-model", rModelLine(x)));
+  if (x.modelOverride || x.maxTurns) rows.push(rel("p", "rc-model", rModelLine(x)));   // model and effort are on the plate; the card keeps overrides and turn limits
   const nd = needList(last || {}).find((n) => roleId(n.role) === id && (!n.project || n.project === p));
   if (nd) rows.push(rel("p", "rc-need", nd.kind === "permission" ? "Waiting for your permission" : nd.kind === "idle" ? "Waiting for your reply" : "Waiting for you"));
   const cl = rCostLine(id, p); if (cl) rows.push(rel("p", "rc-cost num", cl));
