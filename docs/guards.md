@@ -1,6 +1,6 @@
 # Guards: what the toon-crew guard allows, asks and blocks
 
-For anyone who has installed the `toon-crew` plugin and wants to know exactly what the guard does. The README has the short version (the Guards paragraph in [How it works](../README.md#how-it-works)). This page has the full rule list.
+For anyone who has installed the `toon-crew` plugin and wants to know exactly what the guard does. The README has the short version (the guard bullet in [Good to know](../README.md#good-to-know)). This page has the full rule list.
 
 > [!WARNING]
 > The guard is a seatbelt, not a sandbox. It reads the text of a tool call before it runs. It catches mistakes and lazy bypasses. A determined agent with a shell can still get around any text check, for example by writing a script file and running it. For roles that have Bash, Claude Code's own sandbox is the real boundary.
