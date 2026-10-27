@@ -17,3 +17,7 @@ metadata:
 - A team grid inside a subgraph that has in/out edges renders as a 2000px column; draw it as a separate edge-free block with `A ~~~ B` pairs (columns of 2, rows of 4 in `flowchart TD`) and keep a single node in the main flow. (seen 1) [crew]
 - The guard blocks a Bash call that writes a script and runs it in one command; write the script with the Write tool, run it in a second call (inline `python3 - <<EOF` that edits a file is allowed). (seen 1) [crew]
 - Crew Room "working" means an agent is running (agent-start without agent-stop); the assign event only supplies the task line (`plugin/board/lib/room.ts`). (seen 1) [project]
+- When splitting a long README into docs/, grep the whole repo for `README.md#` anchors first (docs/guards.md, docs/how-it-works.md and plugin/board/README.md linked into it) and fix them in the same pass; a script that parses headings (GitHub slug rules) and checks every `](..)`, `src` and `srcset` catches the rest. (seen 1) [project]
+- To fit a line budget, Mermaid `node:::class` inline styling saves one line per `class` statement, and a 9-row team table beats a colour-key diagram (about 11 lines vs 27, since every classDef costs a line). (seen 1) [crew]
+- The old board flow diagram said "15 agents in 8 teams"; docs/roster.md lists nine teams. Check counts in moved diagrams against the roster instead of copying them. (seen 1) [project]
+- Scratchpad files can be overwritten by another agent running in parallel; give helper scripts a distinctive name and re-run after a "changed on disk" notice. (seen 1) [crew]
