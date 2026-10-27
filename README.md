@@ -1,7 +1,6 @@
 <div align="center">
 <h1>toon-crew</h1>
 <p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.2" src="https://img.shields.io/badge/version-0.3.2-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.jpg"><img src="docs/images/hero-light.jpg" alt="The Crew Room board: each team in its own room, every crew member at a desk showing their model and current task." width="820"></picture><br><sub><b>The Crew Room</b>: the live board that shows your crew at work (demo data)</sub>
 </div>
 
 ## Why toon-crew
@@ -18,6 +17,8 @@
 2. **Open the board.** Run `/toon-crew:board`. It prints `{"pid":..,"port":..,"startedAt":..}`; open `http://127.0.0.1:<port>`. Stop it with `/toon-crew:board stop`.
 3. **Ask Doraemon for anything.** He is now your main agent. On your first request he writes `.claude/crew/project.md`: read it before you commit it.
 ## Meet the crew
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.jpg"><img src="docs/images/hero-light.jpg" alt="The Crew Room board: each team in its own room, every crew member at a desk showing their model and current task." width="820"></picture><br><sub><b>The Crew Room</b>: the live board that shows your crew at work (demo data)</sub></p>
+
 | Team | Members | What they do |
 |---|---|---|
 | Management | Doraemon, Miguel Rivera | Plan, brief, commit; keep lessons |
