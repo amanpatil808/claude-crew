@@ -332,6 +332,7 @@ const own = (o, k) => !!o && typeof o === "object" && Object.hasOwn(o, k) ? o[k]
 let last = null, rProj = "", rPicked = false;     // rProj "" = all projects
 // A desk is one role in one project room: walker, bubble and card state is keyed by role + project, so two Doraemons never share it.
 const rK = (id, p) => id + "@" + (p || "");
+let needAll = rGet("crewNeedAll", "0") === "1";
 let rNeed = new Set();                             // role@project keys whose person is waiting for the owner (state.needsYou)
 
 function rDesk(role, m, i, showTeam, proj = "") {
@@ -402,7 +403,7 @@ function renderProjects(s) {
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
     if (nd(p)) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
-    b.append(document.createTextNode(text + " "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
+    b.title = text; b.append(rel("span", "pn-t", text), document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
   nav.replaceChildren(...names.map((p) => chip(p, p)), chip("", "All"));
@@ -430,11 +431,12 @@ function needCopy(x, s, who) {
 function renderNeed(s) {
   const all = needList(s), list = rProj ? all.filter((x) => !x.project || x.project === rProj) : all, box = $("need"), now = Date.now();
   box.hidden = !all.length;
-  if (!changed("need", [all, rProj, Math.floor(now / 60000), s.snapshots])) return;
+  if (!changed("need", [all, rProj, needAll, Math.floor(now / 60000), s.snapshots])) return;
   const more = $("need-more");
   if (!all.length) { $("need-items").replaceChildren(); more.hidden = true; return; }
   $("need-h").textContent = `Needs you · ${list.length}`;
-  $("need-items").replaceChildren(...list.map((x) => {
+  const NEED_CAP = 4, shownNeed = needAll ? list : list.slice(0, NEED_CAP);
+  $("need-items").replaceChildren(...shownNeed.map((x) => {
     const row = rel("div", "nitem"); row.dataset.kind = x.kind;
     const rid = roleId(x.role), body = rel("div"), nt = rel("div", "nt"), who = rid ? nameOf(rid) : "Claude", cp = needCopy(x, s, who);
     row.append(icon(NEED_ICON[x.kind] || "hand", 2));
@@ -443,11 +445,18 @@ function renderNeed(s) {
     const meta = [x.project, cp.green && "checks green", x.since ? agoOf(x.since) : ""].filter(Boolean).join(" · ") + (x.stale ? " · may be old" : "");
     body.append(rel("div", "nm", meta)); row.append(body);
     if (x.kind === "pr") {
-      const r = rel("div", "nr"); const a = link(x.ref, "Open on GitHub ↗"); if (!a.href) a.removeAttribute("target"); r.append(a); row.append(r);
+      const r = rel("div", "nr"), m = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)\/?(?:[?#].*)?$/.exec(typeof x.ref === "string" ? x.ref : "");
+      if (m && (x.number == null || Number(m[1]) === Number(x.number))) r.append(link(x.ref, "Open on GitHub ↗")); else { r.classList.add("nr-none"); r.textContent = "link not shown"; }
+      row.append(r);
     } else row.append(rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")));
     return row;
   }));
   if (!list.length) $("need-items").replaceChildren(rel("p", "need-none", "Nothing is waiting in " + rProj + "."));
+  if (list.length > NEED_CAP) {
+    const b = rel("button", "need-more need-fold", needAll ? "Show less ▴" : "Show " + (list.length - NEED_CAP) + " more ▸"); b.type = "button"; b.setAttribute("aria-expanded", String(needAll));
+    b.onclick = () => { needAll = !needAll; rPut("crewNeedAll", needAll ? "1" : "0"); renderNeed(last); };
+    $("need-items").append(b);
+  }
   // Waiting somewhere else: one button that goes there (or to All when it is several projects).
   const rest = all.filter((x) => !list.includes(x)), ps = [...new Set(rest.map((x) => x.project).filter(Boolean))];
   more.hidden = !rest.length;
@@ -460,7 +469,7 @@ function renderNeed(s) {
 // ---- Floor header ----
 function renderFloor(s) {
   const T = tasksOf(s);
-  $("floor-h").textContent = `The floor · ${rProj || "all projects"}`;
+  $("floor-h").textContent = `The floor · ${rProj || "all projects"}`; $("floor-h").title = rProj || "";
   $("floor-meta").textContent = `${T.active.filter(inView).length} working · ${T.queued.filter(inView).length} queued`;
 }
 
@@ -599,7 +608,7 @@ function renderShip(s0) {
   const probs = [s.problems?.box && "Box: " + s.problems.box, s.problems?.ci, s.problems?.prs, s.problems?.git].filter(Boolean);
   const minute = Math.floor(Date.now() / 60000);
   if (!changed("ship", [s.name, s.deploy, s.ci, s.prs, s.commits, s.errors, probs, pa, minute])) return;
-  $("ship-meta").textContent = [s.name, read ? "read " + agoOf(read) : ""].filter(Boolean).join(" · ");
+  $("ship-meta").textContent = [s.name, read ? "read " + agoOf(read) : ""].filter(Boolean).join(" · "); $("ship-meta").title = s.name || "";
   $("ship-meta").dataset.old = read && Date.now() - Date.parse(read) > 15 * 60000 ? "1" : "";
   const holder = $("ship-rows");
   if (probs.length) out.push(Object.assign(rel("p", "problem", probs.join(" · ")), {}));
@@ -669,7 +678,7 @@ function logEntries(s) {
 function logRow(en, fresh) {
   const r = rel("div", "lrow"); r.dataset.id = en.id; r.dataset.sig = JSON.stringify([en.title, en.sub, en.meta]); if (fresh) r.classList.add("fresh");
   const t = rel("time", null, hm(en.ts)); t.dateTime = en.ts; t.title = `${day(en.ts)} ${hm(en.ts)} IST`;
-  const tx = rel("div", "tx"); tx.append(rel("div", "lt", en.title)); if (en.sub) tx.append(rel("div", "ls", en.sub));
+  const tx = rel("div", "tx"), lt = rel("div", "lt", en.title); lt.title = en.title; tx.append(lt); if (en.sub) { const ls = rel("div", "ls", en.sub); ls.title = en.sub; tx.append(ls); }
   r.append(t, icon(en.ic, 1.5, en.tone), tx, rel("div", "lm num", en.meta)); return r;
 }
 const dayLabel = (iso) => { const d = day(iso); return d === day(new Date().toISOString()) ? "Today" : d === day(new Date(Date.now() - 86400000).toISOString()) ? "Yesterday" : dayName(iso); };
@@ -689,7 +698,8 @@ function renderLog(s) {
   while (ref && !(ref.classList && (ref.classList.contains("lrow") || ref.classList.contains("day")))) ref = ref.nextSibling;   // skip the empty-state / button nodes
   for (const [, n] of want) { if (n === ref) ref = ref.nextSibling; else box.insertBefore(n, ref); }
   const empty = box.querySelector(".empty"), more = box.querySelector(".more");
-  if (!want.length) { if (!empty) box.append(rel("p", "empty", "Nothing finished yet.")); } else empty?.remove();
+  const EMPTY = "No finished tasks yet. Finished work appears here with what each agent found.";
+  if (!want.length) { if (!empty) box.append(rel("p", "empty", EMPTY)); else if (s) empty.textContent = EMPTY; } else empty?.remove();
   if (list.length > cap || (logAll && list.length > 12)) {
     const label = logAll ? "Show fewer ▾" : `Show ${list.length - cap} more ▸`;
     if (more) { more.textContent = label; more.setAttribute("aria-expanded", String(logAll)); }
@@ -814,7 +824,7 @@ function renderRoom(s) {
       if (g.head) {
         const h = rel("button", "pg-head"); h.type = "button"; h.setAttribute("aria-expanded", String(g.open));
         const chev = rel("span", "pg-chev", g.open ? "\u25be" : "\u25b8"); chev.setAttribute("aria-hidden", "true");
-        h.append(chev, rel("b", "pg-name", g.p));
+        { const nb = rel("b", "pg-name", g.p); nb.title = g.p; h.append(chev, nb); }
         if (!g.open && g.who.length) {                       // a closed floor still shows who is at work
           const row = rel("span", "pg-who"); row.setAttribute("aria-hidden", "true");
           g.who.slice(0, 6).forEach((id, k) => { const w = rel("span", "av-w"); w.append(rMini(id, "working", k)); row.append(w); });
