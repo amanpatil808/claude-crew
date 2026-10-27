@@ -76,19 +76,19 @@ evals/
 | mike-wazowski | mike-safe-ci-workflow | least privilege, no `${{ }}` in run:, pins or an open item / wrote ci.yml | harvest DevOps workflow rules |
 | miguel-rivera | miguel-real-clock-confirmed-fact | fact verbatim plus a time in the file / `date -u` before the write | harvest: real clock (seen 3) |
 
-## Last local run (2026-10-23, claude 2.1.308, 1 run each, `--ablation none`)
+## Last local run (2026-10-27, claude 2.1.311, 1 run each, `--ablation none`, smoke tag)
 
 | Case | Score | Cost |
 |---|---|---|
-| joe-not-run-vs-passed | 1.00 | $0.36 |
+| doraemon-verify-before-commit | 1.00 | $0.30 |
+| hattori-proof-fails-before-fix | 1.00 | $0.88 |
+| route-plan-mixed-wave | 1.00 | $0.21 |
+| route-where-defined | 1.00 | $0.16 |
 | stuart-path-line-read-only | 1.00 | $0.16 |
-| doraemon-verify-before-commit | 1.00 | $0.26 |
-| route-plan-mixed-wave | 1.00 | $0.37 |
-| route-where-defined | 0.67 (Doraemon answered with his own Grep, no stuart; 2 of 2 runs) | $0.14 |
-| hattori-proof-fails-before-fix | 1.00 | $0.93 |
-| cost-general-purpose-leak (run twice, without and with `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`) | 1.00 / 1.00 | $0.15 / $0.20 |
 
-These runs used the old (pre-0.2.0) names (tom, chip-and-dale, scooby-doo); the cases were renamed for cast v2 and not re-run. The other cases load but have not been run yet.
+5 cases, 308 s, $1.72 total.
+
+The other cases have not been run yet.
 
 ## Known limits
 
