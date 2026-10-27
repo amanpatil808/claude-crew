@@ -1282,14 +1282,12 @@ html:not([data-ready]) #r-hall { min-height: 640px; }
 /* ---- Edge cases: long names, long text, capped Needs-you ---- */
 html, body { max-width: 100%; overflow-x: clip; }
 .topbar .wrap > * { min-width: 0; }
-.projects { min-width: 0; flex: 0 1 auto; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-block: 4px; }
-.projects > .pchip { flex: 0 0 auto; }
-.topbar .wrap > .projects { flex: 1 1 0; }
+.projects { min-width: 0; }
+.projects > .pchip { flex: 0 1 auto; }
 .topbar .wrap > .spacer { flex: 0 0 0; }
 .topbar .wrap > .status, .topbar .wrap > .tbtn, .topbar .wrap > .brand { flex: none; }
 @media (max-width: 1200px) {
   .topbar .wrap { height: auto; flex-wrap: wrap; padding-block: 8px; row-gap: 4px; }
-  .topbar .wrap > .projects { order: 9; flex: 1 0 100%; margin-left: 0; flex-wrap: wrap; overflow: visible; }
 }
 .pchip { max-width: 100%; min-width: 0; }
 .pchip .pn-t { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1301,3 +1299,20 @@ html, body { max-width: 100%; overflow-x: clip; }
 .need-fold { display: block; }
 .lrow .tx .lt, .lrow .tx .ls { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .lrow .lm { flex-shrink: 0; white-space: nowrap; }
+
+/* ---- Project chips: their own full-width row under the sticky top line. They wrap; nothing scrolls sideways. ---- */
+.projrow { padding: 10px 0 0; }
+.projrow .projects { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; overflow: visible; padding: 0; }
+.projrow .pchip { max-width: 100%; }
+.pchip[data-quiet]:not([aria-pressed="true"]) { border-color: var(--line); color: var(--muted); font-weight: 600; }
+.pchip[data-quiet] b { color: var(--muted); }
+
+/* ---- Desk plates: name, designation, model + effort, status ---- */
+#view-room .plate { max-width: 114px; }
+#view-room .plate .bars { display: none; }
+#view-room .plate-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font: 700 12px/1.4 var(--font); color: var(--plate-soft); }
+#view-room .plate .chips { flex-wrap: nowrap; justify-content: flex-start; min-height: 20px; margin: 1px 0 2px; gap: 3px; }
+#view-room .plate .chips > span { height: 18px; font-size: 12px; padding: 0 4px; flex: none; }
+#view-room .plate .echip { gap: 3px; }
+#view-room .mchip.m-none { border: 1px solid var(--plate-soft); color: var(--plate-soft); }
+#view-room .plate-task { text-align: left; }
