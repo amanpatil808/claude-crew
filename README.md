@@ -1,6 +1,6 @@
 <div align="center">
 <h1>toon-crew</h1>
-<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.2" src="https://img.shields.io/badge/version-0.3.2-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
+<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
 </div>
 
 ## Why toon-crew
