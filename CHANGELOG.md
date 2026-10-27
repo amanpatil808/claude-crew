@@ -2,6 +2,29 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.5 - 28 Oct 2026
+
+Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.
+
+### Added
+
+- Copy light: when Doraemon starts a second copy of a role, he beams his gadget at the desk and a twin pops in with a ×2 badge.
+- Crew meter "Crew n / 4" in the floor header, with striped slots past the usual 4.
+- Every character travels in their own film-inspired style (doors, banana pogo, smoke leap, snow slide, soul glide, petals, bubbles, peel slide); the bamboo copter is Doraemon's. 1-2 s per trip.
+- README and how-it-works explain waves of 2-4, second copies and the queued plan.
+
+### Changed
+
+- One project at a time: the All view is gone and the picked project is a filled, ticked chip.
+- Task times read plainly ("8m"); counts show once.
+
+### Fixed
+
+- The board no longer redraws and re-animates everything on each poll; only new items animate.
+- Done and idle desks no longer bounce forever.
+- Agents that started but never reported back for 45+ min show "Lost contact" instead of working forever.
+- An assign binds the queued task whose text matches it, not just the oldest for that role.
+
 ## 0.3.4 - 28 Oct 2026
 
 Update with `/plugin marketplace update crew`, `/plugin update toon-crew@crew`, then `/reload-plugins` or a new session, and restart the board.

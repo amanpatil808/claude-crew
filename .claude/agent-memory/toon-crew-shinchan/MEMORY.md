@@ -15,4 +15,6 @@
 - The travel hook is `window.crewTravel?.({el, role, from, to, kind, reduced})`, called from rTrip in room.js; travel styles live in travel.js and travel.css. (seen 1) [project]
 - Board renderers must update in place (fill/syncNode keyed by data-k, rMerge for rooms and desks); `replaceChildren` on poll replays every entry animation. Only new keyed elements get `.enter`. Prove it over raw CDP with a MutationObserver plus an animationstart listener, armed 3 s after load, then append a task mid-run. (seen 1) [crew]
 - BOARD_PORT is only a request: if it's busy the board takes the next free port. Read server.json for the real one. (seen 1) [project]
+- The crewTravel hook passes only from/to points; travel.js rebuilds the route by matching desk seat and stand points to rAccess, then calls rRoute. The page script is one "use strict" scope shared with room.js, so keep new code in an IIFE. (seen 1) [project]
+- Trip effects must check the walker is still connected, or the Animation toggle leaves strays. (seen 1) [crew]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]
