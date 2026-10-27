@@ -1,8 +1,9 @@
 // Shapes the event log into the short, meaningful view the Crew Room shows: one line per person,
 // only real outcomes in the feed, at most three facts on top. Noise is dropped here, not in the page.
-import { readFileSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BoardEvent } from "./events.ts";
+import { agentIdOf, type BoardEvent } from "./events.ts";
+import { safeTranscript, transcriptRoot } from "./usage.ts";
 import { isOverride } from "./model.ts";
 import { crewFrom, roleFor, typesById, type AgentInfo, type CrewMember, type Role, type RoleCard } from "./crew.ts";
 import { deriveTasks } from "./tasks.ts";
@@ -93,11 +94,11 @@ export function roomTalks(events: BoardEvent[], roles: Map<string, Role>, now = 
   return out.slice(-10);
 }
 
-export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFeedItem[] {
+export function roomFeed(events: BoardEvent[], roles: Map<string, Role>, probe: Probe = transcriptLife): RoomFeedItem[] {
   const out: RoomFeedItem[] = [];
   const started = new Set<string>();   // repeated starts of the same agent say nothing new
   const running = new Map<string, Map<string, number>>();   // "project\0role" -> running agent id -> start time
-  const types = typesById(events), seen = contactTracker();
+  const types = typesById(events), seen = lifeTracker(probe);
   const push = (e: BoardEvent, item: Omit<RoomFeedItem, "id" | "ts" | "project">) => out.push({ id: e.id, ts: e.ts, ...(e.project ? { project: e.project } : {}), ...item });
   for (const e of events) {
     seen.see(e);
@@ -110,7 +111,7 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFe
     } else if (e.kind === "agent-start" && who && e.agentId && !started.has(e.agentId)) {
       started.add(e.agentId);
       push(e, { tone: "start", role: r?.id, text: `${who} started` });
-      // A start while the same role already runs in this project is a clone (ghosts, see GHOST_MS, do not count).
+      // A start while the same role already runs in this project is a clone (ghosts, see lifeTracker, do not count).
       const key = `${e.project ?? ""}\u0000${r?.id}`, live = [...(running.get(key) ?? new Map<string, number>())].filter(([id]) => id !== e.agentId && !seen.ghost(id, Date.parse(e.ts)));
       const next = new Map(live); next.set(e.agentId, Date.parse(e.ts)); running.set(key, next);
       if (live.length >= 1) push({ ...e, id: e.id + "-clone" }, { tone: "clone", kind: "clone", role: r?.id, n: next.size, agentId: e.agentId, text: `${who} cloned (${next.size} copies)` });
@@ -126,7 +127,8 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>): RoomFe
 }
 
 // One project's own crew: the same members/notes logic, fed with that project's events only.
-// An agent with a start, no stop and no sign of life for GHOST_MS is not running (its session was killed or closed).
+// The fallback when an agent's transcript cannot be found (see lifeTracker):
+// an agent with a start, no stop and no sign of life for GHOST_MS is not running (its session was killed or closed).
 // Signs of life: its own events (start, assign to it, stop, needs-you, usage) and its session's non-agent events
 // (commit, PR, turn end...), but not the manager's heartbeat and usage, which tick on while a dead agent lingers.
 export const GHOST_MS = 45 * 60_000;
@@ -144,7 +146,108 @@ export function contactTracker() {
       else if (e.sid && e.kind !== "main-busy" && e.kind !== "usage") bump(sess, e.sid, t);
     },
     last,
+    own: (agentId: string) => own.get(agentId) ?? 0,
+    sid: (agentId: string) => sidOf.get(agentId),
     ghost: (agentId: string, now: number) => now - last(agentId) > GHOST_MS,
+  };
+}
+
+// ---- Liveness from the agent's own transcript ----
+// An agent stopped by the user (interrupt, TaskStop) never fires SubagentStop, so its start stays "running".
+// Claude Code writes every subagent to <root>/<project-slug>/<session uuid>/subagents/agent-<agentId>.jsonl
+// (checked on CLI 2.1.310): the event's sid (the session uuid's first 8 characters) and agentId find it, so no
+// path is ever stored in the log. Only the file's mtime is read (lstat), never its content.
+// Nothing is written while a tool call runs (measured: a 200 s Bash left the mtime untouched), and a foreground
+// Bash call may run up to 10 minutes, so ALIVE_MS is that limit plus 2 minutes for a long model reply.
+export const ALIVE_MS = 12 * 60_000;
+// The transcript is written async: a start younger than this may have no file yet.
+export const MISSING_GRACE_MS = 2 * 60_000;
+// One lstat per agent per poll: answers are reused this long.
+export const PROBE_TTL_MS = 10_000;
+// none: no usable locator (old event, unknown session, a symlink, a second name, outside the root): GHOST_MS rules.
+export type Life = { kind: "none" } | { kind: "missing" } | { kind: "seen"; mtime: number };
+export type Probe = (agentId: string, sid: string | undefined) => Life;
+const NONE: Life = { kind: "none" }, MISSING: Life = { kind: "missing" };
+const SID = /^[0-9a-f]{8}$/;
+const SESSION_DIR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const MAX_SESSIONS = 20_000, MAX_CACHED = 4_096;
+
+// sid -> session folders, one pass over the root. Dirent types come from readdir without following links,
+// so a symlinked project or session folder is never entered.
+function scanSessions(root: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  let n = 0;
+  try {
+    for (const p of readdirSync(root, { withFileTypes: true })) {
+      if (!p.isDirectory()) continue;
+      let kids;
+      try { kids = readdirSync(join(root, p.name), { withFileTypes: true }); } catch { continue; }
+      for (const k of kids) {
+        if (!k.isDirectory() || !SESSION_DIR.test(k.name)) continue;
+        const sid = k.name.slice(0, 8), dirs = out.get(sid) ?? [];
+        dirs.push(join(root, p.name, k.name)); out.set(sid, dirs);
+        if (++n >= MAX_SESSIONS) return out;
+      }
+    }
+  } catch { /* no root: every agent has no locator */ }
+  return out;
+}
+
+// A missing file is "missing" only when nothing odd is on the path; a symlink, a second name or a path that
+// leaves the root is no locator at all, so it can neither keep a ghost alive nor drop a live agent.
+function fileLife(path: string, root: string): Life {
+  let st;
+  try { st = lstatSync(path); } catch (e) { return (e as { code?: string }).code === "ENOENT" ? MISSING : NONE; }
+  if (!st.isFile() || st.nlink !== 1 || !safeTranscript(path, root)) return NONE;
+  return { kind: "seen", mtime: st.mtimeMs };
+}
+
+export function transcriptProbe(opts: { root?: () => string; clock?: () => number; ttlMs?: number } = {}): Probe {
+  const rootOf = opts.root ?? transcriptRoot, clock = opts.clock ?? Date.now, ttl = opts.ttlMs ?? PROBE_TTL_MS;
+  const cache = new Map<string, { at: number; life: Life }>();
+  let index: { at: number; root: string; dirs: Map<string, string[]> } | undefined;
+  return (agentId, sid) => {
+    if (!agentIdOf(agentId) || typeof sid !== "string" || !SID.test(sid)) return NONE;
+    const now = clock(), root = rootOf(), key = `${root}\0${sid}\0${agentId}`, hit = cache.get(key);
+    if (hit && now - hit.at < ttl) return hit.life;
+    // Session folders never move, so the index is rebuilt only for a sid it does not know yet, at most once per ttl.
+    if (!index || index.root !== root || (!index.dirs.has(sid) && now - index.at >= ttl)) index = { at: now, root, dirs: scanSessions(root) };
+    const dirs = index.dirs.get(sid) ?? [];
+    // Two sessions sharing the 8-character prefix: which one is meant is unknown, so no locator.
+    const life = dirs.length === 1 ? fileLife(join(dirs[0], "subagents", `agent-${agentId}.jsonl`), root) : NONE;
+    if (cache.size >= MAX_CACHED) cache.clear();
+    cache.set(key, { at: now, life });
+    return life;
+  };
+}
+// Shared by the feed and every room, so one poll stats each agent once.
+const transcriptLife = transcriptProbe();
+
+// The decision, pure given the probe: an agent with a transcript is alive while it wrote in the last ALIVE_MS
+// (or had its own event then); a missing file after MISSING_GRACE_MS is gone; no locator falls back to GHOST_MS.
+// An open needs-you of the agent (a permission dialog writes nothing) keeps it for GHOST_MS, as before.
+export function lifeTracker(probe: Probe) {
+  const contact = contactTracker(), waits = new Map<string, number>();
+  const life = (agentId: string) => probe(agentId, contact.sid(agentId));
+  return {
+    see(e: BoardEvent) {
+      contact.see(e);
+      const t = Date.parse(e.ts);
+      if (e.agentId && t >= 0) { if (e.kind === "needs-you") waits.set(e.agentId, t); else waits.delete(e.agentId); }
+    },
+    // The time of the agent's last sign of life, for "Lost contact" against a later hand-back.
+    last(agentId: string): number {
+      const l = life(agentId);
+      return l.kind === "seen" ? Math.max(l.mtime, contact.own(agentId)) : l.kind === "missing" ? contact.own(agentId) : contact.last(agentId);
+    },
+    ghost(agentId: string, now: number): boolean {
+      const l = life(agentId);
+      if (l.kind === "none") return contact.ghost(agentId, now);
+      const wait = waits.get(agentId);
+      if (wait !== undefined && now - wait <= GHOST_MS) return false;
+      if (l.kind === "missing") return now - contact.own(agentId) > MISSING_GRACE_MS;
+      return now - Math.max(l.mtime, contact.own(agentId)) > ALIVE_MS;
+    },
   };
 }
 
@@ -156,10 +259,10 @@ export const CREW_CAP = 4;
 export const STALE_AGENT_MS = 6 * 3_600_000;
 export const ROOM_WINDOW_MS = 7 * 24 * 3_600_000;
 
-export function roomFor(project: string, events: BoardEvent[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now()): ProjectRoom {
+export function roomFor(project: string, events: BoardEvent[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now(), probe: Probe = transcriptLife): ProjectRoom {
   const mine = events.filter((e) => e.project === project), busy = mainBusy(mine, now);
   const active = deriveTasks(mine, roles, now).active;   // tasks are the source of truth for "working"
-  const seen = contactTracker();
+  const seen = lifeTracker(probe);
   for (const e of mine) seen.see(e);
   const everyone = crewFrom(mine, roles);
   const working = everyone.filter((c) => c.status === "working" && c.roleId && c.roleId !== MANAGER && c.agentType !== "agent");
@@ -171,18 +274,23 @@ export function roomFor(project: string, events: BoardEvent[], roles: Map<string
     const ids = live.filter((c) => c.roleId === m.id).map((c) => c.agentId), lost = ghosts.filter((c) => c.roleId === m.id);
     // A role with a ghost keeps no task-based "working" either; its task stays active until tasks.ts's own stale rule.
     const t = lost.length ? undefined : active.find((x) => x.role === m.id);
-    const recent = now - Math.max(0, ...lost.map((c) => seen.last(c.agentId))) <= STALE_AGENT_MS;
-    const gone = !ids.length && lost.length && m.status !== "working" ? { status: "idle" as const, line: recent ? "Lost contact" : "Idle", ...(recent ? { stale: true as const } : {}), since: undefined } : {};
-    return { ...m, project, copies: ids.length, ...(ids.length ? { copyIds: ids } : {}), ...(t && m.status !== "working" ? { status: "working" as const, line: t.text, since: t.startedAt, ref: t.ref ?? m.ref } : {}), ...gone };
+    // "Lost contact" only when no copy lives and the role's newest news is the ghost: a hand-back after it still shows done.
+    const lostAt = Math.max(0, ...lost.map((c) => seen.last(c.agentId)));
+    const doneAt = Math.max(0, ...all.filter((c) => c.roleId === m.id && c.status === "done").map((c) => Date.parse(c.finishedAt ?? "") || 0));
+    const recent = now - lostAt <= STALE_AGENT_MS;
+    const gone = !ids.length && lost.length && m.status !== "working" && lostAt >= doneAt ? { status: "idle" as const, line: recent ? "Lost contact" : "Idle", ...(recent ? { stale: true as const } : {}), since: undefined } : {};
+    const out: RoomMember = { ...m, project, copies: ids.length, ...(ids.length ? { copyIds: ids } : {}), ...(t && m.status !== "working" ? { status: "working" as const, line: t.text, since: t.startedAt, ref: t.ref ?? m.ref } : {}), ...gone };
+    // Copies are live running agents only: a desk that is not working never draws a twin.
+    return out.status === "working" ? out : { ...out, copies: 0, copyIds: [] };
   });
   return { members, managerBusy: busy, managerActive: managerActive(mine, now), crew: { running: live.length, cap: CREW_CAP, roles: new Set(live.map((c) => c.roleId)).size } };
 }
 
 // A room for every registered project and every project with an event in the last 7 days.
-export function buildRooms(events: BoardEvent[], registry: { name: string }[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now()): Record<string, ProjectRoom> {
+export function buildRooms(events: BoardEvent[], registry: { name: string }[], roles: Map<string, Role>, cards: RoleCard[], now = Date.now(), probe: Probe = transcriptLife): Record<string, ProjectRoom> {
   const names = new Set(registry.map((p) => p.name));
   for (const e of events) if (e.project && now - Date.parse(e.ts) <= ROOM_WINDOW_MS) names.add(e.project);
-  return Object.fromEntries([...names].map((n) => [n, roomFor(n, events, roles, cards, now)]));
+  return Object.fromEntries([...names].map((n) => [n, roomFor(n, events, roles, cards, now, probe)]));
 }
 
 function currentBranch(projectDir?: string): string {
