@@ -15,5 +15,7 @@ metadata:
 
 - Queue the WHOLE plan on the board at planning time, including later waves, reviews, QA and merges, not each piece right before dispatch. Otherwise Queued is always empty; the owner reported it as broken on 2026-10-28. [project] (seen 1)
 
+- The owner wants several copies of one role when it speeds things up, with no file clashes. When one file is the bottleneck (board room.js), carve the new work into new files (e.g. travel.js and travel.css appended by server.ts) behind a one-line hook in the shared file, then run a second copy. [project] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.
