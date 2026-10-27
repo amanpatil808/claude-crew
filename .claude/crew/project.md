@@ -45,7 +45,7 @@ Lines marked `(owner)` were set by the owner; agents keep them as they are.
 - Default branch: `main`. Branches: `feat/...`, `fix/...`, `docs/...`.
 - Only the manager commits. PRs only; never push to `main` or force-push.
 - Only the DevOps Team merges, and only with the owner's confirmation (`CHANGELOG.md`, v0.2.2).
-- Required checks: the `ci` workflow (build job and `secrets` job).
+- Required checks: the `ci` workflow (`plugin` job and `secrets` job).
 
 ## Deploy and release
 - Release: bump `version` in the plugin manifest plus a `CHANGELOG.md` entry; users update with `/plugin update toon-crew@crew`.
