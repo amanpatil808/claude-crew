@@ -2,7 +2,7 @@
 // the board's own redaction. Every transcript here is made up; no real one is read.
 import "./env.ts";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
@@ -126,8 +126,10 @@ test("a file swapped after the check is not read: another file, or a symlink, in
   assert.ok(checked && sumTranscript(checked)?.rows.length, "control: unchanged file is read");
   const secret = join(outside, "secret.jsonl");
   writeFileSync(secret, asst("m9", { in: 999 }) + "\n");
-  rmSync(p);
-  writeFileSync(p, asst("m9", { in: 999 }) + "\n");   // same path, new file (new inode)
+  // Create the replacement while the original still exists, then rename it over: the two inodes
+  // are guaranteed different. rm-then-write lets ext4 reuse the freed inode (same dev+ino) on Linux.
+  writeFileSync(p + ".new", asst("m9", { in: 999 }) + "\n");
+  renameSync(p + ".new", p);                           // same path, new file (new inode)
   assert.equal(sumTranscript(checked), null);
   rmSync(p);
   symlinkSync(secret, p);                              // same path, now a symlink to a file outside the root
