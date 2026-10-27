@@ -129,24 +129,22 @@ export function roomFeed(events: BoardEvent[], roles: Map<string, Role>, probe: 
 // One project's own crew: the same members/notes logic, fed with that project's events only.
 // The fallback when an agent's transcript cannot be found (see lifeTracker):
 // an agent with a start, no stop and no sign of life for GHOST_MS is not running (its session was killed or closed).
-// Signs of life: its own events (start, assign to it, stop, needs-you, usage) and its session's non-agent events
-// (commit, PR, turn end...), but not the manager's heartbeat and usage, which tick on while a dead agent lingers.
+// Signs of life are the agent's own events only (start, assign to it, stop, needs-you, usage, anything with its id).
+// Its session's other events (turn end, commit, heartbeat) are not: a busy session would keep a stopped agent forever.
 export const GHOST_MS = 45 * 60_000;
 export function contactTracker() {
-  const own = new Map<string, number>(), sess = new Map<string, number>(), sidOf = new Map<string, string>();
-  const bump = (m: Map<string, number>, k: string, t: number) => { if (!((m.get(k) ?? 0) >= t)) m.set(k, t); };
-  const last = (agentId: string) => Math.max(own.get(agentId) ?? 0, sess.get(sidOf.get(agentId) ?? "") ?? 0);
+  const own = new Map<string, number>(), sidOf = new Map<string, string>();
+  const last = (agentId: string) => own.get(agentId) ?? 0;
   return {
     see(e: BoardEvent) {
       const t = Date.parse(e.ts);
       if (!(t >= 0)) return;
       const who = e.agentId ?? e.toId;
       if (e.agentId && e.sid) sidOf.set(e.agentId, e.sid);
-      if (who) bump(own, who, t);
-      else if (e.sid && e.kind !== "main-busy" && e.kind !== "usage") bump(sess, e.sid, t);
+      if (who && !(last(who) >= t)) own.set(who, t);
     },
     last,
-    own: (agentId: string) => own.get(agentId) ?? 0,
+    own: last,
     sid: (agentId: string) => sidOf.get(agentId),
     ghost: (agentId: string, now: number) => now - last(agentId) > GHOST_MS,
   };
@@ -164,7 +162,8 @@ export const ALIVE_MS = 12 * 60_000;
 export const MISSING_GRACE_MS = 2 * 60_000;
 // One lstat per agent per poll: answers are reused this long.
 export const PROBE_TTL_MS = 10_000;
-// none: no usable locator (old event, unknown session, a symlink, a second name, outside the root): GHOST_MS rules.
+// none: no usable locator (old event, unknown session, a symlink, a second name, outside the root, too many
+// folders for one sid): GHOST_MS rules.
 export type Life = { kind: "none" } | { kind: "missing" } | { kind: "seen"; mtime: number };
 export type Probe = (agentId: string, sid: string | undefined) => Life;
 const NONE: Life = { kind: "none" }, MISSING: Life = { kind: "missing" };
@@ -195,11 +194,33 @@ function scanSessions(root: string): Map<string, string[]> {
 
 // A missing file is "missing" only when nothing odd is on the path; a symlink, a second name or a path that
 // leaves the root is no locator at all, so it can neither keep a ghost alive nor drop a live agent.
-function fileLife(path: string, root: string): Life {
+const absent = (e: unknown): Life => ((e as { code?: string }).code === "ENOENT" ? MISSING : NONE);
+function fileLife(dir: string, agentId: string, root: string): Life {
+  // The session and subagents folders must be real folders now, not only when indexed: a folder swapped for a
+  // symlink (even one into the root) could borrow another session's file.
+  for (const d of [dir, join(dir, "subagents")]) {
+    try { if (!lstatSync(d).isDirectory()) return NONE; } catch (e) { return absent(e); }
+  }
+  const path = join(dir, "subagents", `agent-${agentId}.jsonl`);
   let st;
-  try { st = lstatSync(path); } catch (e) { return (e as { code?: string }).code === "ENOENT" ? MISSING : NONE; }
+  try { st = lstatSync(path); } catch (e) { return absent(e); }
   if (!st.isFile() || st.nlink !== 1 || !safeTranscript(path, root)) return NONE;
   return { kind: "seen", mtime: st.mtimeMs };
+}
+
+// The same session uuid has a folder under every project slug its cwd took (worktrees, /private/tmp), so the sid
+// prefix can name several folders. The agentId is unique: the folder holding its file is the one, and if several
+// do, the newest write decides. With no file anywhere, one odd path (symlink, second name) means no locator.
+const MAX_DIRS = 32;
+function locate(dirs: string[], agentId: string, root: string): Life {
+  if (!dirs.length || dirs.length > MAX_DIRS) return NONE;
+  let best: { kind: "seen"; mtime: number } | undefined, odd = false;
+  for (const d of dirs) {
+    const l = fileLife(d, agentId, root);
+    if (l.kind === "seen") { if (!best || l.mtime > best.mtime) best = l; }
+    else if (l.kind === "none") odd = true;
+  }
+  return best ?? (odd ? NONE : MISSING);
 }
 
 export function transcriptProbe(opts: { root?: () => string; clock?: () => number; ttlMs?: number } = {}): Probe {
@@ -212,9 +233,12 @@ export function transcriptProbe(opts: { root?: () => string; clock?: () => numbe
     if (hit && now - hit.at < ttl) return hit.life;
     // Session folders never move, so the index is rebuilt only for a sid it does not know yet, at most once per ttl.
     if (!index || index.root !== root || (!index.dirs.has(sid) && now - index.at >= ttl)) index = { at: now, root, dirs: scanSessions(root) };
-    const dirs = index.dirs.get(sid) ?? [];
-    // Two sessions sharing the 8-character prefix: which one is meant is unknown, so no locator.
-    const life = dirs.length === 1 ? fileLife(join(dirs[0], "subagents", `agent-${agentId}.jsonl`), root) : NONE;
+    let life = locate(index.dirs.get(sid) ?? [], agentId, root);
+    // A known session can gain a folder under a new slug later (a new worktree cwd): rescan before calling it missing.
+    if (life.kind === "missing" && now - index.at >= ttl) {
+      index = { at: now, root, dirs: scanSessions(root) };
+      life = locate(index.dirs.get(sid) ?? [], agentId, root);
+    }
     if (cache.size >= MAX_CACHED) cache.clear();
     cache.set(key, { at: now, life });
     return life;

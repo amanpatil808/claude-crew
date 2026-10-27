@@ -131,12 +131,81 @@ test("symlinked project or session folders are never indexed, even when they poi
   assert.equal(f.probe("a1", SID).kind, "seen");
 });
 
-test("two session folders sharing the 8-character prefix give no locator, not a guess", () => {
+// Write agent-<id>.jsonl into <root>/<slug>/<uuid>/subagents with an mtime minAgo minutes back.
+function put(root: string, slug: string, uuid: string, agentId: string, minAgo: number) {
+  const subs = join(root, slug, uuid, "subagents");
+  mkdirSync(subs, { recursive: true });
+  const p = join(subs, `agent-${agentId}.jsonl`), t = new Date(NOW - minAgo * MIN);
+  writeFileSync(p, "{}\n"); utimesSync(p, t, t);
+  return p;
+}
+
+test("the same session under 2 slugs plus a tmp folder: the folder holding the agent's file decides, an old mtime drops it", () => {
   const f = fixture();
-  f.file("a1", 30);
+  f.file("a1", 20);                                          // stopped by the user 20 minutes ago
+  put(f.root, "-w-shop-wt", UUID, "a2", 1);                  // the same session uuid under a worktree slug
+  mkdirSync(join(f.root, "-private-tmp", UUID, "tool-results"), { recursive: true });   // a tmp cwd: a folder with no subagents
+  writeFileSync(join(f.root, "-private-tmp", UUID + ".jsonl"), "{}\n");                   // and the main transcript file: never a folder
+  // In both folders (the same id twice): the newest write wins, so an old copy cannot drop a live agent.
+  f.file("a3", 30); put(f.root, "-w-shop-wt", UUID, "a3", 2);
+  // A different session that only shares the 8-character prefix, holding nothing of these agents.
   mkdirSync(join(f.root, "-w-other", SID + "-1111-4000-8000-000000000009", "subagents"), { recursive: true });
-  assert.deepEqual(f.probe("a1", SID), { kind: "none" });
-  assert.equal(shin(roomFor("shop", [start("a1", 30)], roles, cards, NOW, f.probe)).copies, 1);
+  assert.equal((f.probe("a1", SID) as { mtime: number }).mtime, NOW - 20 * MIN);
+  assert.equal((f.probe("a3", SID) as { mtime: number }).mtime, NOW - 2 * MIN);
+  assert.equal(f.probe("zz", SID).kind, "missing");
+  const r = roomFor("shop", [start("a1", 30), start("a2", 30), start("a3", 30)], roles, cards, NOW, f.probe);
+  assert.deepEqual(shin(r).copyIds, ["a2", "a3"]);
+  assert.equal(r.crew.running, 2);
+});
+
+test("several folders: a symlink in one cannot keep a ghost alive while the real file in another is old", () => {
+  const f = fixture();
+  f.file("a1", 20);
+  const outside = mkdtempSync(join(tmpdir(), "crew-live-multi-"));
+  writeFileSync(join(outside, "fresh.jsonl"), "{}\n");
+  mkdirSync(join(f.root, "-w-shop-wt", UUID, "subagents"), { recursive: true });
+  symlinkSync(join(outside, "fresh.jsonl"), join(f.root, "-w-shop-wt", UUID, "subagents", "agent-a1.jsonl"));
+  assert.equal(f.probe("a1", SID).kind, "seen");
+  assert.equal(shin(roomFor("shop", [start("a1", 30)], roles, cards, NOW, f.probe)).copies, 0);
+  // With no real file anywhere, the odd path means no locator (the fallback), not "missing".
+  symlinkSync(join(outside, "fresh.jsonl"), join(f.root, "-w-shop-wt", UUID, "subagents", "agent-l1.jsonl"));
+  assert.deepEqual(f.probe("l1", SID), { kind: "none" });
+});
+
+test("a session that gains a folder under a new slug after indexing is rescanned before an agent counts as missing", () => {
+  const f = fixture();
+  let clock = NOW;
+  const probe = transcriptProbe({ root: () => f.root, clock: () => clock });
+  f.file("a1", 1);
+  assert.equal(probe("a1", SID).kind, "seen");               // indexes the one folder
+  put(f.root, "-w-shop-wt2", UUID, "b1", 1);                 // a new worktree slug appears later
+  clock += 10_001;
+  assert.equal(probe("b1", SID).kind, "seen");
+});
+
+test("a session folder swapped for a symlink that stays inside the root is no locator", () => {
+  const f = fixture();
+  f.file("a1", 1);
+  assert.equal(f.probe("a1", SID).kind, "seen");
+  // Another real session in the root, with a fresh file for s1.
+  put(f.root, "-w-else", "fedcba98-0000-4000-8000-000000000003", "s1", 1);
+  renameSync(join(f.root, "-w-shop", UUID), join(f.root, "-w-shop", "moved"));
+  symlinkSync(join(f.root, "-w-else", "fedcba98-0000-4000-8000-000000000003"), join(f.root, "-w-shop", UUID));
+  assert.deepEqual(f.probe("s1", SID), { kind: "none" });
+});
+
+test("a busy session (turn ends every 5 minutes) with a stopped agent and no locator: dropped after 45 minutes", () => {
+  const f = fixture();
+  const busy = (sid: string) => Array.from({ length: 12 }, (_, i) => ev({ kind: "turn-end", sid, ts: at(55 - i * 5), text: "Turn ended" }));
+  // "fedcba98" has no folder (no locator); "s1" is an old-style sid.
+  for (const sid of ["fedcba98", "s1"]) {
+    const events = [start("a1", 60, { sid }), ...busy(sid), ev({ kind: "commit", sid, ts: at(1), text: "Commit" })];
+    const r = roomFor("shop", events, roles, cards, NOW, f.probe);
+    assert.deepEqual([shin(r).status, shin(r).line, shin(r).copies, r.crew.running], ["idle", "Lost contact", 0, 0], sid);
+    // The agent's own event inside the window still keeps it.
+    const own = ev({ kind: "usage", agentId: "a1", sid, ts: at(10), text: "usage" });
+    assert.equal(shin(roomFor("shop", [...events, own], roles, cards, NOW, f.probe)).copies, 1, sid);
+  }
 });
 
 test("two stopped agents with old transcripts and no live one: idle, copies 0, copyIds empty", () => {
