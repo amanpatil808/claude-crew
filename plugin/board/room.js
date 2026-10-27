@@ -343,11 +343,11 @@ function rCrewMeter(c) {
   if (!c) return null;
   const run = Math.max(0, Math.floor(c.running)), cap = Number.isFinite(c.cap) && c.cap > 0 ? Math.min(8, Math.floor(c.cap)) : 4;
   const m = rel("span", "crewm"); m.dataset.over = String(run > cap); m.setAttribute("role", "img");
-  m.setAttribute("aria-label", "Crew: " + run + " running, up to " + cap + (run > cap ? ", over the usual limit" : ""));
+  m.setAttribute("aria-label", "Crew: " + run + " running, up to " + cap + (run > cap ? ", over the usual " + cap : ""));
   const names = Array.isArray(c.roles) ? c.roles.filter((x) => typeof x === "string").map(nameOf) : [];
   m.title = "Doraemon runs 2-4 crew at once to keep cost down." + (names.length ? "\nNow: " + names.join(", ") : "");
   const slots = rel("span", "cm-slots"); slots.setAttribute("aria-hidden", "true");
-  for (let i = 0; i < cap; i++) slots.append(rel("i", i < run ? "on" : ""));
+  for (let i = 0; i < Math.max(run, cap); i++) slots.append(rel("i", (i < run ? "on" : "") + (i >= cap ? " x" : "") + (i === cap - 1 && run > cap ? " cap" : "")));
   m.append(rel("span", "cm-l", "Crew"), slots, rel("b", "cm-n num", run + " / " + cap));
   return m;
 }
@@ -359,6 +359,7 @@ function rDesk(role, m, i, showTeam, proj = "") {
   if (waiting) m = { ...m, status: "idle", line: "Waiting for task" };
   const stale = m.stale === true && m.status === "idle" && !waiting;      // started, never stopped, silent for 45+ min
   const key = rKeyOf(role.id), nap = rNaps(key, m), need = rNeed.has(k), nc = waiting ? 1 : rCopiesOf(m);
+  const vis = rHold[k] ? Math.max(1, rHold[k] - 1) : nc;      // the badge and the line wait for the copy light, like the twin
   const s = m.status === "idle" || nap ? "queued" : m.status;
   const desk = rel("div", "desk"); desk.dataset.s = s; desk.dataset.id = role.id; desk.dataset.p = proj; desk.dataset.k = k; desk.style.setProperty("--i", i * 60 + "ms");
   if (key) desk.dataset.who = key;
@@ -388,13 +389,13 @@ function rDesk(role, m, i, showTeam, proj = "") {
   const table = rel("div", "table"); table.append(rel("span", "led"), rel("span", "laptop"), rel("span", "mug"));
   const seat = rel("div", "seat"); seat.append(stage, table, ...rTouches(key));
   // The plate keeps to a name and one status line: the full task text is in the Tasks card and the hover card.
-  const plate = rel("div", "plate"), nm = rel("div", "plate-name"), st = rel("span", s === "working" ? "st bell" : "st", R_ICON[s]); st.setAttribute("aria-hidden", "true");
+  const plate = rel("div", "plate"), nm = rel("div", "plate-name"), st = rel("span", s === "working" ? "st bell" : "st", stale ? "" : R_ICON[s]); st.setAttribute("aria-hidden", "true");
   const sw = rel("i", "swatch"); sw.setAttribute("aria-hidden", "true");
   nm.append(sw, rel("b", null, plateName(role)));
-  if (nc > 1) { const cb = rel("span", "cbadge", "×" + nc); cb.title = nc + " copies of " + stripPet(role.mascot) + " at work"; nm.append(cb); }
+  if (vis > 1) { const cb = rel("span", "cbadge", "×" + vis); cb.title = vis + " copies of " + stripPet(role.mascot) + " at work"; nm.append(cb); }
   nm.append(st);
   const span = m.since ? shortSpan(rMins(m.since)) : "";
-  const line = stale ? "Lost contact" : waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (nc > 1 ? " ×" + nc : "") + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
+  const line = stale ? "Lost contact · 45+ min" : waiting ? "Waiting for task" : s === "working" ? (role.id === MGR ? m.line : "Working" + (span && span !== "now" ? " · " + span : "")) : s === "done" ? "Done" + (span ? " " + span + " ago" : "") : "Resting";
   const task = rel("div", "plate-task", line); task.title = stale ? STALE : m.task || m.line || "";
   // Name, designation, model + effort chips, status: the same four lines on every plate so the rows line up.
   const px = { ...role, ...m }, ttl = rel("div", "plate-title", rTitle(px) || "Crew"); ttl.title = rTitleFull(px);
@@ -429,6 +430,34 @@ function pickInit(s) {
 }
 const sigs = {};                                   // section -> last painted signature: a section is repainted only when its data changed
 const changed = (name, value) => { const sig = JSON.stringify(value); if (sigs[name] === sig) return false; sigs[name] = sig; return true; };
+// fill(parent, ...nodes): put the new nodes into the parent by changing the nodes already there (text, attributes), never by re-creating them.
+// Children with data-k are matched by key; the others by position. A node that is really new is added, and slides in once the page is up (class "enter").
+function syncNode(o, n) {
+  if (o.nodeType === 3) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; return; }
+  if (o.nodeType !== 1) return;
+  for (const a of [...o.attributes]) if (a.name !== "open" && !n.hasAttribute(a.name)) { if (a.name === "class" && o.classList.contains("enter")) o.className = "enter"; else o.removeAttribute(a.name); }
+  for (const a of n.attributes) {
+    if (a.name === "open") continue;
+    if (a.name === "class") { const cur = o.classList.contains("enter") ? a.value + " enter" : a.value; if (o.getAttribute("class") !== cur) o.setAttribute("class", cur); }
+    else if (o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value);
+  }
+  o.onclick = n.onclick;
+  fill(o, ...n.childNodes, { inner: true });
+}
+function fill(parent, ...args) {
+  const opts = args.at(-1)?.inner ? args.pop() : {}, nodes = args;
+  const olds = [...parent.childNodes], byKey = new Map(), used = new Set();
+  for (const o of olds) if (o.dataset?.k) byKey.set(o.dataset.k, o);
+  const out = nodes.map((n, i) => {
+    const k = n.dataset?.k, o = k ? byKey.get(k) : olds[i];
+    if (o && !used.has(o) && o.nodeType === n.nodeType && o.nodeName === n.nodeName && !o.dataset?.k === !k) { used.add(o); syncNode(o, n); return o; }
+    if (n.nodeType === 1 && document.documentElement.dataset.ready && n.dataset?.k) n.classList.add("enter");
+    return n;
+  });
+  for (const o of olds) if (!used.has(o)) o.remove();
+  let ref = parent.firstChild;
+  for (const n of out) { if (n === ref) ref = ref.nextSibling; else parent.insertBefore(n, ref); }
+}
 function pick(p) {
   if (rProj === p) return;
   rProj = p; rPut("crewProject", p); rSig = "";
@@ -442,15 +471,15 @@ function renderProjects(s) {
   if (!changed("projects", [names, rProj, names.map(n), n(""), names.map(nd), nd(""), (T.queued || []).map((t) => t.project)])) return;
   const chip = (p, text) => {
     const b = rel("button", "pchip"); b.type = "button"; b.setAttribute("aria-pressed", String(rProj === p));
-    if (rProj === p) { b.setAttribute("aria-current", "true"); b.append(icon("check", 1.4, "pchk")); }   // the picked project: filled chip with a tick
-    if (nd(p)) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
-    b.title = text; b.append(rel("span", "pn-t", text), document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
+    if (rProj === p) { b.setAttribute("aria-current", "true"); b.append(icon("check", 1.6, "pchk")); }   // the picked project: filled chip with a tick
+    if (nd(p) && rProj !== p) b.dataset.need = "1";                  // amber dot: someone in that project is waiting for you
+    b.title = text; b.append(rel("span", "pn-t", text)); if (rProj !== p) b.append(document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
   // All first, then the picked project, then projects with working or queued tasks (most first), then the quiet ones.
   const Q = T.queued || [], load = (p) => n(p) + Q.filter((t) => t.project === p).length;
   const order = names.map((p, i) => ({ p, i, l: load(p) })).sort((a, b) => (b.p === rProj) - (a.p === rProj) || b.l - a.l || a.i - b.i);
-  nav.replaceChildren(...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
+  fill(nav, ...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
 }
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
@@ -480,8 +509,8 @@ function renderNeed(s) {
   if (!all.length) { $("need-items").replaceChildren(); more.hidden = true; return; }
   $("need-h").textContent = `Needs you · ${list.length}`;
   const NEED_CAP = 4, shownNeed = needAll ? list : list.slice(0, NEED_CAP);
-  $("need-items").replaceChildren(...shownNeed.map((x) => {
-    const row = rel("div", "nitem"); row.dataset.kind = x.kind;
+  const needRows = shownNeed.map((x) => {
+    const row = rel("div", "nitem"); row.dataset.kind = x.kind; row.dataset.k = String(x.id ?? x.kind + ":" + (x.role || "") + ":" + (x.project || ""));
     const rid = roleId(x.role), body = rel("div"), nt = rel("div", "nt"), who = rid ? nameOf(rid) : "Claude", cp = needCopy(x, s, who);
     row.append(icon(NEED_ICON[x.kind] || "hand", 2));
     if (rid) { const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(rid, "working", 0)); row.append(w); } else row.append(rel("span"));
@@ -494,13 +523,14 @@ function renderNeed(s) {
       row.append(r);
     } else row.append(rel("div", "nx", (NEED_HINT[x.kind] || "Look at your Claude Code session.").replace("{p}", x.project || "")));
     return row;
-  }));
-  if (!list.length) $("need-items").replaceChildren(rel("p", "need-none", "Nothing is waiting in " + rProj + "."));
+  });
+  if (!list.length) needRows.push(rel("p", "need-none", "Nothing is waiting in " + rProj + "."));
   if (list.length > NEED_CAP) {
     const b = rel("button", "need-more need-fold", needAll ? "Show less ▴" : "Show " + (list.length - NEED_CAP) + " more ▸"); b.type = "button"; b.setAttribute("aria-expanded", String(needAll));
     b.onclick = () => { needAll = !needAll; rPut("crewNeedAll", needAll ? "1" : "0"); renderNeed(last); };
-    $("need-items").append(b);
+    needRows.push(b);
   }
+  fill($("need-items"), ...needRows);
   // Waiting somewhere else: one button that goes there (or to All when it is several projects).
   const rest = all.filter((x) => !list.includes(x)), ps = [...new Set(rest.map((x) => x.project).filter(Boolean))];
   more.hidden = !rest.length;
@@ -515,9 +545,9 @@ function renderNeed(s) {
 function renderFloor(s) {
   const T = tasksOf(s);
   $("floor-h").textContent = rProj ? `The floor · ${rProj}` : "The floor"; $("floor-h").title = rProj || "";
-  $("floor-meta").textContent = `${T.active.filter(inView).length} working · ${T.queued.filter(inView).length} queued`;
   const fc = $("floor-crew"), cm = rCrewMeter(rCrewOf(s, rProj));
-  if (fc) { fc.hidden = !cm; if (changed("floor-crew", cm && [cm.getAttribute("aria-label"), cm.title])) fc.replaceChildren(...(cm ? [cm] : [])); }
+  $("floor-meta").textContent = (cm ? "" : `${T.active.filter(inView).length} working · `) + `${T.queued.filter(inView).length} queued`;   // the crew meter already says how many are working
+  if (fc) { fc.hidden = !cm; if (changed("floor-crew", cm && [cm.getAttribute("aria-label"), cm.title])) fill(fc, ...(cm ? [cm] : [])); }
 }
 
 // ---- Cost: Today / 7 days, for the picked project (All projects sums the rooms). usd null is "–", never $0. ----
@@ -589,7 +619,7 @@ function renderCost(s) {
   if (crew.length) items.push({ head: "Crew ≈ " + fmtFloor(cUsd, cPart) });
   for (const a of top) items.push({ n: shortOf(a.role), full: nameOf(a.role), v: a.usd, part: a.partial, pct: a.usd != null ? a.usd / max * 100 : 0, cls: "" });
   if (rest.length) items.push({ n: "Others", full: `Others: ${rest.length} agent${rest.length === 1 ? "" : "s"}`, v: sumUsd(rest), part: rest.some((a) => a.partial), pct: sumUsd(rest) != null ? sumUsd(rest) / max * 100 : 0, cls: " oth" });
-  $("c-bars").replaceChildren(...items.map((it) => {
+  fill($("c-bars"), ...items.map((it) => {
     if (it.head) return rel("li", "chead", it.head);
     const li = rel("li", "cbar" + it.cls), trk = rel("span", "trk"), fill = rel("i");
     if (it.v == null) fill.hidden = true; else fill.style.width = Math.min(100, it.pct) + "%";
@@ -599,10 +629,10 @@ function renderCost(s) {
   $("c-bars").hidden = !items.length;
   $("c-details").hidden = !c.agents.length && !c.tasks.length;
   $("c-cap").textContent = `By agent, ${label} (estimated)`;
-  $("c-rows").replaceChildren(...c.agents.map((a) => { const r = tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), fmtTok(a.cached), fmtFloor(a.usd, a.partial)], true); r.firstChild.title = nameOf(a.role); return r; }));
-  $("c-foot").replaceChildren(...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), fmtTok(c.cached), fmtFloor(c.usd, c.partial)])]);
+  fill($("c-rows"), ...c.agents.map((a) => { const r = tr([agentLabel(a), a.runs ?? "–", fmtTok(a.tok), fmtTok(a.cached), fmtFloor(a.usd, a.partial)], true); r.firstChild.title = nameOf(a.role); return r; }));
+  fill($("c-foot"), ...[tr(["Total", c.runs ?? "–", fmtTok(c.tok), fmtTok(c.cached), fmtFloor(c.usd, c.partial)])]);
   $("c-task-cap").textContent = `By task, ${label} (estimated)`; $("c-task-table").hidden = !c.tasks.length;
-  $("c-task-rows").replaceChildren(...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, shortOf(t.role), fmtTok(t.tok), fmtFloor(t.usd, t.partial)]); r.firstChild.className = "tt"; r.children[1].title = nameOf(t.role); return r; }));
+  fill($("c-task-rows"), ...c.tasks.slice(0, 12).map((t) => { const r = tr([t.text, shortOf(t.role), fmtTok(t.tok), fmtFloor(t.usd, t.partial)]); r.firstChild.className = "tt"; r.children[1].title = nameOf(t.role); return r; }));
   // One sentence about what the number is; a floor note and the age only when they apply. The server's price note is not repeated.
   const note = $("c-note"); note.replaceChildren();
   note.append(document.createTextNode(`Estimated from token counts at Anthropic API list prices${prices.asOf ? " (" + prices.asOf + ")" : ""}. Not a bill: subscription plans aren't charged per token.`));
@@ -626,8 +656,8 @@ function taskList(rows, kind, running) {
     const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); w.append(rMini(t.role, running ? "working" : "queued", k));
     const tx = rel("div", "tx2"), nm = rel("b", null, nameOf(t.role)); if (!rProj) nm.append(rel("small", null, " · " + t.project));
     const text = rel("span", null, t.text); tx.title = t.text; tx.append(nm, text);
-    const age = rel("time", "age" + (running ? " run" : ""), (running ? "running " : "waiting ") + shortSpan(mins)); if (iso) { age.dateTime = iso; age.title = `${running ? "Started" : "Queued"} ${rclock(iso)}`; }
-    li.append(chip, w, tx, age); ul.append(li);
+    const age = rel("time", "age" + (running ? " run" : ""), shortSpan(mins)); if (iso) { age.dateTime = iso; age.title = `${running ? "Started" : "Queued"} ${rclock(iso)}`; }
+    li.append(chip, w, tx, age); if (t.id != null) li.dataset.k = String(t.id); ul.append(li);
   });
   const out = [ul];
   if (rows.length > 4) {
@@ -641,7 +671,7 @@ function renderTasks(s) {
   const run = T.active.filter(inView).sort(by("startedAt")), que = T.queued.filter(inView).sort(by("queuedAt"));
   if (!changed("tasks", [run, que, tkOpen, rProj, Math.floor(Date.now() / 60000)])) return;
   $("run-n").textContent = String(run.length); $("q-n").textContent = String(que.length);
-  $("tk-run").replaceChildren(...taskList(run, "run", true)); $("tk-q").replaceChildren(...taskList(que, "q", false));
+  fill($("tk-run"), ...taskList(run, "run", true)); fill($("tk-q"), ...taskList(que, "q", false));
   $("run-pulse").dataset.on = run.length ? "1" : "";
 }
 
@@ -702,9 +732,9 @@ function renderShip(s0) {
   } else out.push(shipRow("errors", "dot", "", "App errors", "not read yet", null));
   if (out.every((el) => el.classList?.contains("none"))) {   // nothing read at all: one line, not five identical ones
     const p = rel("p", "empty"); p.append(document.createTextNode("Nothing read yet. "), rel("code", null, "docs/setup.md"), document.createTextNode(" shows how to connect GitHub, CI and your deploy log."));
-    holder.replaceChildren(p); return;
+    fill(holder, p); return;
   }
-  holder.replaceChildren(...out);
+  fill(holder, ...out);
 }
 
 // ---- Log: one row per finished task (what was done, the hand-back summary, how long and what it cost) and per dropped task. Assignments, commits, PRs, CI and deploys are elsewhere. ----
@@ -786,7 +816,7 @@ function setConn(ok, s) {
   const st = $("status"), band = $("offband");
   if (ok) {
     lastOk = Date.now(); band.hidden = true;
-    st.replaceChildren(rel("i"), document.createTextNode("Live · "), rel("span", "num", hm(s.now)), document.createTextNode(" IST"));
+    fill(st, rel("i"), document.createTextNode("Live · "), rel("span", "num", hm(s.now)), document.createTextNode(" IST"));
     st.dataset.s = "ok";
   } else {
     if (fails < 2) return;                                   // one miss is just a slow poll
@@ -834,6 +864,36 @@ function rGroupsOf(s) {
   const T = tasksOf(s), p = rProj;
   return [{ p, head: false, open: true, w: T.active.filter((t) => t.project === p).length, q: T.queued.filter((t) => t.project === p).length, who: [] }];
 }
+const rDeskSig = (d) => d.outerHTML.replace(/\b([a-z]{2})\d+(?=["')])/g, "$1#");   // ids of the drawn characters count up with every build; they are not a change
+const rBody = (d) => { const c = d.cloneNode(true); c.querySelector(".plate")?.remove(); return rDeskSig(c); };   // the desk without its nameplate
+const rStamp = (d) => { d._h = rDeskSig(d); d._r = rBody(d); };
+function rMerge(host, nsec) {
+  const osec = host.querySelector(":scope > .pgroup"), orooms = osec?.querySelector(":scope > .rooms"), nrooms = nsec?.querySelector(":scope > .rooms");
+  if (!orooms || !nrooms || osec.dataset.project !== nsec.dataset.project) return false;
+  const teams = [...nrooms.children].map((nt) => {
+    const ot = [...orooms.children].find((x) => x.dataset.room === nt.dataset.room);
+    if (!ot) { nt.querySelectorAll(".desk").forEach(rStamp); return nt; }     // a new room: it slides in
+    for (const a of ["data-n", "aria-label"]) if (ot.getAttribute(a) !== nt.getAttribute(a)) ot.setAttribute(a, nt.getAttribute(a));
+    const ow = ot.querySelector(".wall"), nw = nt.querySelector(".wall");
+    if (ow && nw && ow.outerHTML !== nw.outerHTML) ow.replaceWith(nw);
+    const og = ot.querySelector(".stations"), ng = nt.querySelector(".stations");
+    if (!og || !ng) return ot;
+    const have = new Map([...og.children].map((d) => [d.dataset.k, d])), want = [];
+    for (const nd of [...ng.children]) {
+      const od = have.get(nd.dataset.k), h = rDeskSig(nd);
+      if (od && od._h === h) { want.push(od); continue; }                                         // same desk, same look: untouched
+      const r = rBody(nd);
+      if (od && od._r === r) { syncNode(od.querySelector(".plate"), nd.querySelector(".plate")); od._h = h; want.push(od); continue; }   // only the nameplate text moved (a minute passed): change it in place
+      nd._h = h; nd._r = r; if (od) { nd.classList.add("still"); od.replaceWith(nd); }      want.push(nd);
+    }
+    for (const d of [...og.children]) if (!want.includes(d)) d.remove();
+    let ref = og.firstChild; for (const d of want) { if (d === ref) ref = ref.nextSibling; else og.insertBefore(d, ref); }
+    return ot;
+  });
+  for (const t of [...orooms.children]) if (!teams.includes(t)) t.remove();
+  let ref = orooms.firstChild; for (const t of teams) { if (t === ref) ref = ref.nextSibling; else orooms.insertBefore(t, ref); }
+  return true;
+}
 let rSig = "", rFeedSeen = null, rState = null, rShown = [];   // rShown: projects whose room is on screen
 const rMemOf = (id, p) => rState?.byProj?.[p || ""]?.find((x) => x.id === id) || rState?.members.find((x) => x.id === id);
 function renderRoom(s) {
@@ -873,7 +933,12 @@ function renderRoom(s) {
       if (g.open) sec.append(hallOf(g));
       return sec;
     });
-    RSVG("r-rooms").replaceChildren(...(roles && Object.keys(roles).length ? parts : [rel("p", "empty", "No roles found.")]));
+    const host = RSVG("r-rooms"), has = roles && Object.keys(roles).length;
+    // Entry animations belong to what is new. A desk or room that is already on screen is kept, or (when its look changed) swapped for a copy that does not pop in again.
+    if (!(has && rMerge(host, parts[0]))) {
+      host.replaceChildren(...(has ? parts : [rel("p", "empty", "No roles found.")]));
+      host.querySelectorAll(".desk").forEach(rStamp);
+    }
   }
   // Feed: real outcomes, plus Doraemon's instructions ("Doraemon -> Shinchan: ..."); new rows slide in.
   const roleOf = Object.fromEntries(r.roles.map((x) => [x.id, x])), name = (id) => roleOf[id]?.mascot || id;
@@ -1178,19 +1243,23 @@ function rPlanClone(f) {
   rCloneChain = rCloneChain.then(() => rClone({ role, p, n, k, text })).catch(() => {}).finally(() => { if (rHold[k] === n) { delete rHold[k]; rReveal(role, p, false); } });
 }
 function rReveal(role, p, pop) {
-  rDeskEl(role, p)?.querySelectorAll(".twin.pending").forEach((t) => { t.classList.remove("pending"); if (pop) { t.classList.add("pop"); setTimeout(() => t.classList.remove("pop"), 700); } });
+  const held = [];
+  rDeskEl(role, p)?.querySelectorAll(".twin.pending").forEach((t) => { t.classList.remove("pending"); held.push(t.dataset.c); });
+  if (!held.length) return;
+  const d = rRefreshDesk(role, p);                 // the badge and the line now show the real count
+  if (pop) d?.querySelectorAll(".twin").forEach((t) => { if (held.includes(t.dataset.c)) { t.classList.add("pop"); setTimeout(() => t.classList.remove("pop"), 700); } });
 }
 async function rClone({ role, p, n, k, text }) {
   const g = rGeo(), tgt = rDeskEl(role, p), mgr = rDeskEl(MGR, p), layer = RSVG("r-walkers"), made = [];
   if (!tgt) return;
   for (let t = 0; mgr && rAway.has(rK(MGR, p)) && t < 9000; t += 250) await rSleep(250);   // Doraemon is out on a walk: let him sit down first, so the pocket gadget comes from his desk
   const put = (el, x, y) => { const pos = rel("div", "cl-pos"); pos.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`; pos.style.zIndex = 1000; pos.append(el); layer.append(pos); made.push(pos); return pos; };
-  const b = rAccess(tgt, g), to = [b.seat[0], b.seat[1] - 30];
+  const b = rAccess(tgt, g), to = [b.seat[0], b.seat[1] - 82];       // the beam runs above the heads, the flash lands on the twin
   const mp = mgr && mgr !== tgt && !rAway.has(rK(MGR, p)) ? rAccess(mgr, g) : null;
   let lamp = null, beam = null, bub = null;
   try {
     if (mp) {
-      const from = [mp.seat[0] + 12, mp.seat[1] - 26], ang = Math.atan2(to[1] - from[1], to[0] - from[0]), tip = [from[0] + Math.cos(ang) * 34, from[1] + Math.sin(ang) * 34];
+      const from = [mp.seat[0] + 12, mp.seat[1] - 78], ang = Math.atan2(to[1] - from[1], to[0] - from[0]), tip = [from[0] + Math.cos(ang) * 34, from[1] + Math.sin(ang) * 34];
       lamp = rel("div", "cl-lamp"); lamp.innerHTML = CL_LIGHT; lamp.style.setProperty("--rot", ang + "rad"); put(lamp, from[0], from[1]);
       bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); mgr.append(bub);
       await rSleep(450);
@@ -1198,7 +1267,7 @@ async function rClone({ role, p, n, k, text }) {
       beam = rel("div", "cl-beam"); beam.style.width = len + "px"; beam.append(rel("i")); put(beam, tip[0], tip[1]).style.transform += ` rotate(${ang}rad)`;
     } else { bub = rel("div", "sbubble", ""); bub.append(rel("span", null, text)); tgt.append(bub); }
     await rSleep(500);
-    const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, to[0], to[1]);
+    const fl = rel("div", "cl-flash"); for (const c of ["a", "b", "c", "d"]) fl.append(rel("b", c)); put(fl, b.seat[0] + 38, b.seat[1] - 30);
     delete rHold[k]; rReveal(role, p, true);
     await rSleep(700);
     beam?.classList.add("out"); lamp?.classList.add("out");

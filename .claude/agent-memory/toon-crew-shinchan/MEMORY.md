@@ -13,4 +13,6 @@
 - Prove "no lingering animation" with `getAnimations({subtree:true})` and `iterations === Infinity`, not by eye. (seen 1) [crew]
 - Board demo walks keep Doraemon away from his desk; for a desk-bound scene (copy light) use a scratch proxy that strips talks, and check the port is free first, since a stale board on the same port silently serves old data. (seen 1) [project]
 - The travel hook is `window.crewTravel?.({el, role, from, to, kind, reduced})`, called from rTrip in room.js; travel styles live in travel.js and travel.css. (seen 1) [project]
+- Board renderers must update in place (fill/syncNode keyed by data-k, rMerge for rooms and desks); `replaceChildren` on poll replays every entry animation. Only new keyed elements get `.enter`. Prove it over raw CDP with a MutationObserver plus an animationstart listener, armed 3 s after load, then append a task mid-run. (seen 1) [crew]
+- BOARD_PORT is only a request: if it's busy the board takes the next free port. Read server.json for the real one. (seen 1) [project]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]

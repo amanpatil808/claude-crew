@@ -142,6 +142,10 @@ h2::after { content: ""; flex: 1; height: var(--bw); background: var(--line); }
 
 
 .desk.changed { animation: statusPop .6s ease-out; }
+.desk.still { animation: none; }                        /* a desk that was already on screen and was only redrawn: no pop-in again */
+.enter { animation: feedIn .4s ease-out; }               /* a Needs-you item or task row that is genuinely new */
+html[data-motion="off"] .enter { animation: none; }
+@media (prefers-reduced-motion: reduce) { html:not([data-motion="on"]) .enter { animation: none; } }
 
 .seat { position: relative; width: 120px; height: 108px; }
 .seat::before { content: ""; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 76px; height: 46px; border: var(--bw) solid var(--wall-ink); border-radius: 14px 14px var(--r-chip) var(--r-chip);
@@ -1138,7 +1142,6 @@ html[data-motion="off"] .pulse { animation: none; }
 .tl .tx2 b { font-size: 14px; }
 .tl .tx2 span { display: block; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl .age { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tl .age.run { color: var(--ink); font-weight: 700; }
 #view-room .plate .swatch { display: none; }
 #view-room .sign small { display: none; }
 #view-room .plate { max-width: 114px; }
@@ -1324,6 +1327,7 @@ html[data-tab="room"][data-theme="dark"] { --on-accent: #04121a; }
 .pchip[aria-current="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 800; box-shadow: var(--sh); }
 .pchip[aria-current="true"] b { background: transparent; color: var(--on-accent); border-color: var(--on-accent); }
 .pchip .pchk { display: inline-flex; flex: none; }
+.pchip .pchk svg rect { stroke: currentColor; stroke-width: .7; }
 .pchip[data-need][aria-current="true"]::before { border-color: var(--on-accent); }
 
 /* ---- Done and idle desks are still: their small loops play once and settle. Only working desks loop (typing, pacing). ---- */
@@ -1359,6 +1363,8 @@ html[data-tab="room"][data-theme="dark"] { --on-accent: #04121a; }
 #view-room .cm-slots { display: inline-flex; gap: 2px; }
 #view-room .cm-slots i { width: 10px; height: 14px; border: var(--bw) solid currentColor; border-radius: 1px; }
 #view-room .cm-slots i.on { background: currentColor; }
+#view-room .cm-slots i.x { border-style: dashed; background: repeating-linear-gradient(135deg, currentColor 0 2px, transparent 2px 4px); }
+#view-room .cm-slots i.cap { margin-right: 4px; }
 #view-room .cm-n { font-weight: 400; }
 #view-room .crewm[data-over="true"] { color: #8a3b06; }
 html[data-theme="dark"] #view-room .crewm[data-over="true"] { color: var(--amber); }
