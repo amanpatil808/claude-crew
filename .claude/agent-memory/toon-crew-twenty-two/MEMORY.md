@@ -1,0 +1,5 @@
+- Re-read the file under test right before reporting: a README being edited in parallel changed under me mid-run, so earlier quotes went stale. (seen 1) [crew]
+- The toon-crew guard blocks shell writes that use `$VAR` paths, `python -c` and heredoc python for read-only roles; use literal temp paths and put scripts in the scratchpad. (seen 1) [crew]
+- `claude plugin ...` with `CLAUDE_CONFIG_DIR=<temp>` isolates fully; compare `stat -f %m` on ~/.claude/settings.json and plugins/* before and after. A marketplace install clones GitHub main, not the local branch. (seen 1) [project]
+- Demo board: `node scripts/board-demo.mjs <dir>` then `BOARD_LOG_DIR=<dir> BOARD_PORT=<p> bash plugin/board/board.sh start|stop|status`; port 8811 may already be held by the owner's real board, so use another BOARD_PORT and never touch it. (seen 1) [project]
+- `node --no-warnings --test plugin/board/test/*.test.ts` had 4 failures in tasks.test.ts on 2026-10-27 (fixture clock fixed at 2026-10-26, guess: date-dependent); check it before calling the repo green. (seen 1) [project]

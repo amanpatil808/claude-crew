@@ -1,1 +1,2 @@
 - [Branch from origin](branch-from-origin.md) — fetch first; local main lagged origin by 15 commits; tasks.test.ts looks date-dependent
+- [Short, tested docs](feedback-short-tested-docs.md) — README ~120 lines, detail in docs/, test every instruction with twenty-two

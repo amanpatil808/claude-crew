@@ -457,4 +457,4 @@ No. Only Mike Wazowski and Sulley may merge, only a pull request you approved, a
 Not directly. Memory stays in each project. If you turn on `lessons`, the owner can run the lessons pass by hand, which opens a pull request to this repo with rules that hold in any project; the owner decides what to merge.
 
 **My builder's worktree started from the wrong branch.**
-Add `"worktree": { "baseRef": "head" }` to the project's `.claude/settings.json`. Plugin settings cannot set it, and the guard stops the crew editing that file, so make the edit yourself. See [Per-project setup](../README.md#per-project-setup) in the README.
+Add `"worktree": { "baseRef": "head" }` to the project's `.claude/settings.json`. Plugin settings cannot set it, and the guard stops the crew editing that file, so make the edit yourself. See [Per-project setup](setup.md#per-project-setup).
