@@ -28,7 +28,7 @@ test("two concurrent shinchan starts give copies 2, copyIds oldest first and one
   const c = clones(events);
   assert.equal(c.length, 1);
   assert.deepEqual([c[0].kind, c[0].role, c[0].n, c[0].agentId, c[0].ts, c[0].project], ["clone", "shinchan", 2, "a2", at(1), "shop"]);
-  assert.deepEqual(r.crew, { running: 2, cap: 4, roles: 1 });
+  assert.deepEqual(r.crew, { running: 2, cap: 8, light: 4, roles: 1 });
 });
 
 test("a stop brings copies back to 1 and a lone agent has no clone item", () => {
@@ -59,12 +59,12 @@ test("the manager's main session and generic helpers are not counted in crew.run
     ev({ kind: "agent-start", agentId: "d", agentType: "toon-crew:doraemon", ts: at(3), text: "manager" }),
     ev({ kind: "main-busy", ts: at(1), text: "Manager at work" }),
   ];
-  assert.deepEqual(room(events).crew, { running: 1, cap: 4, roles: 1 });
+  assert.deepEqual(room(events).crew, { running: 1, cap: 8, light: 4, roles: 1 });
 });
 
 test("distinct roles count once each in crew.roles, copies count in running", () => {
   const events = [start("a1", 5), start("a2", 4), start("b1", 3, { agentType: "toon-crew:bob" })];
-  assert.deepEqual(room(events).crew, { running: 3, cap: 4, roles: 2 });
+  assert.deepEqual(room(events).crew, { running: 3, cap: 8, light: 4, roles: 2 });
   assert.equal(room(events).members.find((m) => m.id === "bob")!.copies, 1);
 });
 
@@ -89,7 +89,7 @@ test("a never-stopped start beyond the staleness rule does not count", () => {
 test("a start with no stop and no events for 46 minutes is a ghost: idle, Lost contact, stale, not counted", () => {
   const r = room([start("g1", 46)]);
   assert.deepEqual([shin(r).status, shin(r).line, shin(r).stale, shin(r).copies], ["idle", "Lost contact", true, 0]);
-  assert.deepEqual(r.crew, { running: 0, cap: 4, roles: 0 });
+  assert.deepEqual(r.crew, { running: 0, cap: 8, light: 4, roles: 0 });
 });
 
 test("a start 30 minutes ago is still working", () => {

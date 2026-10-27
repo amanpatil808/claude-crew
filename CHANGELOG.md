@@ -2,6 +2,12 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.9 - 28 Oct 2026
+
+### Changed
+
+- Doraemon runs 2-4 crew at once for light work and up to 6-8 for heavy work (many independent pieces on separate files), defaulting to the small end. The crew meter shows 8 slots with a marker after 4 and turns amber only above 8.
+
 ## 0.3.8 - 28 Oct 2026
 
 ### Changed
