@@ -22,7 +22,7 @@
 | Team | Members | What they do |
 |---|---|---|
 | Management | Doraemon, Miguel Rivera | Plan, brief, commit; keep lessons |
-| Frontend | Nobita, Shinchan | Design reviews and screens |
+| Frontend | Nobita, Shinchan | Design direction, styles and reviews (Nobita); behaviour and logic (Shinchan) |
 | Backend | Kevin, Bob | Data, logins, APIs, integrations |
 | DevOps | Mike Wazowski, Sulley | CI, builds, deploys, merges |
 | Security | Ninja Hattori | Attack-style reviews with proof tests |

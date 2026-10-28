@@ -25,7 +25,12 @@ const BUDGET_MS = 6000; // well under the 10 s hook timeout
 const ROLE_GIT_BLOCKED = new Set(['reset', 'checkout', 'switch', 'restore', 'apply', 'am', 'clean', 'commit', 'merge', 'rebase', 'cherry-pick', 'revert', 'pull', 'rm', 'mv', 'add',
   'update-ref', 'read-tree', 'checkout-index', 'update-index', 'filter-branch', 'replace']);
 // Where a read-only role may Write its deliverables inside the project (besides its memory file and temp).
-const ROLE_DOC_DIRS = { dekisugi: ['docs/research'], olaf: ['docs/research'], nobita: ['docs/design', 'docs/research'] };
+const ROLE_DOC_DIRS = { dekisugi: ['docs/research'], olaf: ['docs/research'], nobita: ['docs/research'] };
+// What a read-only role may Edit as well as Write: styles and visual assets in its own checkout (its worktree, or the project).
+// No JS/TS/HTML, tests, config or hooks: the extension list is the allow-list, and `tokens.*` / `theme.*` count only as data files.
+const ROLE_STYLE_FILES = { nobita: { dirs: ['docs/design'], files: /\.(css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico)$|(^|\/)(tokens|theme)\.(json|ya?ml)$/i } };
+// Never inside dot folders (.claude, .github, .git), dependencies or test folders (visual baselines), whatever the file type.
+const STYLE_DENY_PART = /^(\..*|node_modules|tests?|__tests__|specs?|e2e|fixtures|__snapshots__)$/i;
 const READ_ONLY_ROLES = /^(?:toon-crew:)?(ninja-hattori|joe-gardner|twenty-two|nobita|dekisugi|olaf|stuart)$/i;
 const CREW_REPO = 'amanpatil808/claude-crew';
 // Who may start which agents. A role that spawns a builder gets edits the guard refuses for the role itself.
@@ -455,6 +460,7 @@ function checkGit(words, ctx, via, depth) {
   if ((sub === 'credential' && rest.includes('fill')) || (/^credential-/.test(sub) && rest.includes('get'))) return 'Reading stored git credentials (git credential fill/get) is blocked for every role.';
   // An alternate git dir (--git-dir, --work-tree, GIT_DIR, GIT_WORK_TREE) hides its config and aliases from the checks.
   if (gitDirUsed && (sub === 'push' || !GIT_BUILTINS.has(sub))) return 'git push or an unknown git subcommand with --git-dir/--work-tree/GIT_DIR is blocked: its config and aliases cannot be verified.';
+  if (ctx.role && sub === 'push') return `${ctx.role} is a read-only role: git push is for the builders and the manager.`;
   if (ctx.role && ROLE_GIT_BLOCKED.has(sub)) return `${ctx.role} is a read-only role: git ${sub} changes the working tree or history.`;
   if (ctx.role) { const w = roleGitWrite(sub, rest); if (w) return `${ctx.role} is a read-only role: git ${sub} ${w}; only its list forms are allowed.`; }
   // A subagent in the checkout that holds the live plugin (not its own worktree) gets the read-only git rules.
@@ -1123,26 +1129,42 @@ function checkFileEdit(input, ctx) {
   if (why) return `${why} cannot be edited by Claude: the owner changes them by hand.`;
   const live = livePluginRule(r, ctx) ?? livePluginRule(abs, ctx);
   if (live) return live;
-  if (ctx.role) { // read-only roles: no Edit-type tools; Write only to their own memory file or temp
-    if (!ctx.isWrite) return `${ctx.role} is a read-only role: it cannot use Edit/MultiEdit/NotebookEdit.`;
-    // Own memory is this project's file only (not ~/.claude or another checkout); a MEMORY.md symlink resolves away from it.
-    const memFile = path.join(real(path.join(ctx.project, '.claude/agent-memory', `toon-crew-${ctx.role}`)), 'MEMORY.md');
-    const ownMemory = r.toLowerCase() === memFile.toLowerCase();
+  if (ctx.role) { // read-only roles: Edit only on their style files; Write only there, to their own memory file, docs or temp
+    const style = roleStyleTarget(r, ctx);
+    if (!ctx.isWrite && !(ctx.isEdit && style)) return `${ctx.role} is a read-only role: it cannot use Edit/MultiEdit/NotebookEdit${ROLE_STYLE_FILES[ctx.role] ? ' outside its style and visual files' : ''}.`;
+    // Own memory is this project's (or this checkout's) file only, not ~/.claude; a MEMORY.md symlink resolves away from it.
+    const ownMemory = [ctx.project, roleRoot(ctx)].some((root) => r.toLowerCase() === path.join(real(path.join(root, '.claude/agent-memory', `toon-crew-${ctx.role}`)), 'MEMORY.md').toLowerCase());
     if (hardLinked(r)) return `${ctx.role} is a read-only role: the target has other hard links, so writing it would change another file.`;
     const docRoots = (ROLE_DOC_DIRS[ctx.role] ?? []).map((d) => path.join(ctx.project, d));
     // The target is realpath-resolved, the root is not: a symlinked docs/ or docs/research lands outside the root.
     const inDocs = docRoots.some((root) => within(r, root));
-    if (!ownMemory && !inDocs && !ctx.writeRoots.some((root) => within(r, root))) return `${ctx.role} is a read-only role: Write is allowed only to ${[...docRoots.map((d) => path.relative(ctx.project, d) + '/'), `.claude/agent-memory/toon-crew-${ctx.role}/MEMORY.md`, 'the temp dir'].join(', ')}.`;
-    if (inDocs) { const hit = findSecret(input.content); if (hit) return `Documents must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
+    if (!ownMemory && !inDocs && !style && !ctx.writeRoots.some((root) => within(r, root))) {
+      const where = [...docRoots.map((d) => path.relative(ctx.project, d) + '/'), ...(ROLE_STYLE_FILES[ctx.role] ? ['style and visual files (css, scss, less, svg, images, tokens/theme data, docs/design/)'] : []), `.claude/agent-memory/toon-crew-${ctx.role}/MEMORY.md`, 'the temp dir'];
+      return `${ctx.role} is a read-only role: Write is allowed only to ${where.join(', ')}.`;
+    }
+    if (inDocs || style?.doc) for (const p of newTexts(r, input)) { const hit = findSecret(p); if (hit) return `Documents must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
   }
   const soft = crewConfigAsk(r) ?? crewConfigAsk(abs);
   if (soft) return soft;
   if (isMemoryPath(r) && r.toLowerCase().endsWith('.md')) {
-    const after = applyEdits(r, input);
-    const parts = [after, input.content, input.new_string, input.new_source, ...(Array.isArray(input.edits) ? input.edits.map((e) => e?.new_string) : [])];
-    for (const p of parts) { const hit = findSecret(p); if (hit) return `Memory files must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
+    for (const p of newTexts(r, input)) { const hit = findSecret(p); if (hit) return `Memory files must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
   }
   return null;
+}
+// The file after the edit, and each new piece of text the call brings.
+const newTexts = (file, input) => [applyEdits(file, input), input.content, input.new_string, input.new_source, ...(Array.isArray(input.edits) ? input.edits.map((e) => e?.new_string) : [])];
+// A role's own checkout: the git checkout holding the session cwd (its worktree) when that sits inside the project, else the project.
+const roleRoot = (ctx) => { const c = checkoutOf(real(ctx.startCwd)); return c && (c === ctx.project || within(c, ctx.project)) ? c : ctx.project; };
+// A style or visual file the role may Edit or Write: realpath inside its checkout, no denied folder, an allowed type or folder.
+// Returns { doc } (docs get the secret scan) or null. SVG and CSS skip the scan: path data trips the phone pattern.
+function roleStyleTarget(r, ctx) {
+  const rule = ROLE_STYLE_FILES[ctx.role];
+  const root = rule ? roleRoot(ctx) : null;
+  if (!root || !within(r, root)) return null;
+  const rel = path.relative(root, r).split(path.sep).join('/');
+  if (rel.split('/').some((part) => STYLE_DENY_PART.test(part)) || /\.(test|spec|stories)\.[^/]+$/i.test(rel)) return null;
+  if (rule.files.test(rel)) return { doc: false };
+  return rule.dirs.some((d) => rel.toLowerCase().startsWith(`${d}/`)) ? { doc: true } : null;
 }
 
 // ---------- Agent (spawning) and relay tools ----------
@@ -1186,7 +1208,7 @@ export function evaluate(input, env = process.env) {
   const ctx = { cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), devops: DEVOPS.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
     role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null,
     // agent_id marks a subagent; agent_type alone is also set for `claude --agent`, the main thread when it is Doraemon.
-    subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
+    subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', isEdit: ['Edit', 'MultiEdit'].includes(String(input.tool_name)), writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
   const tool = String(input.tool_name ?? '');
   const ti = input.tool_input ?? {};
   if (tool === 'Agent' || tool === 'Task') { const r = checkSpawn(input); return r ? { deny: r } : null; }
