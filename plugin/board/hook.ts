@@ -212,6 +212,20 @@ export async function loadReadUsage(): Promise<ReadUsage | null> {
   } catch { return null; }
 }
 
+// A command that changes GitHub (gh pr create/merge/close/ready/reopen, a push) leaves the project's name in a
+// marker file, so the board re-reads GitHub within seconds. The command text itself is never stored.
+export async function leaveRefreshMarker(input: HookInput, env: Record<string, string | undefined> = process.env): Promise<void> {
+  if (input.hook_event_name !== "PostToolUse" || input.tool_name !== "Bash") return;
+  const cmd = String(input.tool_input?.command ?? "");
+  if (!/\b(?:gh|git)\b/.test(cmd)) return;   // most Bash calls: skip loading the poller module
+  try {
+    const { refreshWanted, markRefresh } = await import("./lib/pollers.ts");
+    if (!refreshWanted(cmd)) return;
+    const project = projectName(env.CLAUDE_PROJECT_DIR || input.cwd);
+    if (project) markRefresh(project);
+  } catch { /* the timer still catches up */ }
+}
+
 async function main() {
   try {
     let raw = "";
@@ -219,6 +233,7 @@ async function main() {
     const input: HookInput = JSON.parse(raw);
     const e = toEvent(input);
     if (e) appendEvent(e);
+    await leaveRefreshMarker(input);
     const read = input.hook_event_name === "Stop" || input.hook_event_name === "SubagentStop" || input.hook_event_name === "SessionEnd" ? await loadReadUsage() : null;
     const u = read ? await toUsage(input, read, (id) => (id === e?.agentId ? e.agentType : undefined) ?? typeOfAgent(id)) : null;
     if (u) logUsage(u);

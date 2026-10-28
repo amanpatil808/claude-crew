@@ -2,6 +2,14 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.12 - 28 Oct 2026
+
+### Fixed
+
+- A merged, created or closed PR now shows on the board within a few seconds: after the crew runs `gh pr` or `git push`, the board checks GitHub straight away (the regular check is every 20 seconds, down from 60).
+- The board no longer downloads its whole state every 2 seconds. When nothing has changed, the server answers "not modified" and the page doesn't redraw.
+- Project chips keep one fixed order. Selecting a project or a change in activity no longer moves them.
+
 ## 0.3.11 - 28 Oct 2026
 
 ### Changed
