@@ -5,7 +5,8 @@ metadata:
   type: feedback
 ---
 
-- Never brief a read-only role (joe-gardner, twenty-two, stuart, nobita, dekisugi, olaf, ninja-hattori) to edit a repo file. The guard blocks it, and having another role apply the text looks like laundering. Have them report, and send the edit to a writer role. [crew] (seen 1)
+- Never brief a read-only role (joe-gardner, twenty-two, stuart, dekisugi, olaf, ninja-hattori) to edit a repo file. The guard blocks it, and having another role apply the text looks like laundering. Have them report, and send the edit to a writer role. Nobita may edit style files since 0.3.11. [crew] (seen 1)
+- A role change only takes effect after `/reload-plugins` (or a restart). Before you rely on it, check which version the session's guard and agents come from. On 2026-10-28, after 0.3.11 was installed, Nobita still ran the 0.3.8 definition: he got no worktree and the guard blocked his room.css edit, so I applied his CSS by hand. [project] (seen 1)
 - Worktree builders start from main when no `worktree.baseRef` is set. Their "failures" may already be fixed on the branch, so always re-run checks after bringing work into the branch. [crew] (seen 2)
 - Before prescribing a fix, read the reference file the brief points at. An eval case.yaml fix was wrong because the cases use a case.yaml + prompt.md split. [crew] (seen 1)
 
