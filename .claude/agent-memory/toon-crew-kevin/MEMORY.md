@@ -1,6 +1,9 @@
 # Kevin memory
 
 - A plugin cannot ship the main statusLine (plugin settings apply only `agent` and `subagentStatusLine`, and the subagent status line has no rate_limits). For plan windows use a mod's `session.measure` / `$.session.usage().rateLimits` (CC >= 2.1.287). (seen 1) [crew]
+- Guard path rules for a worktree-isolated role are relative to its own checkout (the git checkout holding cwd, if inside the project), not CLAUDE_PROJECT_DIR: either may be the worktree. Test with project dir = main checkout, = worktree, and the plain checkout. (seen 1) [project]
+- Old-code proofs for a guard role test must run outside the system temp dir: read-only roles may write anywhere under temp, so "cannot" cases pass there for the wrong reason. (seen 1) [project]
+- Don't run the phone/card secret scan over SVG or CSS: space-separated path numbers match the phone pattern. Scan documents only. (seen 1) [crew]
 - Never read ~/.claude.json for plan or usage: the keys (oauthAccount.*, cachedUsageUtilization) are undocumented and sit beside the email and name. Probe only with a key-name/type script that never prints values. (seen 1) [crew]
 
 - [Guard workarounds and proving fixes](board-guard-and-proofs.md) — Bash forms the guard blocks; failing-before-fix proofs; records.ts; server import.meta.main

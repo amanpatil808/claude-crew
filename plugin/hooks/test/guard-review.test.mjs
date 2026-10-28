@@ -100,7 +100,8 @@ test('read-only roles: Edit/MultiEdit/Write denied outside docs and own memory; 
       assert.equal(call('Edit', f, edit), 2, `${agent_type} Edit ${f}`);
     }
     assert.equal(call('MultiEdit', 'src/a.ts', { edits: [edit] }), 2, `${agent_type} MultiEdit`);
-    for (const d of DOCS[role] ?? ['docs/research']) assert.equal(call('Edit', `${d}/a.md`, edit), 2, `${agent_type} Edit in ${d}`);
+    // Nobita edits docs/design as part of his style allow-list (guard-style.test.mjs); docs/research stays Write-only.
+    for (const d of DOCS[role] ?? ['docs/research']) assert.equal(call('Edit', `${d}/a.md`, edit), role === 'nobita' && d === 'docs/design' ? 0 : 2, `${agent_type} Edit in ${d}`);
     for (const d of DOCS[role] ?? []) assert.equal(call('Write', `${d}/a.md`, { content: '# notes' }), 0, `${agent_type} Write in ${d}`);
     assert.equal(call('Write', `.claude/agent-memory/toon-crew-${role}/MEMORY.md`, { content: '- a clean lesson (seen 1) [crew]' }), 0, `${agent_type} memory write`);
   }

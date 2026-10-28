@@ -2,6 +2,16 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.11 - 28 Oct 2026
+
+### Changed
+
+- Nobita (UX & Design Lead) builds styles as well as reviewing: he may edit CSS, SVG, images, design-token data and docs/design in his own worktree, and nothing else. Shinchan builds behaviour and logic. Doraemon splits UI work by file between them, in parallel.
+
+### Security
+
+- Read-only roles can no longer push to git (a plain push to a feature branch was allowed before).
+
 ## 0.3.10 - 28 Oct 2026
 
 ### Fixed
