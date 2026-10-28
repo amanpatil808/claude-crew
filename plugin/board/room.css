@@ -122,7 +122,7 @@ h2::after { content: ""; flex: 1; height: var(--bw); background: var(--line); }
 .f-cooler::before { content: ""; position: absolute; left: 1px; top: -10px; width: 10px; height: 8px; background: var(--white); border: var(--bw) solid var(--wall-ink); border-radius: 50% 50% 0 0; }
 .f-coffee { width: 22px; height: 16px; background: var(--dark); }
 .f-coffee::before { content: ""; position: absolute; left: 4px; bottom: 2px; width: 6px; height: 6px; background: var(--white); }
-.f-coffee::after { content: ""; position: absolute; left: 6px; top: -12px; width: 3px; height: 3px; background: var(--muted); box-shadow: 4px -3px 0 var(--muted); animation: steam 3.2s steps(4) infinite; }
+.f-coffee::after { content: ""; position: absolute; left: 6px; top: -12px; width: 3px; height: 3px; background: var(--muted); box-shadow: 4px -3px 0 var(--muted); animation: steam 1.6s steps(4) infinite; }
 
 .f-rack { width: 20px; height: 32px; background: var(--dark); }
 .f-rack::before { content: ""; position: absolute; left: 4px; top: 4px; width: 4px; height: 4px; background: var(--ok); box-shadow: 0 8px 0 var(--accent), 0 16px 0 var(--bad); }
@@ -138,7 +138,7 @@ h2::after { content: ""; flex: 1; height: var(--bw); background: var(--line); }
 .desk:hover { transform: translateY(-2px); }
 .desk:focus-visible { outline: var(--bw) dashed var(--accent); outline-offset: 2px; }
 
-.desk.receiving .seat { animation: catch 2.6s ease-in-out infinite; }
+.desk.receiving .seat { animation: catch 1.3s ease-in-out infinite; }
 
 
 .desk.changed { animation: statusPop .6s ease-out; }
@@ -153,7 +153,7 @@ html[data-motion="off"] .enter { animation: none; }
 .stage { position: absolute; left: 50%; top: 12px; width: 84px; height: 84px; margin-left: -42px; display: grid; place-items: center; z-index: 1; }
 .stage .scale, .walker .scale { display: block; transform: scale(1.45); }
 .pace { display: block; }
-.desk[data-s="working"]:not(.away) .pace { animation: none; }
+.desk[data-s="working"]:not(.away) .pace { animation: pace 5s ease-in-out infinite; }
 
 .desk.away .pace { visibility: hidden; }
 .table { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); width: 112px; height: 10px; z-index: 2; border: var(--bw) solid var(--wall-ink); border-radius: var(--r-chip); background: color-mix(in srgb, var(--brown) 70%, var(--panel)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .22); }
@@ -164,11 +164,11 @@ html[data-motion="off"] .enter { animation: none; }
 .laptop::after { content: ""; position: absolute; inset: 2px; border-radius: 1px; background: var(--accent); opacity: 0; }
 .desk[data-s="working"] .laptop, .desk[data-s="reviewing"] .laptop { height: 18px; border-radius: var(--r-chip) var(--r-chip) 0 0; }
 .desk[data-s="working"] .laptop { box-shadow: 0 0 10px var(--accent); }
-.desk[data-s="working"] .laptop::after, .desk[data-s="reviewing"] .laptop::after { opacity: 1; animation: type 2.4s steps(2) infinite; }
+.desk[data-s="working"] .laptop::after, .desk[data-s="reviewing"] .laptop::after { opacity: 1; animation: type .35s steps(2) infinite; }
 
-.zzz { position: absolute; right: 4px; top: 2px; font-weight: 900; color: var(--white); text-shadow: 1px 1px 0 var(--wall-ink); animation: zzz 5.2s ease-in infinite; }
+.zzz { position: absolute; right: 4px; top: 2px; font-weight: 900; color: var(--white); text-shadow: 1px 1px 0 var(--wall-ink); animation: zzz 2.6s ease-in infinite; }
 
-.spark { position: absolute; color: var(--gold); font-size: 14px; animation: sparkle 3.2s ease-in-out infinite; }
+.spark { position: absolute; color: var(--gold); font-size: 14px; animation: sparkle 1.6s ease-in-out infinite; }
 .spark.a { left: 2px; top: 8px; } .spark.b { right: 4px; top: 40px; animation-delay: .8s; }
 
 
@@ -187,7 +187,7 @@ html[data-motion="off"] .enter { animation: none; }
 .desk[data-s="done"] .st { color: #166534; font-weight: 900; }
 /* status lamp on the desk: reads from across the room */
 .led { position: absolute; left: 10px; bottom: 100%; width: 8px; height: 8px; margin-bottom: -1px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: var(--idle); }
-.desk[data-s="working"] .led { background: var(--accent); box-shadow: 0 0 8px 2px var(--accent); }
+.desk[data-s="working"] .led { background: var(--accent); box-shadow: 0 0 8px 2px var(--accent); animation: ledPulse 1.6s ease-in-out infinite; }
 .desk[data-s="reviewing"] .led { background: var(--accent2); box-shadow: 0 0 8px 2px var(--accent2); }
 .desk[data-s="done"] .led { background: var(--ok); box-shadow: 0 0 8px 2px var(--ok); }
 .desk[data-s="blocked"] .led { background: var(--bad); box-shadow: 0 0 8px 2px var(--bad); animation: led 1.2s steps(1) infinite; }
@@ -209,7 +209,7 @@ html[data-motion="off"] .enter { animation: none; }
 /* ---------- Characters (cute: big shiny eyes, blush, round shapes) ---------- */
 .av { position: relative; width: 48px; height: 54px; flex: none; }
 .av > i { position: absolute; display: block; }
-.av .eye { width: 9px; height: 11px; border-radius: 50%; background: var(--dark); top: 22px; animation: blink 9.2s infinite; animation-delay: var(--blink, 0s); }
+.av .eye { width: 9px; height: 11px; border-radius: 50%; background: var(--dark); top: 22px; animation: blink 4.6s infinite; animation-delay: var(--blink, 0s); }
 .av .eye::after { content: ""; position: absolute; left: 2px; top: 2px; width: 3px; height: 3px; border-radius: 50%; background: var(--white); }
 .av .eye.l { left: 13px; } .av .eye.r { right: 13px; }
 .av .blush { top: 31px; width: 8px; height: 4px; border-radius: 50%; background: var(--blush); opacity: .8; }
@@ -223,7 +223,7 @@ html[data-motion="off"] .enter { animation: none; }
 .av-cat .nose { left: 20px; top: 24px; width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: inset 2px 2px 0 rgba(255,255,255,.5); }
 .av-cat .whisk { left: 6px; right: 6px; top: 32px; height: 5px; border-top: 1.5px solid var(--dark); border-bottom: 1.5px solid var(--dark); opacity: .35; }
 .av-cat .collar { left: 8px; right: 8px; bottom: 7px; height: 5px; border-radius: 3px; background: var(--red); }
-.av-cat .bell { left: 19px; bottom: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: inset 0 -2px 0 rgba(0,0,0,.2); animation: ring 4s ease-in-out infinite; }
+.av-cat .bell { left: 19px; bottom: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: inset 0 -2px 0 rgba(0,0,0,.2); animation: ring 2s ease-in-out infinite; }
 
 
 /* duck in a top hat with a monocle */
@@ -237,7 +237,7 @@ html[data-motion="off"] .enter { animation: none; }
 .av-duck .blush { top: 33px; }
 
 /* caped hero */
-.av-hero .cape { left: 4px; right: 4px; top: 22px; bottom: 0; border-radius: 12px 12px 6px 6px; background: var(--red); animation: cape 3.6s ease-in-out infinite; transform-origin: top; }
+.av-hero .cape { left: 4px; right: 4px; top: 22px; bottom: 0; border-radius: 12px 12px 6px 6px; background: var(--red); animation: cape 1.8s ease-in-out infinite; transform-origin: top; }
 
 .av-hero .body { left: 14px; right: 14px; top: 32px; bottom: 2px; border-radius: 8px; background: var(--gold); }
 .av-hero .emblem { left: 20px; top: 36px; width: 8px; height: 8px; background: var(--red); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
@@ -286,7 +286,7 @@ html[data-motion="off"] .enter { animation: none; }
 
 /* strong kid flexing */
 .av-strong .body { left: 9px; right: 9px; top: 33px; bottom: 0; border-radius: 12px 12px 5px 5px; background: var(--orange); }
-.av-strong .arm { right: 0; top: 28px; width: 8px; height: 17px; border-radius: 5px; background: #d99766; transform: rotate(-25deg); transform-origin: bottom; animation: flex 3.2s ease-in-out infinite; }
+.av-strong .arm { right: 0; top: 28px; width: 8px; height: 17px; border-radius: 5px; background: #d99766; transform: rotate(-25deg); transform-origin: bottom; animation: flex 1.6s ease-in-out infinite; }
 
 .av-strong .head { left: 8px; right: 8px; top: 5px; height: 30px; border-radius: 50%; background: #d99766; }
 .av-strong .tuft { left: 20px; top: 0; width: 9px; height: 10px; border-radius: 50% 50% 0 50%; background: var(--dark); transform: rotate(45deg); }
@@ -295,7 +295,7 @@ html[data-motion="off"] .enter { animation: none; }
 .av-strong .blush { top: 24px; } .av-strong .blush.l { left: 10px; } .av-strong .blush.r { right: 10px; }
 
 /* spotted dog with floppy ears */
-.av-dog .ear { top: 8px; width: 11px; height: 22px; border-radius: 50%; background: var(--dbrown); animation: flop 4.8s ease-in-out infinite; }
+.av-dog .ear { top: 8px; width: 11px; height: 22px; border-radius: 50%; background: var(--dbrown); animation: flop 2.4s ease-in-out infinite; }
 .av-dog .ear.l { left: 1px; transform-origin: top right; } .av-dog .ear.r { right: 1px; transform-origin: top left; animation-delay: .3s; }
 
 .av-dog .head { left: 6px; right: 6px; top: 6px; height: 36px; border-radius: 46% 46% 50% 50%; background: var(--brown); }
@@ -317,7 +317,7 @@ html[data-motion="off"] .enter { animation: none; }
 
 .av-dorami .head { inset: 6px 3px 8px; border-radius: 50%; background: var(--gold); box-shadow: inset -3px -4px 0 rgba(0,0,0,.08); }
 .av-dorami .face { left: 9px; right: 9px; top: 18px; height: 24px; border-radius: 50%; background: var(--white); }
-.av-dorami .bow { top: 0; width: 15px; height: 12px; background: var(--red); animation: wiggle 4.4s ease-in-out infinite; }
+.av-dorami .bow { top: 0; width: 15px; height: 12px; background: var(--red); animation: wiggle 2.2s ease-in-out infinite; }
 .av-dorami .bow.l { left: 8px; clip-path: polygon(0 0, 100% 50%, 0 100%); transform-origin: right; }
 .av-dorami .bow.r { right: 8px; clip-path: polygon(100% 0, 0 50%, 100% 100%); transform-origin: left; animation-delay: .2s; }
 
@@ -332,32 +332,32 @@ html[data-motion="off"] .enter { animation: none; }
 .av-ninja .hood { left: 3px; right: 3px; top: 2px; height: 42px; border-radius: 50%; background: #3557a8; box-shadow: inset -3px -4px 0 rgba(0,0,0,.12); }
 .av-ninja .face { left: 10px; right: 10px; top: 15px; height: 20px; border-radius: 10px; background: var(--skin); }
 .av-ninja .band { left: 3px; right: 3px; top: 9px; height: 5px; border-radius: 3px; background: var(--red); }
-.av-ninja .knot { right: -3px; top: 6px; width: 11px; height: 6px; border-radius: 2px 6px 6px 2px; background: var(--red); transform-origin: left; animation: knot 2.4s ease-in-out infinite; }
+.av-ninja .knot { right: -3px; top: 6px; width: 11px; height: 6px; border-radius: 2px 6px 6px 2px; background: var(--red); transform-origin: left; animation: knot 1.2s ease-in-out infinite; }
 
 .av-ninja .eye { top: 19px; } .av-ninja .eye.l { left: 14px; } .av-ninja .eye.r { right: 14px; }
 .av-ninja .blush { top: 28px; } .av-ninja .blush.l { left: 12px; } .av-ninja .blush.r { right: 12px; }
 
 /* two chipmunks */
 .av-pair .one, .av-pair .two { bottom: 0; width: 23px; height: 32px; border-radius: 46% 46% 40% 40%; background: var(--brown); }
-.av-pair .one { left: 0; } .av-pair .two { right: 0; bottom: 5px; animation: hop 2.4s ease-in-out infinite; }
+.av-pair .one { left: 0; } .av-pair .two { right: 0; bottom: 5px; animation: hop 1.2s ease-in-out infinite; }
 
 .av-pair .one::before, .av-pair .two::before { content: ""; position: absolute; left: 5px; top: 7px; width: 5px; height: 6px; border-radius: 50%; background: var(--dark); box-shadow: 8px 0 0 var(--dark); }
 .av-pair .one::after, .av-pair .two::after { content: ""; position: absolute; left: 8px; top: 16px; width: 6px; height: 5px; background: var(--white); border-radius: 0 0 2px 2px; }
 .av-pair .nose1, .av-pair .nose2 { width: 5px; height: 4px; border-radius: 50%; background: var(--dark); }
-.av-pair .nose1 { left: 9px; bottom: 19px; } .av-pair .nose2 { right: 9px; bottom: 24px; animation: hop 2.4s ease-in-out infinite; }
+.av-pair .nose1 { left: 9px; bottom: 19px; } .av-pair .nose2 { right: 9px; bottom: 24px; animation: hop 1.2s ease-in-out infinite; }
 .av-pair .eye { display: none; }
 
 /* status poses shared by everyone */
-.av[data-s="working"] { animation: none; }
+.av[data-s="working"] { animation: bob 1s ease-in-out infinite; }
 
-.av[data-s="done"] { animation: happy 3.6s ease-in-out infinite; }
+.av[data-s="done"] { animation: happy 1.8s ease-in-out infinite; }
 
 .av[data-s="done"] .eye { height: 5px; border-radius: 6px 6px 0 0; background: none; border: 2.5px solid var(--dark); border-bottom: 0; animation: none; }
 .av[data-s="done"] .eye::after { display: none; }
 .av[data-s="queued"] .eye { height: 2px; animation: none; } .av[data-s="queued"] .eye::after { display: none; }
-.av[data-s="reviewing"] .eye { animation: look 4.8s ease-in-out infinite; }
+.av[data-s="reviewing"] .eye { animation: look 2.4s ease-in-out infinite; }
 
-.av[data-s="blocked"] { animation: shake 1s ease-in-out infinite; }
+.av[data-s="blocked"] { animation: shake .5s ease-in-out infinite; }
 
 
 /* ---------- Mini characters (org chart, handoffs): a fixed box, the character scaled inside ---------- */
@@ -491,14 +491,14 @@ html[data-tab="room"] {
 @keyframes doorAjar { 0%, 70%, 100% { transform: none; } 80%, 90% { transform: perspective(60px) rotateY(-28deg); } }
 
 /* gadgets for people at work, drawn in CSS */
-#view-room .gadget { position: absolute; left: 50%; top: -4px; z-index: 3; pointer-events: none; transform: translateX(-50%); animation: hover 3.2s ease-in-out infinite; }
+#view-room .gadget { position: absolute; left: 50%; top: -4px; z-index: 3; pointer-events: none; transform: translateX(-50%); animation: hover 1.6s ease-in-out infinite; }
 @keyframes hover { 50% { translate: 0 -3px; } }
 #view-room .copter { width: 36px; height: 14px; }
-#view-room .copter::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(90deg, var(--gold) 50%, var(--red) 50%); animation: spinBlade 1s steps(2) infinite; }
+#view-room .copter::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(90deg, var(--gold) 50%, var(--red) 50%); animation: spinBlade .5s steps(2) infinite; }
 #view-room .copter::after { content: ""; position: absolute; left: 50%; top: 5px; width: 4px; height: 9px; margin-left: -2px; background: var(--wall-ink); }
 @keyframes spinBlade { 50% { transform: scaleX(.45); } }
 #view-room .timem { width: 32px; height: 18px; border: var(--bw) solid var(--wall-ink); border-radius: 4px; background: linear-gradient(#7fd0ff, #1e78c8); box-shadow: 0 0 8px var(--accent); }
-#view-room .timem::before { content: ""; position: absolute; left: 3px; right: 3px; top: 3px; height: 4px; background: #fff; opacity: .8; animation: type 1.2s steps(2) infinite; }
+#view-room .timem::before { content: ""; position: absolute; left: 3px; right: 3px; top: 3px; height: 4px; background: #fff; opacity: .8; animation: type .6s steps(2) infinite; }
 #view-room .timem::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 6px; height: 4px; margin-left: -3px; background: var(--red); }
 #view-room .pocket { width: 32px; height: 16px; border: var(--bw) solid var(--wall-ink); border-radius: 0 0 32px 32px; background: #fff; }
 #view-room .pocket::after { content: ""; position: absolute; left: 5px; top: 3px; width: 8px; height: 3px; border-radius: 2px; background: #cfe3f7; }
@@ -550,6 +550,7 @@ html[data-tab="room"] { --hall-wood-a: #e2bd8b; --hall-wood-b: #d3a874; }
   background: linear-gradient(90deg, #efe4c8 0 47%, var(--wall-ink) 47% 53%, #efe4c8 53%); }
 #view-room .door.gate { position: absolute; left: calc(var(--corr) / 2 - 10px); top: calc(var(--corr) / 2 - 15px); margin: 0; z-index: 4; }
 #view-room .desk.away .stage { visibility: hidden; }
+#view-room .desk.away .stage .twin:not(.leaving):not(.pending):not(.gone) { visibility: visible; }   /* the working copy stays seated while another copy (or the original) is away */
 @media (max-width: 600px) { #view-room .hall { --corr: 44px; padding-right: var(--s3); } }
 @media (prefers-reduced-motion: reduce) { html:not([data-motion="on"]) #view-room .walkers { display: none; } }
 #view-room .door.gate { animation: doorAjar 3.6s ease-in-out; transform-origin: left center; }
@@ -570,7 +571,7 @@ html[data-tab="room"] { --hall-wood-a: #e2bd8b; --hall-wood-b: #d3a874; }
 #view-room .rc-ref { display: inline-block; font-family: var(--mono); font-size: var(--t-xs); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 0 6px; }
 #view-room .desk { -webkit-tap-highlight-color: transparent; }
 /* life: sleepers breathe, the bell jingles now and then (not constantly), workers keep typing */
-#view-room .desk[data-s="queued"] .stage { animation: breathe 7.6s ease-in-out infinite; transform-origin: 50% 90%; }
+#view-room .desk[data-s="queued"] .stage { animation: breathe 3.8s ease-in-out infinite; transform-origin: 50% 90%; }
 @keyframes breathe { 50% { transform: scaleY(1.035) translateY(-1px); } }
 #view-room .st.bell { animation: ring 5s ease-in-out 1; }
 @keyframes ring { 0%, 84%, 100% { transform: rotate(0); } 87% { transform: rotate(20deg); } 90% { transform: rotate(-18deg); } 93% { transform: rotate(12deg); } 96% { transform: rotate(-6deg); } }
@@ -652,7 +653,7 @@ html[data-motion="off"] #view-room .walkers { display: none; }
 #view-room .walker .shadow { transition: opacity .1s; }
 #view-room .walker.flying .shadow { opacity: .45; }
 #view-room .walker .copterhat { position: absolute; left: 12px; top: -12px; width: 36px; height: 14px; z-index: 4; }
-#view-room .walker .copterhat::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(90deg, var(--gold) 50%, var(--red) 50%); animation: spinBlade 1s steps(2) infinite; }
+#view-room .walker .copterhat::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(90deg, var(--gold) 50%, var(--red) 50%); animation: spinBlade .5s steps(2) infinite; }
 #view-room .walker .copterhat::after { content: ""; position: absolute; left: 50%; top: 5px; width: 4px; height: 9px; margin-left: -2px; background: var(--wall-ink); }
 #view-room .walker.flying .copterhat { translate: 0 var(--lift, 0px); }
 @keyframes spinBlade { 50% { transform: scaleX(.4); } }
@@ -739,12 +740,12 @@ html[data-tab="room"] {
 .av-pair .fed::after { content: ""; position: absolute; left: 6px; top: 4px; width: 13px; height: 2px; background: var(--red); }
 .av-pair .shirt { right: 0; bottom: 5px; width: 23px; height: 11px; border-radius: 0 0 9px 9px; z-index: 1; background: radial-gradient(circle, #ffd84a 0 1.5px, transparent 2px) 3px 3px / 8px 7px, radial-gradient(circle, #ff7aa2 0 1.5px, transparent 2px) 7px 6px / 8px 7px, #1f9c93; }
 /* chip and dale take turns: one hops, then the other */
-.av-pair .one { animation: hop 4.8s ease-in-out infinite; }
-.av-pair .two, .av-pair .nose2 { animation: hop 4.8s ease-in-out infinite 2.4s; }
-.av-pair .fed { animation: hop 4.8s ease-in-out infinite; }
-.av-pair .shirt { animation: hop 4.8s ease-in-out infinite 2.4s; }
+.av-pair .one { animation: hop 2.4s ease-in-out infinite; }
+.av-pair .two, .av-pair .nose2 { animation: hop 2.4s ease-in-out infinite 1.2s; }
+.av-pair .fed { animation: hop 2.4s ease-in-out infinite; }
+.av-pair .shirt { animation: hop 2.4s ease-in-out infinite 1.2s; }
 /* nobita: pushes up his glasses now and then while working, and naps after ten idle minutes */
-.desk[data-s="working"] .av-nobita .glass { animation: pushUp 18s ease-in-out infinite; }
+.desk[data-s="working"] .av-nobita .glass { animation: pushUp 9s ease-in-out infinite; }
 @keyframes pushUp { 0%, 88%, 100% { translate: 0 0; } 92% { translate: 0 -3px; } 96% { translate: 0 -1px; } }
 /* tom straightens his whiskers before a run */
 .av-tomcat .muzzle::before, .av-tomcat .muzzle::after { content: ""; position: absolute; top: 4px; width: 9px; height: 1.5px; background: var(--dark); opacity: .55; }
@@ -766,7 +767,7 @@ html[data-tab="room"] {
 #view-room .t-teacup { left: 80px; bottom: 17px; width: 16px; height: 9px; border: var(--bw) solid var(--wall-ink); border-radius: 0 0 7px 7px; background: #fff; box-shadow: 0 2px 0 -0.5px #e5e7ef; }
 #view-room .t-teacup::before { content: ""; position: absolute; right: -6px; top: 1px; width: 5px; height: 4px; border: var(--bw) solid var(--wall-ink); border-left: 0; border-radius: 0 4px 4px 0; }
 #view-room .t-teacup b { left: 5px; top: -9px; width: 2px; height: 5px; background: var(--muted); opacity: 0; }
-#view-room .desk[data-s="working"] .t-teacup b { animation: steam 3.6s steps(4) infinite; }
+#view-room .desk[data-s="working"] .t-teacup b { animation: steam 1.8s steps(4) infinite; }
 /* Shinchan: an Action Kamen figure (his dog Shiro is drawn by rDog) */
 #view-room .t-figure { left: 26px; bottom: 17px; width: 12px; height: 22px; }
 #view-room .t-figure::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--dark); border-radius: 1px; }
@@ -881,8 +882,8 @@ html[data-tab="room"] {
 .av[data-s="done"] .fl-eyes.happy, .av[data-s="queued"] .fl-eyes.shut { display: inline; }
 .av[data-s="blocked"] .fl-drop { display: inline; }
 /* blink: flash the shut eyes now and then (working, idle, blocked); motion off keeps them hidden */
-.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.shut { display: inline; opacity: 0; animation: flBlink 9.2s steps(1) infinite; animation-delay: var(--blink, 0s); }
-.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.open { animation: flOpen 9.2s steps(1) infinite; animation-delay: var(--blink, 0s); }
+.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.shut { display: inline; opacity: 0; animation: flBlink 4.6s steps(1) infinite; animation-delay: var(--blink, 0s); }
+.av:not([data-s="done"]):not([data-s="queued"]) .fl-eyes.open { animation: flOpen 4.6s steps(1) infinite; animation-delay: var(--blink, 0s); }
 @keyframes flBlink { 0%, 95%, 100% { opacity: 0; } 96%, 98% { opacity: 1; } }
 @keyframes flOpen { 0%, 95%, 100% { opacity: 1; } 96%, 98% { opacity: 0; } }
 #view-room .av-mike .foot, #view-room .av-sulley .foot, #view-room .av-joe .foot, #view-room .av-ttwo .foot { display: none !important; }
@@ -921,7 +922,7 @@ html[data-tab="room"] {
 #view-room .t-clip::before { content: ""; position: absolute; left: 2px; right: 2px; top: 4px; bottom: 2px; background: linear-gradient(transparent 0 20%, #7d8fb3 20% 28%, transparent 28% 50%, #7d8fb3 50% 58%, transparent 58% 78%, #3fa05a 78% 86%, transparent 86%), #fff; }
 #view-room .t-clip b { left: 4px; top: -3px; width: 8px; height: 5px; border: 1.5px solid var(--wall-ink); border-radius: 2px; background: #8d96a8; }
 #view-room .t-can { right: -12px; bottom: 10px; width: 14px; height: 26px; border: var(--bw) solid var(--wall-ink); border-radius: 3px; background: linear-gradient(#3a3550 0 14%, #f2c53a 14% 40%, #c99a22 40% 52%, #f2c53a 52%); box-shadow: 0 0 8px rgba(255, 220, 90, .6); }
-#view-room .desk[data-s="working"] .t-can { animation: ledPulse 4.8s ease-in-out infinite; }
+#view-room .desk[data-s="working"] .t-can { animation: ledPulse 2.4s ease-in-out infinite; }
 #view-room .t-shuriken { left: 24px; bottom: 17px; width: 16px; height: 16px; background: #aab4c6; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 #view-room .t-shuriken b { left: 6px; top: 6px; width: 4px; height: 4px; border-radius: 50%; background: #2b3350; }
 #view-room .t-piano { right: -16px; bottom: 10px; width: 28px; height: 26px; border: var(--bw) solid var(--wall-ink); border-radius: 2px; background: #2a2433; }
@@ -936,7 +937,7 @@ html[data-tab="room"] {
 #view-room .t-flake::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7px; border: 1.5px solid #8fb4d4; border-radius: 9px 9px 0 0; background: #fff; }
 #view-room .t-flake b { width: 4px; height: 4px; background: #bfe3ff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 #view-room .t-flake b:nth-child(1) { left: 3px; top: -4px; } #view-room .t-flake b:nth-child(2) { left: 11px; top: -2px; }
-#view-room .desk[data-s="working"] .t-flake b { animation: sparkle 5.2s ease-in-out infinite; }
+#view-room .desk[data-s="working"] .t-flake b { animation: sparkle 2.6s ease-in-out infinite; }
 #view-room .t-uke { right: -8px; bottom: 10px; width: 16px; height: 30px; }
 #view-room .t-uke::before { content: ""; position: absolute; left: 6px; top: 0; width: 3px; height: 16px; background: #5a3a22; border: 1px solid var(--wall-ink); }
 #view-room .t-uke::after { content: ""; position: absolute; left: 1px; bottom: 0; width: 14px; height: 14px; border: var(--bw) solid var(--wall-ink); border-radius: 50%; background: #e0a050; }
@@ -949,11 +950,11 @@ html[data-tab="room"] {
 #view-room .dog .o { stroke: var(--wall-ink); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
 #view-room .dog .lg { transform-box: fill-box; }
 #view-room .seat > .dog { left: 6px; bottom: -4px; transform-origin: 50% 100%; }
-#view-room .desk[data-s="working"] .seat > .dog { animation: dogWander 36s linear infinite; }
+#view-room .desk[data-s="working"] .seat > .dog { animation: dogWander 18s linear infinite; }
 #view-room .desk[data-s="working"] .seat > .dog .lg.a, #view-room .desk[data-s="working"] .seat > .dog .lg.d,
-#view-room .walker:not([data-frame="s"]) .dog .lg.a, #view-room .walker:not([data-frame="s"]) .dog .lg.d { animation: dogStep 0.92s steps(1) infinite; }
+#view-room .walker:not([data-frame="s"]) .dog .lg.a, #view-room .walker:not([data-frame="s"]) .dog .lg.d { animation: dogStep .46s steps(1) infinite; }
 #view-room .desk[data-s="working"] .seat > .dog .lg.b, #view-room .desk[data-s="working"] .seat > .dog .lg.c,
-#view-room .walker:not([data-frame="s"]) .dog .lg.b, #view-room .walker:not([data-frame="s"]) .dog .lg.c { animation: dogStep 0.92s steps(1) infinite reverse; }
+#view-room .walker:not([data-frame="s"]) .dog .lg.b, #view-room .walker:not([data-frame="s"]) .dog .lg.c { animation: dogStep .46s steps(1) infinite reverse; }
 @keyframes dogStep { 0% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes dogWander { 0%, 8% { transform: translateX(0) scaleX(1); } 44% { transform: translateX(82px) scaleX(1); } 46%, 54% { transform: translateX(82px) scaleX(-1); } 90% { transform: translateX(0) scaleX(-1); } 92%, 100% { transform: translateX(0) scaleX(1); } }
 #view-room .desk.away .dog { visibility: hidden; }
@@ -1062,7 +1063,7 @@ a { color: var(--accent); }
 #view-room .plate-task .p0 { display: inline-block; padding: 0 4px; margin-right: 4px; border-radius: 3px; background: var(--bad); color: #fff; font: 800 11px/1.4 var(--mono); }
 #view-room .desk[data-need] .plate { outline: 2px solid var(--need-edge); outline-offset: 2px; }
 /* raised hand */
-.hand { position: absolute; z-index: 6; left: 50%; top: -6px; margin-left: 16px; width: 24px; transform-origin: 50% 90%; animation: waveHand 4s steps(1) infinite; }
+.hand { position: absolute; z-index: 6; left: 50%; top: -6px; margin-left: 16px; width: 24px; transform-origin: 50% 90%; animation: waveHand 2s steps(1) infinite; }
 .hand svg { display: block; shape-rendering: crispEdges; }
 @keyframes waveHand { 0%, 100% { transform: rotate(-10deg); } 25% { transform: rotate(12deg); } 50% { transform: rotate(-10deg); } 75% { transform: rotate(12deg); } 90% { transform: rotate(0); } }
 .hand::after { content: "ask"; position: absolute; left: 26px; top: 2px; padding: 0 5px; border: 2px solid var(--wall-ink); border-radius: 3px; background: var(--need-bg); color: var(--need-ink); font: 800 11px/1.4 var(--mono); text-transform: uppercase; }

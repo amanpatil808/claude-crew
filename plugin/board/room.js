@@ -1116,15 +1116,19 @@ function rAccess(el, g) {
   const L = t.left - g.hb.left, R = t.right - g.hb.left, top = t.top - g.hb.top, dx = (L + R) / 2;
   const tx = tb.left - g.hb.left + tb.width / 2, ty = tb.top - g.hb.top + tb.height;     // feet on the table line
   const side = R - tx >= tx - L ? 1 : -1, sx = Math.max(L + 34, Math.min(R - 34, tx + side * CHAR_W));   // stand one body width aside, where there is more room
-  const pl = el.querySelector(".plate")?.getBoundingClientRect(), lane = pl ? pl.bottom - g.hb.top + 8 : top + 46, cy = top - g.corr / 2;
-  return { room: el.closest(".team"), seat: [tx, ty], stand: [sx, ty], side, sx, lane, dx, cy, out: [[tx, ty], [sx, ty], [sx, lane], [dx, lane], [dx, cy]] };
+  const pl = el.querySelector(".plate")?.getBoundingClientRect(), lane = pl ? pl.bottom - g.hb.top + 8 : top + 46, cy = Math.max(top - g.corr / 2, 20);   // the corridor line stays inside the hall frame (the top row sits at the frame edge)
+  const hi = top + 46;                     // leaving the room: straight up the aisle to the top door, not down under the name plates and back up
+  const mates = [...el.closest(".team").querySelectorAll(".table")].map((t) => { const b = t.getBoundingClientRect(); return b.left - g.hb.left + b.width / 2; });
+  return { room: el.closest(".team"), seat: [tx, ty], stand: [sx, ty], side, sx, lane, dx, cy, mates, out: [[tx, ty], [sx, ty], [sx, hi], [dx, hi], [dx, cy]] };
 }
 const rDedupe = (p) => p.filter((q, i) => !i || Math.hypot(q[0] - p[i - 1][0], q[1] - p[i - 1][1]) > 1);
 const rLen = (p) => p.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);
 // from/to: "seat" or "stand" at each end.
 function rRoute(a, b, spine, from, to) {
   if (a.room === b.room) {
-    const p = from === "seat" ? [a.seat, a.stand] : [a.stand]; p.push([a.sx, a.lane], [b.sx, a.lane], b.stand); if (to === "seat") p.push(b.seat); return rDedupe(p);
+    const lo = Math.min(a.sx, b.sx) - 30, hi = Math.max(a.sx, b.sx) + 30;
+    if (!a.mates.some((x) => x > lo && x < hi)) { const q = from === "seat" ? [a.seat, a.stand] : [a.stand]; q.push(b.stand); if (to === "seat") q.push(b.seat); return rDedupe(q); }   // nobody's desk between the two stand spots: walk straight
+    const p =from === "seat" ? [a.seat, a.stand] : [a.stand]; p.push([a.sx, a.lane], [b.sx, a.lane], b.stand); if (to === "seat") p.push(b.seat); return rDedupe(p);
   }
   const p = [...(from === "seat" ? a.out : a.out.slice(1))];
   if (Math.abs(a.cy - b.cy) < 2) p.push([b.dx, b.cy]); else p.push([spine, a.cy], [spine, b.cy], [b.dx, b.cy]);

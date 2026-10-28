@@ -21,5 +21,7 @@ metadata:
 
 - Never start building from research or ideas the owner didn't explicitly ask to build. "Just do what I said" means finish their current asks, not my proposals. On 2026-10-28 I started token cuts from Dekisugi's plan and the owner stopped it ("did I ask you"). Present proposals, then wait for a clear yes. [project] (seen 1)
 
+- The owner wants WORKING characters lively (bobbing, pacing, typing). Calm only done and idle desks, and never apply research advice that removes the board's life without showing it to the owner first. 0.3.8/0.3.9 removed working motion and the owner said "you fucked up the animations". [project] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.

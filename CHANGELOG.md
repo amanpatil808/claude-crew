@@ -2,6 +2,18 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.10 - 28 Oct 2026
+
+### Fixed
+
+- Working characters move again (pace, bob, typing, desk light at their 0.3.7 speed); done and idle desks stay still.
+- Natural paths: characters went down, up, across, down and up on every cross-room trip. Now they go straight up the aisle, out the top door, across and in; short walks inside a room go straight.
+- A working copy stays seated while its twin walks off.
+
+### Changed
+
+- Mike and Sulley travel between rooms by closet door (step in, step out at the destination) and walk only inside their own room.
+
 ## 0.3.9 - 28 Oct 2026
 
 ### Changed
