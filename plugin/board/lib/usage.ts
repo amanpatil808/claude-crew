@@ -7,8 +7,8 @@ import { isAbsolute, join, sep } from "node:path";
 import { LONG_PROMPT_TOKENS } from "./prices.ts";
 // The event shape, row fields, fixed text, model and day patterns and the size caps have one home: lib/events.ts.
 import {
-  agentIdOf, agentTypeOf, dayOf, localDay, MODEL_ID, USAGE_MAX_DAYS, USAGE_MAX_ROWS, USAGE_TEXT,
-  type UsageEvent, type UsageOptions, type UsageRow,
+  agentIdOf, agentTypeOf, dayOf, localDay, MODEL_ID, USAGE_MAX_DAYS, USAGE_MAX_HOUR_ROWS, USAGE_MAX_HOURS, USAGE_MAX_ROWS, USAGE_TEXT, utcHour,
+  type HourRow, type UsageEvent, type UsageOptions, type UsageRow,
 } from "./events.ts";
 
 // Overridable for tests only; the hook passes nothing.
@@ -57,14 +57,14 @@ export function safeTranscript(path: unknown, root = transcriptRoot()): SafeFile
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
 const obj = (x: unknown): Record<string, unknown> => (x && typeof x === "object" && !Array.isArray(x) ? x as Record<string, unknown> : {});
 
-type Response = Omit<UsageRow, "n">;
+// hr: the response's UTC clock hour ("" without a usable time), for the plan's 5-hour window.
+type Response = Omit<UsageRow, "n"> & { hr: string };
 
-// The response's calendar day, or "" when the line has no usable time (it then counts toward all-time only).
-function dayOfLine(t: unknown, day: (ms: number) => string): string {
+// The response's time in ms, or NaN when the line has no usable time (it then counts toward all-time only).
+function timeOfLine(t: unknown): number {
   // dayOf on the written date too: Date.parse rolls "2026-02-30" over to March instead of refusing it.
-  if (typeof t !== "string" || !ISO_TIME.test(t) || !dayOf(t.slice(0, 10))) return "";
-  const ms = Date.parse(t);
-  return Number.isFinite(ms) ? dayOf(day(ms)) : "";
+  if (typeof t !== "string" || !ISO_TIME.test(t) || !dayOf(t.slice(0, 10))) return NaN;
+  return Date.parse(t);
 }
 
 // One assistant line to one response's numbers, or null when it is not one.
@@ -80,9 +80,10 @@ function response(line: string, day: (ms: number) => string): [string, Response]
   const cwAll = u.cache_creation_input_tokens === undefined ? num(cc.ephemeral_5m_input_tokens) + cw1h : num(u.cache_creation_input_tokens);
   // Without the TTL split, every write is counted as a 5-minute one (the cheaper rate).
   const cw5m = cc.ephemeral_5m_input_tokens === undefined ? Math.max(0, cwAll - cw1h) : num(cc.ephemeral_5m_input_tokens);
-  const input = num(u.input_tokens), cr = num(u.cache_read_input_tokens);
+  const input = num(u.input_tokens), cr = num(u.cache_read_input_tokens), ms = timeOfLine(rec.timestamp);
   return [msg.id, {
-    model, speed: u.speed === "fast" ? "fast" : "standard", long: input + cwAll + cr > LONG_PROMPT_TOKENS, day: dayOfLine(rec.timestamp, day),
+    model, speed: u.speed === "fast" ? "fast" : "standard", long: input + cwAll + cr > LONG_PROMPT_TOKENS,
+    day: Number.isFinite(ms) ? dayOf(day(ms)) : "", hr: Number.isFinite(ms) ? utcHour(ms) : "",
     in: input, out: num(u.output_tokens), cw5m, cw1h, cr, ws: num(tools.web_search_requests), wf: num(tools.web_fetch_requests),
   }];
 }
@@ -90,7 +91,7 @@ function response(line: string, day: (ms: number) => string): [string, Response]
 // Streams the file in chunks. A response is written as several lines (one per content block) repeating the
 // same usage, so responses are keyed by message.id and the last line seen wins.
 // Exported for the swap test only; callers use readUsage, which checks the path first.
-export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: UsageRow[]; partial: boolean; since: string } | null {
+export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: UsageRow[]; hours: HourRow[]; partial: boolean; since: string } | null {
   const maxBytes = limits.maxBytes ?? MAX_BYTES, maxMs = limits.maxMs ?? MAX_MS, clock = limits.clock ?? (() => performance.now());
   const maxLine = limits.maxLineBytes ?? MAX_LINE_BYTES, day = limits.dayOf ?? localDay;
   // O_NOFOLLOW plus the same inode as the checked path: a file swapped in after the check is not read.
@@ -136,9 +137,28 @@ export function sumTranscript(file: SafeFile, limits: ReadLimits = {}): { rows: 
     }
     // A last line without "\n" may be torn (the transcript is written async); it is used only if it parses.
     if (!partial && !dropping && restLen) scan(Buffer.concat(parts, restLen).toString("utf8"));
-    const out = toRows([...seen.values()], limits.maxDays ?? USAGE_MAX_DAYS, limits.maxRows ?? USAGE_MAX_ROWS);
-    return { rows: out.rows, partial: partial || out.cut, since: out.since };
+    const responses = [...seen.values()];
+    const out = toRows(responses, limits.maxDays ?? USAGE_MAX_DAYS, limits.maxRows ?? USAGE_MAX_ROWS);
+    return { rows: out.rows, hours: toHours(responses), partial: partial || out.cut, since: out.since };
   } finally { closeSync(fd); }
+}
+
+// Rows per (model, speed, long, UTC hour) for the newest USAGE_MAX_HOURS hours that have a response. Older hours are
+// dropped (the day rows keep them); while the rows are over the cap the oldest kept hour goes too.
+function toHours(responses: readonly Response[]): HourRow[] {
+  const all = [...new Set(responses.map((x) => x.hr).filter(Boolean))].sort().reverse();
+  for (let kept = Math.min(all.length, USAGE_MAX_HOURS); kept > 0; kept--) {
+    const keep = new Set(all.slice(0, kept)), rows = new Map<string, HourRow>();
+    for (const x of responses) {
+      if (!keep.has(x.hr)) continue;
+      const key = `${x.model}\0${x.speed}\0${x.long}\0${x.hr}`;
+      const row = rows.get(key) ?? { model: x.model, speed: x.speed, long: x.long, hr: x.hr, n: 0, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0 };
+      row.n++; row.in += x.in; row.out += x.out; row.cw5m += x.cw5m; row.cw1h += x.cw1h; row.cr += x.cr; row.ws += x.ws; row.wf += x.wf;
+      rows.set(key, row);
+    }
+    if (rows.size <= USAGE_MAX_HOUR_ROWS) return [...rows.values()].sort((a, b) => (a.hr < b.hr ? 1 : a.hr > b.hr ? -1 : a.model.localeCompare(b.model)));
+  }
+  return [];
 }
 
 function group(responses: readonly Response[], keep: ReadonlySet<string>): UsageRow[] {
@@ -182,6 +202,6 @@ export function readUsage(path: string, opts: UsageOptions, limits: ReadLimits =
     : {};
   return {
     kind: "usage", project: opts.project, sid: opts.sid, ...agent, text: USAGE_TEXT, scope: opts.scope, final: opts.final, partial: read.partial, rows: read.rows,
-    ...(read.since ? { since: read.since } : {}),
+    ...(read.hours.length ? { hours: read.hours } : {}), ...(read.since ? { since: read.since } : {}),
   };
 }

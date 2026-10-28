@@ -653,6 +653,68 @@ function renderCost(s) {
   const b = $("c-badge"); b.hidden = false; b.textContent = prices.stale ? "estimate · stale prices" : "estimate"; b.dataset.stale = prices.stale ? "1" : "";
 }
 
+// ---- Plan usage (state.plan): subscription = limit rows + shares; unknown = shares + the dollar ledger; api / null = today's ledger only. ----
+let planWin = rGet("crewPlanWin", "5h") === "7d" ? "7d" : "5h", planHid = false;
+const fmtPct = (v) => !Number.isFinite(v) ? "–" : (v >= 10 || v === 0 ? String(Math.round(v)) : v.toFixed(1)) + "%";
+const clampPct = (v) => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null;
+const planWhen = (iso) => { if (!iso || !Number.isFinite(Date.parse(iso))) return ""; return day(iso) === day(new Date().toISOString()) ? hm(iso) : dayName(iso) + " " + hm(iso); };
+const PLAN_SRC = { "rate-limits": "live rate limits", setting: "from your settings", none: "shown at API prices" };
+function planBar(pct, label, tone) {
+  const bar = rel("span", "plan-bar"), f = rel("i", "plan-fill" + (tone || ""));
+  f.style.setProperty("--pct", String(pct ?? 0));
+  bar.setAttribute("role", "progressbar"); bar.setAttribute("aria-label", label); bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", "100");
+  if (pct != null) bar.setAttribute("aria-valuenow", String(Math.round(pct)));
+  bar.append(f); return bar;
+}
+function planLimit(l) {
+  const li = rel("div", "plan-limit"), u = clampPct(l.usedPct), lbl = String(l.label || l.id);
+  li.dataset.k = "limit-" + l.id;
+  const when = planWhen(l.resetsAt);
+  li.append(rel("b", null, lbl), planBar(u, lbl + " limit used", u >= 90 ? " full" : u >= 75 ? " warn" : ""), rel("span", "num", u == null ? "–" : fmtPct(u)), rel("span", "plan-reset", when ? "resets " + when : "reset time unknown"));
+  return li;
+}
+function planRow(a) {
+  const li = rel("li", "plan-row" + (a.heavy ? " heavy" : "")), sp = clampPct(a.sharePct), name = a.role === "other" ? "Other" : shortOf(a.role);
+  li.dataset.k = a.role;
+  const w = rel("span", "av-w"); w.setAttribute("aria-hidden", "true"); if (a.role !== "other") w.append(rMini(a.role, "idle", 0));
+  li.append(w, rel("b", null, name), planBar(sp, name + " share of usage"), rel("span", "num", fmtPct(sp)));
+  if (Number.isFinite(a.planPct)) li.append(rel("span", "num", fmtPct(a.planPct) + " of plan"));
+  if (a.heavy) li.append(rel("span", "plan-badge", "uses more"));
+  li.title = `${nameOf(a.role)}: ${fmtPct(sp)} of the usage${Number.isFinite(a.planPct) ? `, about ${fmtPct(a.planPct)} of the plan` : ""}${a.heavy ? ". Uses much more than the others." : ""}`;
+  return li;
+}
+function renderPlan(s) {
+  const p = s.plan && typeof s.plan === "object" ? s.plan : null, host = $("plan");
+  const show = !!p && (p.kind === "subscription" || p.kind === "unknown"), sub = show && p.kind === "subscription";
+  if (planHid !== sub) { planHid = sub; delete sigs.cost; renderCost(s); }   // leaving subscription: repaint the ledger parts that were hidden
+  host.hidden = !show;
+  if (sub) {
+    for (const e of [$("c-hero"), $("c-cached"), $("c-since"), $("c-bars"), $("c-details"), $("c-badge"), $("c-note").parentElement, document.querySelector("#cost .seg")]) if (e) e.hidden = true;
+  }
+  $("cost-h").textContent = sub ? "Plan usage" : "Cost";
+  if (!show) return;
+  const nodes = [];
+  const head = rel("div", "plan-head"); head.dataset.k = "head";
+  const src = (PLAN_SRC[p.source] || PLAN_SRC.none) + (p.updatedAt ? " · read " + agoOf(p.updatedAt) : "");
+  head.append(rel("b", null, p.name ? p.name + " plan" : sub ? "Subscription" : "Plan not detected"), rel("span", null, src));
+  nodes.push(head);
+  if (sub) for (const l of p.limits || []) nodes.push(planLimit(l));
+  const tabs = rel("div", "plan-tabs"); tabs.dataset.k = "tabs"; tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Share window");
+  for (const [w, t] of [["5h", "5-hour"], ["7d", "Weekly"]]) {
+    const b = rel("button", null, t); b.type = "button"; b.setAttribute("aria-pressed", String(planWin === w));
+    b.onclick = () => { planWin = w; rPut("crewPlanWin", w); if (last) renderPlan(last); };
+    tabs.append(b);
+  }
+  nodes.push(tabs);
+  const agents = (p.shares || []).find((x) => x && x.window === planWin)?.agents || [];
+  const ul = rel("ul", "plan-share"); ul.dataset.k = "share"; ul.setAttribute("aria-label", `Each agent's share of ${planWin === "5h" ? "5-hour" : "weekly"} usage`);
+  for (const a of agents) ul.append(planRow(a));
+  if (!agents.length) { const e = rel("li", "tk-empty", "No usage in this window yet."); e.dataset.k = "none"; ul.append(e); }
+  nodes.push(ul);
+  if (p.basis) { const n = rel("p", "plan-note", p.basis); n.dataset.k = "note"; nodes.push(n); }
+  fill(host, ...nodes);
+}
+
 // ---- Tasks: Running and Queued (the full task text lives here; desk plates keep a short status) ----
 const TPRIO = { P0: 0, P1: 1, P2: 2 };
 const R_PRIO = { P0: "P0: do first", P1: "P1: next", P2: "P2: when free" };
@@ -849,7 +911,7 @@ function paintAll() {
   run("pick", pickInit); run("projects", renderProjects);
   rNeed = needKeys(s);
   run("head", renderHead); run("need", renderNeed); run("floor", renderFloor);
-  run("room", renderRoom); run("cost", renderCost); run("tasks", renderTasks); run("ship", renderShip); run("log", renderLog);
+  run("room", renderRoom); run("cost", renderCost); run("plan", renderPlan); run("tasks", renderTasks); run("ship", renderShip); run("log", renderLog);
   document.documentElement.dataset.ready = "1";
 }
 for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { period = b.dataset.p; if (last) renderCost(last); };

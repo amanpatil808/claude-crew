@@ -2,7 +2,8 @@
 // (several subagents finishing at once) never interleave half-lines.
 import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { EVENTS_FILE } from "./paths.ts";
+import { join } from "node:path";
+import { EVENTS_FILE, LOG_DIR } from "./paths.ts";
 import { appendPrivate } from "./private-fs.ts";
 import { redactDeep } from "./redact.ts";
 
@@ -44,6 +45,12 @@ export interface UsageRow {
   wf: number;     // web fetch requests
 }
 export const USAGE_NUMBERS = ["n", "in", "out", "cw5m", "cw1h", "cr", "ws", "wf"] as const;
+// The same numbers per UTC clock hour ("2026-10-28T09"), for the plan's 5-hour window. Only the transcript's newest
+// USAGE_MAX_HOURS hours with a response are kept (a 5-hour window touches at most 6 clock hours); older ones are dropped,
+// not folded, since the day rows already hold every response.
+export interface HourRow extends Omit<UsageRow, "day"> { hr: string }
+export const USAGE_MAX_HOURS = 6;
+export const USAGE_MAX_HOUR_ROWS = 96;
 // A Claude model id, optionally with a two-letter region and Bedrock's "anthropic." prefix ("us.anthropic.claude-...").
 // Anything else is stored as "unknown", so no free text gets in.
 export const MODEL_ID = /^(?:[a-z]{2}\.)?(?:anthropic\.)?claude-[a-z0-9.-]{1,56}$/;
@@ -71,6 +78,47 @@ export const localDay = (ms: number): string => {
 };
 // Calendar arithmetic on the string itself, so a DST change can never skip or repeat a day. "" for a bad day.
 export const addDays = (day: string, n: number): string => dayOf(utcDayOf(Date.parse(`${dayOf(day)}T00:00:00Z`) + n * 86_400_000));
+// A UTC clock hour "YYYY-MM-DDTHH", checked by round trip like a day; "" for anything else.
+export const HOUR = /^\d{4}-\d{2}-\d{2}T\d{2}$/;
+export const utcHour = (ms: number): string => (Number.isFinite(ms) && Math.abs(ms) <= 8.64e15 ? new Date(ms).toISOString().slice(0, 13) : "");
+export const hourOf = (v: unknown): string => (typeof v === "string" && HOUR.test(v) && utcHour(Date.parse(`${v}:00:00Z`)) === v ? v : "");
+
+// The plan's rate-limit reading: what the toon-crew mod (plugin/hooks/plan-mod.mjs) saw in Claude Code's
+// `session.measure`, handed to the Stop hook (board/limits.ts) through one environment variable and kept in
+// LIMITS_FILE. Numbers, times and one flag only. Short key names: redaction blanks keys that say token or session.
+export type LimitId = "5h" | "7d";
+export interface LimitReading { id: LimitId; pct: number; end: string | null }   // pct 0-100; end: reset time, ISO UTC
+// sub: true when a 5-hour or weekly window was reported (claude.ai subscriptions only); false when responses came back
+// with none (API key, cloud provider, or a gateway's spend limit).
+export interface LimitsReading { v: 1; at: string; sub: boolean; w: LimitReading[] }
+export const LIMITS_FILE = join(LOG_DIR, "limits.json");
+export const LIMITS_ENV = "TOON_CREW_LIMITS";
+const LIMIT_IDS: ReadonlyMap<string, LimitId> = new Map<string, LimitId>([["5h", "5h"], ["7d", "7d"]]);
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+const isoOf = (v: unknown): string | null => {
+  if (typeof v !== "string" || !ISO_UTC.test(v) || !dayOf(v.slice(0, 10))) return null;
+  const ms = Date.parse(v);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+};
+
+// The allow-list both ends use (the writer on the environment variable, the board on the file): known keys only,
+// a finite percentage clamped to 0-100, real UTC times, each window at most once. Anything else gives null.
+export function limitsReading(x: unknown): LimitsReading | null {
+  if (!x || typeof x !== "object" || Array.isArray(x)) return null;
+  const r = x as Record<string, unknown>;
+  const at = isoOf(r.at);
+  if (r.v !== 1 || !at || typeof r.sub !== "boolean" || !Array.isArray(r.w) || r.w.length > LIMIT_IDS.size) return null;
+  const w: LimitReading[] = [];
+  for (const raw of r.w) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const y = raw as Record<string, unknown>;
+    const id = typeof y.id === "string" ? LIMIT_IDS.get(y.id) : undefined;
+    const end = y.end === null ? null : isoOf(y.end);
+    if (!id || w.some((q) => q.id === id) || typeof y.pct !== "number" || !Number.isFinite(y.pct) || (y.end !== null && !end)) return null;
+    w.push({ id, pct: Math.min(100, Math.max(0, Math.round(y.pct * 10) / 10)), end });
+  }
+  return { v: 1, at, sub: r.sub, w };
+}
 
 export interface BoardEvent {
   id: string;          // also the board's feed doc_id, so it uses only doc_id-safe characters
@@ -97,19 +145,40 @@ export interface BoardEvent {
   final?: boolean;     // usage: that transcript is finished (SubagentStop, SessionEnd)
   partial?: boolean;   // usage: a read budget stopped the sum early
   rows?: UsageRow[];   // usage: cumulative for that transcript; the newest per (sid, agentId ?? "main") wins
+  hours?: HourRow[];   // usage: the same transcript's newest clock hours, for the plan's 5-hour window
   since?: string;      // usage: the earliest day of any response in that transcript, also when folded into day ""
 }
 
 // What lib/usage.ts readUsage(path, opts) returns: a ready-to-append usage event.
 export interface UsageEvent {
   kind: "usage"; project: string; sid: string; agentId?: string; agentType?: string;
-  text: typeof USAGE_TEXT; scope: "main" | "agent"; final: boolean; partial: boolean; rows: UsageRow[]; since?: string;
+  text: typeof USAGE_TEXT; scope: "main" | "agent"; final: boolean; partial: boolean; rows: UsageRow[]; hours?: HourRow[]; since?: string;
 }
 export interface UsageOptions { scope: "main" | "agent"; agentId?: string; agentType?: string; project: string; sid: string; final: boolean }
 // The part of a reader's answer the hook keeps; usageFields() checks it. Identity comes from the hook payload.
-export type UsageFields = Pick<UsageEvent, "scope" | "final" | "partial" | "rows" | "since">;
+export type UsageFields = Pick<UsageEvent, "scope" | "final" | "partial" | "rows" | "hours" | "since">;
 
 const count = (v: unknown) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : 0);
+
+// Hour rows from the log or a reader, re-checked: a pattern-checked model and hour, non-negative integer counts.
+// A row without a real hour or without any count is dropped.
+export function hourRows(x: unknown): HourRow[] {
+  if (!Array.isArray(x)) return [];
+  const out: HourRow[] = [];
+  for (const r of x.slice(0, USAGE_MAX_HOUR_ROWS)) {
+    if (!r || typeof r !== "object") continue;
+    const y = r as Record<string, unknown>;
+    const hr = hourOf(y.hr);
+    if (!hr) continue;
+    const row: HourRow = {
+      model: typeof y.model === "string" && MODEL_ID.test(y.model) ? y.model : "unknown", speed: y.speed === "fast" ? "fast" : "standard", long: y.long === true,
+      hr, n: 0, in: 0, out: 0, cw5m: 0, cw1h: 0, cr: 0, ws: 0, wf: 0,
+    };
+    for (const k of USAGE_NUMBERS) row[k] = count(y[k]);
+    if (USAGE_NUMBERS.some((k) => row[k] > 0)) out.push(row);
+  }
+  return out;
+}
 
 // The hook's own allow-list over whatever the transcript reader returned: known keys only, counts that are
 // non-negative integers, a pattern-checked model id and day. No non-empty row means nothing to log (never zeros).
@@ -128,8 +197,8 @@ export function usageFields(u: unknown): UsageFields | null {
     for (const k of USAGE_NUMBERS) row[k] = count(y[k]);
     if (USAGE_NUMBERS.some((k) => row[k] > 0)) rows.push(row);
   }
-  const since = dayOf(x.since);
-  return rows.length ? { scope: x.scope, final: x.final === true, partial: x.partial === true, rows, ...(since ? { since } : {}) } : null;
+  const since = dayOf(x.since), hours = hourRows(x.hours);
+  return rows.length ? { scope: x.scope, final: x.final === true, partial: x.partial === true, rows, ...(hours.length ? { hours } : {}), ...(since ? { since } : {}) } : null;
 }
 
 export function newId(at: Date): string {
