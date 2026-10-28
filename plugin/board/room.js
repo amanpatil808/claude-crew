@@ -487,10 +487,9 @@ function renderProjects(s) {
     b.title = text; b.append(rel("span", "pn-t", text)); if (rProj !== p) b.append(document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
-  // All first, then the picked project, then projects with working or queued tasks (most first), then the quiet ones.
+  // One stable order: the order the server lists the projects (registry order, new ones last). Picking or activity never moves a chip.
   const Q = T.queued || [], load = (p) => n(p) + Q.filter((t) => t.project === p).length;
-  const order = names.map((p, i) => ({ p, i, l: load(p) })).sort((a, b) => (b.p === rProj) - (a.p === rProj) || b.l - a.l || a.i - b.i);
-  fill(nav, ...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
+  fill(nav, ...names.map((p) => { const b = chip(p, p); b.dataset.k = p; if (!load(p)) b.dataset.quiet = "1"; return b; }));
 }
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
