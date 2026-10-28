@@ -8,8 +8,9 @@ import { RETIRED } from "./roster.ts";
 import { activeByProject, costTaskOf, deriveTasks } from "./tasks.ts";
 import { deriveNeeds } from "./needs.ts";
 import { getOwn, putOwn } from "./records.ts";
-// Types only (erased at run time), so this line never makes cost.ts required.
+// Types only (erased at run time), so these lines never make cost.ts or plan.ts required.
 import type { CostOptions, CostState } from "./cost.ts";
+import type { PlanOptions, PlanState } from "./plan.ts";
 
 // lib/cost.ts buildCost(events, now, opts): the cost ledger. Optional, so the board works without it.
 // `taskOf` maps an agent id to the one task its usage counts toward (see costTaskOf: only tasks still shown).
@@ -29,6 +30,25 @@ const buildCost = await loadBuildCost();
 export function costOf(events: BoardEvent[], roles: Map<string, Role>, now: number, fn: BuildCost | null = buildCost): CostState | null {
   if (!fn) return null;
   try { return fn(events, now, { roles, taskOf: costTaskOf(events, roles, now) }) ?? null; } catch { return null; }
+}
+
+// lib/plan.ts buildPlan(events, now, opts): the plan panel. Optional in the same way (it must not import this file).
+export type BuildPlan = (events: readonly BoardEvent[], now: number, opts?: PlanOptions) => PlanState;
+
+// `from` is for tests only (a module that throws on import, or exports no function); the board passes nothing.
+export async function loadBuildPlan(from = "./plan.ts"): Promise<BuildPlan | null> {
+  try {
+    const m: Record<string, unknown> = await import(from);
+    const fn = m.buildPlan;
+    return typeof fn === "function" ? (events, now, opts) => fn(events, now, opts) : null;
+  } catch { return null; }
+}
+const buildPlan = await loadBuildPlan();
+
+// `plan` is null until lib/plan.ts exists, or when it throws: the page then shows the dollar ledger.
+export function planOf(events: BoardEvent[], roles: Map<string, Role>, now: number, fn: BuildPlan | null = buildPlan): PlanState | null {
+  if (!fn) return null;
+  try { return fn(events, now, { roles }) ?? null; } catch { return null; }
 }
 
 export interface ProjectSummary extends Project { working: number; polled: boolean }
@@ -71,8 +91,9 @@ export function buildState(now = Date.now()) {
   const rooms = buildRooms(events, registry, roleMap, roles, now);
   const needsYou = deriveNeeds(events, roleMap, registry, snapshots, now);
   const cost = costOf(events, roleMap, now);
+  const plan = planOf(events, roleMap, now);
   // usage and needs-you are bookkeeping: they must not push real history out of the last 300.
   const history = events.filter((e) => !QUIET_KINDS.has(e.kind)).slice(-300).reverse();
-  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: history, room, rooms, factsByProject, snapshots, needsYou, cost, ...snap };
+  return { now: new Date(now).toISOString(), projects, focus: focus ?? null, crew, tasks, events: history, room, rooms, factsByProject, snapshots, needsYou, cost, plan, ...snap };
 }
 

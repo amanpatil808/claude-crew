@@ -2,6 +2,13 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.13 - 28 Oct 2026
+
+### Added
+
+- The cost panel follows your plan. On a Pro or Max subscription it becomes "Plan usage": the 5-hour and weekly limits with % used and reset times (amber at 75%, red at 90%), then each agent's share of that usage and about how much of the plan it used. Agents that use much more than the others get a "uses more" badge. API users keep the dollar ledger. Needs Claude Code 2.1.287 or later for the limits; shares work without them.
+- A small mod in the plugin reads the limits Claude Code reports after each turn and hands them to the board. It touches no files, network or credentials. Turning off all hooks or allowing only managed mods turns it off.
+
 ## 0.3.12 - 28 Oct 2026
 
 ### Fixed
