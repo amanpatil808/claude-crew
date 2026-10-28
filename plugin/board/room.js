@@ -487,10 +487,9 @@ function renderProjects(s) {
     b.title = text; b.append(rel("span", "pn-t", text)); if (rProj !== p) b.append(document.createTextNode(" "), rel("b", "num", String(n(p)))); b.setAttribute("aria-label", `${text}, ${n(p)} working${nd(p) ? ", needs you" : ""}`);
     b.onclick = () => pick(p); return b;
   };
-  // All first, then the picked project, then projects with working or queued tasks (most first), then the quiet ones.
+  // One stable order: the order the server lists the projects (registry order, new ones last). Picking or activity never moves a chip.
   const Q = T.queued || [], load = (p) => n(p) + Q.filter((t) => t.project === p).length;
-  const order = names.map((p, i) => ({ p, i, l: load(p) })).sort((a, b) => (b.p === rProj) - (a.p === rProj) || b.l - a.l || a.i - b.i);
-  fill(nav, ...order.map((o) => { const b = chip(o.p, o.p); if (!o.l) b.dataset.quiet = "1"; return b; }));
+  fill(nav, ...names.map((p) => { const b = chip(p, p); b.dataset.k = p; if (!load(p)) b.dataset.quiet = "1"; return b; }));
 }
 
 // ---- Needs you: the amber strip. Gone when empty; "not tracked yet" is only said in the footer when the server does not send the key. ----
@@ -1487,16 +1486,20 @@ try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", pain
 paintTheme();
 
 // ---- Polling: every 2 s while the tab is visible, slower after failures, none while it is hidden ----
-let pollT = 0, polling = false, fails = 0;
+// The server tags each answer; a 304 means nothing changed, so the page keeps what it has and does not parse or repaint.
+// Every 30 s it asks for the full state anyway, so times that count up on screen (ages, "Live") do not freeze.
+let pollT = 0, polling = false, fails = 0, etag = "", fullAt = 0;
 function schedule() { clearTimeout(pollT); if (document.hidden) return; pollT = setTimeout(tick, fails ? Math.min(15000, 2000 * (fails + 1)) : 2000); }
 async function tick() {
   if (polling) return;
   polling = true; clearTimeout(pollT);
   try {
     const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
-    const r = await fetch("/api/state", { cache: "no-store", signal: ctl.signal }); clearTimeout(to);
+    const ask = etag && last && Date.now() - fullAt < 30000;
+    const r = await fetch("/api/state", { cache: "no-store", signal: ctl.signal, ...(ask ? { headers: { "If-None-Match": etag } } : {}) }); clearTimeout(to);
+    if (r.status === 304 && last) { fails = 0; setConn(true, { now: new Date().toISOString() }); return; }
     if (!r.ok) throw new Error(String(r.status));
-    last = await r.json(); fails = 0;
+    last = await r.json(); fails = 0; etag = r.headers.get("etag") || ""; fullAt = Date.now();
     setConn(true, last); paintAll();
   } catch (e) { fails++; setConn(false); }
   finally { polling = false; schedule(); }
