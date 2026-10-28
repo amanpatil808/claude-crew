@@ -70,13 +70,29 @@
   const MIN_MS = 2600, MAX_MS = 4500;   // the moving leg; the lift-off and landing flourishes add about 0.5-1 s, so a whole trip is about 3-5.5 s
   const legOf = (st, len, ms) => ({ ...st.leg, ...(st.legFor ? st.legFor(len, ms) : {}), ms, ease: st.leg?.ease || easeIO });
   async function tNear(w, path, st, dir) {
-    const L = rLen(path), ms = Math.max(MIN_MS, Math.min(MAX_MS, (L / (st.speed || 160)) * 1000));
+    const L = rLen(path), ms = Math.max(st.minMs || MIN_MS, Math.min(MAX_MS, (L / (st.speed || 160)) * 1000));
     tPlace(w, ...path[0]);
     await st.depart?.(w, dir);
     await tLeg(w, path, legOf(st, L, ms));
     tPlace(w, ...path.at(-1));
     if (st.face) rFace(w, st.face);
     await st.arrive?.(w, dir);
+  }
+
+  // ---- door trip (Mike, Sulley): about 2.6 s. Door A opens, he steps in (hidden about 0.55 s while door A closes and shrinks), door B opens, he steps out and settles ----
+  async function tDoor(w, f, t, A, B, fromKind, toKind, D, leg, face) {
+    const DMS = 1800, step = (p, q) => tLeg(w, [p, q], { ms: 560, ease: lin, stride: leg.stride, go: leg.go });
+    const dA = [f[0] + (A ? A.side : 1) * (fromKind === "seat" ? 64 : 0), f[1]], dB = [t[0] + (B ? B.side : 1) * (toKind === "seat" ? 64 : 0), t[1]];
+    tPlace(w, ...f);
+    door(dA, D.colour, D.wpx, D.hpx, DMS); await rSleep(520);   // pops up and swings open
+    await step(f, dA);
+    w.style.visibility = "hidden"; tPlace(w, ...dB);            // inside door A, which is still on screen
+    await rSleep(40); door(dB, D.colour, D.wpx, D.hpx, DMS);
+    await rSleep(540);                                          // door B swings open
+    if (!w.isConnected) return;
+    w.style.visibility = ""; await step(dB, t);
+    if (w.isConnected) rFace(w, face);
+    if (D.duck) await pose(w, "p-squash", 200); else { const av = w.querySelector(".av"); if (av) { av.dataset.s = "queued"; await rSleep(350); av.dataset.s = "walk"; } }   // the wink
   }
 
   // ---- the crew: one style each ----
@@ -122,11 +138,11 @@
     async depart(w, dir) { tFx("peel", [w._p[0] + side(dir) * 16, w._p[1]], 300, { kids: 1, z: -1 }); await rSleep(300); w._pl = tProp(w, "peel"); },
     async arrive(w, dir) { w.classList.add("p-spin"); await rSleep(380); w._pl?.remove(); tFx("bit peelfly", w._p, 600, { kids: 1, z: 3, vars: { "--dx": side(dir) * 18 + "px" } }); await rSleep(380); w.classList.remove("p-spin"); },
   };
-  // Mike and Sulley: a door pops open beside them at the start, they step out and walk the whole way in view, and a door opens again as they arrive
-  const doorStyle = (colour, wpx, hpx, duck) => ({ id: duck ? "door-duck" : "door-wink", speed: duck ? 150 : 140,
+  // Mike and Sulley travel by door, Monsters, Inc. style. Out of their own room: a door opens beside them, they step in, a door opens at the destination and they step out - nobody walks the floor between.
+  // This is the one deliberate exception to "nobody vanishes": the door is the travel, and each door stays drawn while they are inside it. Inside their own room: a short normal walk.
+  const doorStyle = (colour, wpx, hpx, duck) => ({ id: duck ? "door-duck" : "door-wink", speed: duck ? 150 : 140, minMs: 1400,
     leg: { stride: 6, go: duck ? "go-scurry" : "go-wiggle" },
-    async depart(w) { door(w._p, colour, wpx, hpx, 1600); await rSleep(380); },
-    async arrive(w) { door(w._p, colour, wpx, hpx, 1200); await rSleep(200); if (duck) await pose(w, "p-squash", 180); else { const av = w.querySelector(".av"); av.dataset.s = "queued"; await rSleep(250); av.dataset.s = "walk"; } },
+    door: { colour, wpx, hpx, duck },
   });
   T["mike-wazowski"] = doorStyle("#5aa24a", 50, 64, false);
   T.sulley = doorStyle("#6a4aa8", 58, 76, true);
@@ -169,14 +185,46 @@
 
   // ---- the route: room.js hands over only the two end points, so find the desks they belong to and ask rRoute for the corridor path ----
   const close = (p, q) => Math.abs(p[0] - q[0]) < 2 && Math.abs(p[1] - q[1]) < 2;
+  // rRoute sends everyone down to the lane under the name plates and back up before they head for the door, which reads as a zig-zag.
+  // Here: leave the desk sideways to the stand, go straight up the aisle to the door at the top of the room, and take the corridor; arrive the mirror way.
+  // Points closer than 6 px are dropped and collinear points merged, so the walk has the fewest turns.
+  const tSimplify = (p) => {
+    const q = [];
+    for (let i = 0; i < p.length; i++) {
+      const last = i === p.length - 1;
+      if (q.length && Math.hypot(p[i][0] - q.at(-1)[0], p[i][1] - q.at(-1)[1]) < 6) { if (last) q[q.length - 1] = p[i]; continue; }
+      while (q.length >= 2) { const a = q.at(-2), b = q.at(-1), c = p[i], cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]), dot = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]); if (Math.abs(cr) < 40 && dot > 0) q.pop(); else break; }
+      q.push(p[i]);
+    }
+    return q;
+  };
+  // from the stand, straight up to the wall line of the room, along it to the door (only when the stand is not already in the aisle), out to the corridor
+  const tDoorway = (a, top) => { const x1 = Math.abs(a.sx - a.dx) < 14 ? a.dx : a.sx, sl = top + 24; return [[x1, a.seat[1]], [x1, sl], [a.dx, sl], [a.dx, a.cy]]; };
+  function tRouteDirect(A, B, from, to, spine, acc) {
+    const [a, fk] = A, [b, tk] = B, hb = rGeo().hb, top = a.room.getBoundingClientRect().top - hb.top, btop = b.room.getBoundingClientRect().top - hb.top;
+    if (a.room === b.room) {
+      const lo = Math.min(a.sx, b.sx) - 30, hi = Math.max(a.sx, b.sx) + 30;
+      if (acc.some((o) => o.room === a.room && o.seat[0] > lo && o.seat[0] < hi)) return null;   // a desk is in the way on the table line: keep the lane route
+      const p = [...(fk === "seat" ? [a.seat] : []), a.stand, b.stand, ...(tk === "seat" ? [b.seat] : [])];
+      return tSimplify(p);
+    }
+    const p = [...(fk === "seat" ? [a.seat] : []), a.stand, ...tDoorway(a, top)];
+    if (Math.abs(a.cy - b.cy) >= 2) p.push([spine, a.cy], [spine, b.cy]);
+    p.push(...tDoorway(b, btop).reverse(), b.stand, ...(tk === "seat" ? [b.seat] : []));
+    // the corridor row: keep the walk level between the two doors
+    return tSimplify(p);
+  }
   function tRoute(from, to) {
     try {
       const g = rGeo(), acc = [...document.querySelectorAll("#r-rooms .desk")].map((d) => { try { return rAccess(d, g); } catch { return null; } }).filter(Boolean);
       const find = (p) => { for (const a of acc) { if (close(p, a.seat)) return [a, "seat"]; if (close(p, a.stand)) return [a, "stand"]; } return null; };
       const A = find(from), B = find(to);
-      if (A && B && A[0] !== B[0]) return { route: rRoute(A[0], B[0], g.corr / 2, A[1], B[1]), b: B[0], toKind: B[1] };
+      if (A && B && A[0] !== B[0]) {
+        const direct = tRouteDirect(A, B, from, to, g.corr / 2, acc), ok = direct && direct.length > 1 && close(direct[0], from) && close(direct.at(-1), to);
+        return { route: ok ? direct : rRoute(A[0], B[0], g.corr / 2, A[1], B[1]), a: A[0], b: B[0], fromKind: A[1], toKind: B[1], cross: A[0].room !== B[0].room };
+      }
     } catch (e) { /* fall through to the elbow */ }
-    return { route: rDedupe([from, [to[0], from[1]], to]), b: null, toKind: "seat" };
+    return { route: rDedupe([from, [to[0], from[1]], to]), a: null, b: null, fromKind: "seat", toKind: "seat", cross: false };
   }
 
   // ---- entry point ----
@@ -186,7 +234,7 @@
     if (!fig) return undefined;
     if (av) { const tv = rel("span", "tv"); fig.insertBefore(tv, av); tv.append(av); }   // the pose layer between .fig (flip, lift) and .av (scale)
     const key = rKeyOf(role) || "", st = T[key] || WALK, f = [from.x, from.y], t = [to.x, to.y];
-    const { route, b, toKind } = tRoute(f, t);
+    const { route, a, b, fromKind, toKind, cross } = tRoute(f, t);
     const path = st.air ? rDedupe([route[0], route.at(-1)]) : route, L = rLen(path);
     if (L < 2) return Promise.resolve();
     const dir = tDir(path.at(-1)[0] - path[0][0], path.at(-1)[1] - path[0][1]);
@@ -194,7 +242,7 @@
     const st2 = { ...st, face };
     w._p = f; w.dataset.tv = st.id; live.add(w);
     return (async () => {
-      try { await tNear(w, path, st2, dir); }
+      try { if (st.door && cross) await tDoor(w, f, t, a, b, fromKind, toKind, st.door, st.leg, face); else await tNear(w, path, st2, dir); }
       finally {
         live.delete(w);
         w.style.visibility = ""; w.style.setProperty("--lift", "0px"); delete w.dataset.tv;
