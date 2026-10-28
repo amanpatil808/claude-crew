@@ -21,4 +21,5 @@
 - Owner's travel rules (0.3.9): no character ever vanishes mid-trip (no cut path); trips 3-5.5 s; step frames at most about 3/s. The copy light: Doraemon flies to the desk to make the twin, and only the finished copy walks to submit, then poofs. Gate props on a role with `rKeyOf(role.id)`; dorayaki is Doraemon's alone. (seen 1) [project]
 - Use `perl -i -pe` on macOS for in-place edits (`sed -i` needs an empty suffix arg and leaves `file-e` otherwise). (seen 1) [crew]
 - Route bugs: probe with Chrome over raw CDP, sample the walker every frame, draw the polyline over the hall, and count y reversals. Rooms have doors only at the top, so a same-row cross-room trip is one U by design; anything more is a bug (the old rAccess lane under the desks made 3). (seen 1) [project]
+- Test browser JS without a DOM: slice a function out of room.js by text and build it with `new Function` plus stubs (see test/project-chips.test.ts). Add extra projects to a seeded demo by editing its projects.json. (seen 1) [project]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]

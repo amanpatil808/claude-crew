@@ -2,6 +2,7 @@
 // process so a single stop command turns everything off. Bound to 127.0.0.1 only.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { SERVER_FILE } from "./lib/paths.ts";
 import { writePrivate } from "./lib/private-fs.ts";
@@ -16,6 +17,15 @@ const readPage = () => readFileSync(join(DIR, "page.html"), "utf8")
 const BASE = Number(process.env.BOARD_PORT) || 8811;
 const PORTS = Array.from({ length: 10 }, (_, i) => BASE + i);
 
+// Strong ETag: a hash of the body without its own clock (`now` changes on every build and would never match).
+function etagOf(state: unknown, body: string): string {
+  const stable = state && typeof state === "object" && "now" in state ? JSON.stringify({ ...state, now: undefined }) : body;
+  return `"${createHash("sha256").update(stable).digest("base64url").slice(0, 27)}"`;
+}
+// If-None-Match is a list of tags (or *); a weak prefix still matches for this comparison.
+const matches = (header: string | string[] | undefined, etag: string) =>
+  String(header ?? "").split(",").some((t) => { const v = t.trim(); return v === "*" || v.replace(/^W\//, "") === etag; });
+
 // Exported for tests, which pass their own state builder; the server passes nothing.
 export function handle(req: IncomingMessage, res: ServerResponse, state: () => unknown = () => buildState()) {
   // A Host check blocks DNS-rebinding: a web page elsewhere cannot read this through a lookalike name.
@@ -26,9 +36,16 @@ export function handle(req: IncomingMessage, res: ServerResponse, state: () => u
   if (req.url === "/api/state") {
     // An error thrown here would end the whole process (and the pollers with it). The answer is a fixed line:
     // the error's own text can carry paths or log content.
-    let body: string;
-    try { body = JSON.stringify(state()); } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("board state unavailable"); return; }
-    res.writeHead(200, { ...headers, "content-type": "application/json" }).end(body);
+    let body: string, etag: string;
+    try {
+      const st = state();
+      body = JSON.stringify(st);
+      etag = etagOf(st, body);
+    } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("board state unavailable"); return; }
+    // The tag is sent with the 304 too (RFC 9110). The page asks every 2 s and a quiet board answers with no body.
+    const tagged = { ...headers, "cache-control": "private, no-cache", etag };
+    if (matches(req.headers["if-none-match"], etag)) { res.writeHead(304, tagged).end(); return; }
+    res.writeHead(200, { ...tagged, "content-type": "application/json" }).end(body);
   } else if (req.url === "/" || req.url?.startsWith("/?")) {
     let page: string;
     try { page = readPage(); } catch { res.writeHead(500, { ...headers, "content-type": "text/plain" }).end("page.html is missing from the board folder"); return; }
