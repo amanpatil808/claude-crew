@@ -2,9 +2,10 @@
 // real changes (a CI run finishing, a new deploy result, a commit no hook saw) into timeline events.
 // A project with no .claude/crew/project.md Board section has no poller. The first poll only records
 // what exists, so starting the server never floods the log.
-import { existsSync, readFileSync, renameSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { projectStateDir } from "./paths.ts";
+import { LOG_DIR, projectStateDir } from "./paths.ts";
 import { writePrivate } from "./private-fs.ts";
 import { appendEvent, readEvents } from "./events.ts";
 import { configFor } from "./project-config.ts";
@@ -106,10 +107,57 @@ async function step(snap: Snapshot, name: string, fn: () => Promise<void>): Prom
 
 function trim(seen: Seen) { seen.ci = seen.ci.slice(-300); seen.prs = seen.prs.slice(-300); seen.commits = seen.commits.slice(-600); }
 
+// ---- Instant refresh: the hook leaves a small marker when the crew runs a command that changes GitHub ----
+// The marker holds the project name only (never the command). The server sees the marker change and polls that
+// project's GitHub at once, instead of waiting for the next timer round.
+export const refreshDir = () => join(LOG_DIR, "refresh");
+const REFRESH_CMD = [/\bgh\s+pr\s+(?:create|merge|close|ready|reopen)\b/, /\bgit\s+(?:-C\s+\S+\s+)?push\b/];
+export const refreshWanted = (cmd: string): boolean => REFRESH_CMD.some((re) => re.test(cmd));
+export function markRefresh(project: string, dir = refreshDir()): void {
+  writePrivate(join(dir, `${createHash("sha256").update(project).digest("hex").slice(0, 16)}.json`), JSON.stringify({ project }));
+}
+
+interface Watch { dir?: string; registry?: () => Project[]; poll?: (p: Project) => Promise<void>; debounceMs?: number; everyMs?: number }
+
+// Looks at the marker folder once a second. A changed marker starts one debounced poll for that project (markers
+// changing inside the window share it); a marker that changes during a poll queues exactly one more, so at most
+// one poll per project runs at a time. Only projects with board: true are polled.
+export function watchRefresh({ dir = refreshDir(), registry = readRegistry, poll = pollGithub, debounceMs = 1000, everyMs = 1000 }: Watch = {}): () => void {
+  const mtimes = new Map<string, number>(), due = new Set<string>(), running = new Set<string>(), again = new Set<string>();
+  let timer: NodeJS.Timeout | undefined, stopped = false;
+  const scan = (fire: boolean) => {
+    let files: string[] = [];
+    try { files = readdirSync(dir).filter((f) => f.endsWith(".json")); } catch { return; }
+    for (const f of files) {
+      let at: number;
+      try { at = statSync(join(dir, f)).mtimeMs; } catch { continue; }
+      const before = mtimes.get(f);
+      mtimes.set(f, at);
+      if (!fire || before === at) continue;
+      try { const name = (JSON.parse(readFileSync(join(dir, f), "utf8")) as { project?: unknown }).project; if (typeof name === "string") due.add(name); } catch { /* a torn marker: the next write fixes it */ }
+    }
+    if (due.size && !timer) timer = setTimeout(flush, debounceMs);
+  };
+  const go = (p: Project) => {
+    if (running.has(p.name)) { again.add(p.name); return; }
+    running.add(p.name);
+    poll(p).catch(() => undefined).finally(() => { running.delete(p.name); if (again.delete(p.name) && !stopped) go(p); });
+  };
+  const flush = () => {
+    timer = undefined;
+    const names = [...due]; due.clear();
+    if (!stopped) for (const p of registry()) if (p.board && names.includes(p.name)) go(p);
+  };
+  scan(false);
+  const every = setInterval(() => scan(true), everyMs);
+  return () => { stopped = true; clearInterval(every); clearTimeout(timer); };
+}
+
 // Overlapping polls would race on the state files, so each loop waits for its previous round and the two
 // pollers are chained through one queue. The registry is re-read each round, so a new project is picked up
-// without a restart. The box is polled every 2 min: each poll is an ssh login there.
-export function startPolling(githubMs = 60_000, boxMs = 120_000): () => void {
+// without a restart. GitHub is polled every 20 s as a fallback (about 180 calls an hour of gh's 5000) and at once
+// after a marker; the box every 2 min: each poll is an ssh login there.
+export function startPolling(githubMs = 20_000, boxMs = 120_000): () => void {
   const loop = (fn: (p: Project) => Promise<void>, ms: number) => {
     let stopped = false, timer: NodeJS.Timeout | undefined;
     const tick = async () => {
@@ -121,6 +169,7 @@ export function startPolling(githubMs = 60_000, boxMs = 120_000): () => void {
   };
   let queue = Promise.resolve();
   const enqueue = (fn: () => Promise<void>) => (queue = queue.then(fn, fn));
-  const stops = [loop(pollGithub, githubMs), loop(pollBox, boxMs)];
+  // Refresh polls join the same queue as the timers, so they never overlap a timer round on the state files.
+  const stops = [loop(pollGithub, githubMs), loop(pollBox, boxMs), watchRefresh({ poll: (p) => enqueue(() => pollGithub(p)) })];
   return () => stops.forEach((s) => s());
 }

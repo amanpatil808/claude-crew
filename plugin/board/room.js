@@ -1425,16 +1425,20 @@ try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", pain
 paintTheme();
 
 // ---- Polling: every 2 s while the tab is visible, slower after failures, none while it is hidden ----
-let pollT = 0, polling = false, fails = 0;
+// The server tags each answer; a 304 means nothing changed, so the page keeps what it has and does not parse or repaint.
+// Every 30 s it asks for the full state anyway, so times that count up on screen (ages, "Live") do not freeze.
+let pollT = 0, polling = false, fails = 0, etag = "", fullAt = 0;
 function schedule() { clearTimeout(pollT); if (document.hidden) return; pollT = setTimeout(tick, fails ? Math.min(15000, 2000 * (fails + 1)) : 2000); }
 async function tick() {
   if (polling) return;
   polling = true; clearTimeout(pollT);
   try {
     const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
-    const r = await fetch("/api/state", { cache: "no-store", signal: ctl.signal }); clearTimeout(to);
+    const ask = etag && last && Date.now() - fullAt < 30000;
+    const r = await fetch("/api/state", { cache: "no-store", signal: ctl.signal, ...(ask ? { headers: { "If-None-Match": etag } } : {}) }); clearTimeout(to);
+    if (r.status === 304 && last) { fails = 0; setConn(true, { now: new Date().toISOString() }); return; }
     if (!r.ok) throw new Error(String(r.status));
-    last = await r.json(); fails = 0;
+    last = await r.json(); fails = 0; etag = r.headers.get("etag") || ""; fullAt = Date.now();
     setConn(true, last); paintAll();
   } catch (e) { fails++; setConn(false); }
   finally { polling = false; schedule(); }
