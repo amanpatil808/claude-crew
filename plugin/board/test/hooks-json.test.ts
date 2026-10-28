@@ -10,8 +10,21 @@ import { NEED_OF } from "../lib/events.ts";
 interface Hook { type: string; command: string; async?: boolean; timeout?: number; onFailure?: string }
 interface Group { matcher?: string; hooks: Hook[] }
 const file = join(import.meta.dirname, "..", "..", "hooks", "hooks.json");
-const { hooks } = JSON.parse(readFileSync(file, "utf8")) as { hooks: Record<string, Group[]> };
+const { hooks, modules } = JSON.parse(readFileSync(file, "utf8")) as { hooks: Record<string, Group[]>; modules?: unknown };
 const BOARD = 'node --no-warnings "${CLAUDE_PLUGIN_ROOT}/board/hook.ts"';
+const LIMITS = 'node --no-warnings "${CLAUDE_PLUGIN_ROOT}/board/limits.ts"';
+
+test("the plan mod is the one hooks module, and it exists", async () => {
+  assert.deepEqual(modules, ["./plan-mod.mjs"]);
+  const mod: Record<string, unknown> = await import(join(import.meta.dirname, "..", "..", "hooks", "plan-mod.mjs"));
+  assert.equal(typeof mod.register, "function");
+});
+
+test("the limits writer runs async at Stop, SubagentStop and SessionEnd only", () => {
+  const where = Object.entries(hooks).filter(([, groups]) => groups.some((g) => g.hooks.some((h) => h.command === LIMITS))).map(([ev]) => ev).sort();
+  assert.deepEqual(where, ["SessionEnd", "Stop", "SubagentStop"]);
+  for (const ev of where) for (const g of hooks[ev]) for (const h of g.hooks) if (h.command === LIMITS) assert.deepEqual(h, { type: "command", command: LIMITS, async: true }, ev);
+});
 
 test("Notification: one async board entry whose matcher is exactly the hook's allow-list", () => {
   assert.equal(hooks.Notification?.length, 1);

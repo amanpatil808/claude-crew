@@ -32,12 +32,18 @@ const pad2 = (x) => String(x).padStart(2, '0');
 const localDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const daysAgo = (k) => { const d = new Date(now); d.setDate(d.getDate() - k); return localDay(d); };
 const row = (day, model, n, out, cw5m, cw1h, cr, ws = 0, wf = 0) => ({ model, speed: 'standard', long: false, day, n, in: n * 2, out, cw5m, cw1h, cr, ws, wf });
-const SIZE = { dekisugi: ['opus', 1.2], kevin: ['sonnet', 1], 'ninja-hattori': ['sonnet', 0.6], shizuka: ['haiku', 0.8], 'joe-gardner': ['haiku', 0.7], bob: ['sonnet', 1.1], 'mike-wazowski': ['sonnet', 0.5], olaf: ['sonnet', 0.9], nobita: ['opus', 1], shinchan: ['sonnet', 1.3], stuart: ['haiku', 0.2] };
+// The same numbers in a UTC clock hour ("YYYY-MM-DDTHH"), which the plan panel's 5-hour window sums.
+const utcHour = (min) => ago(min).toISOString().slice(0, 13);
+const hourRow = ({ day, ...r }, min) => ({ ...r, hr: utcHour(min) });
+// Shinchan's three runs at once (two clones in shop-api, one in recipe-app) make him the one heavy user of the plan
+// panel's 5-hour window; the manager's long session is the heavy one of the week.
+const SIZE = { dekisugi: ['opus', 1.2], kevin: ['sonnet', 1], 'ninja-hattori': ['sonnet', 0.6], shizuka: ['haiku', 0.8], 'joe-gardner': ['haiku', 0.7], bob: ['sonnet', 1.1], 'mike-wazowski': ['sonnet', 0.5], olaf: ['sonnet', 0.9], nobita: ['opus', 0.6], shinchan: ['sonnet', 1.3], stuart: ['haiku', 0.2] };
 // Cumulative usage for one agent run; `final` is true once it has stopped, like the SubagentStop snapshot.
 const usage = (project, min, { agentId, agentType, role, final }) => {
   const [m, k] = SIZE[role] ?? ['sonnet', 1], search = role === 'dekisugi';
+  const r = row(localDay(ago(min)), MODEL[m], Math.round(24 * k), Math.round(13000 * k), Math.round(59000 * k), 0, Math.round(1_040_000 * k), search ? 3 : 0, search ? 5 : 0);
   ev(min, { project, kind: 'usage', sid: project === SHOP ? 'demo0001' : 'demo0002', agentId, agentType, text: 'Usage update', scope: 'agent', final, partial: false,
-    rows: [row(localDay(ago(min)), MODEL[m], Math.round(24 * k), Math.round(13000 * k), Math.round(59000 * k), 0, Math.round(1_040_000 * k), search ? 3 : 0, search ? 5 : 0)] });
+    rows: [r], hours: [hourRow(r, min)] });
 };
 // The manager's own session: a long-lived one, so its cumulative total holds today's calls and earlier days'. Like the
 // reader, days older than the newest 8 sit in day "" and `since` keeps the first day. The board's Today counts only
@@ -50,7 +56,9 @@ const mainUsage = (project, min, sid, k = 1) => ev(min, { project, kind: 'usage'
     row(daysAgo(1), MODEL.opus, Math.round(260 * k), Math.round(180_000 * k), 0, Math.round(520_000 * k), Math.round(55_000_000 * k)),
     row(daysAgo(3), MODEL.opus, Math.round(120 * k), Math.round(90_000 * k), 0, Math.round(240_000 * k), Math.round(26_000_000 * k)),
     row('', MODEL.opus, Math.round(300 * k), Math.round(210_000 * k), 0, Math.round(610_000 * k), Math.round(64_000_000 * k)),
-  ] });
+  ],
+  // The last three hours of today's calls (the session's newest hours; the reader keeps at most six).
+  hours: [30, 90, 150].map((m) => hourRow(row('', MODEL.opus, Math.round(2 * k), Math.round(1_000 * k), 0, Math.round(2_000 * k), Math.round(200_000 * k)), m)) });
 let bobId;
 
 // A task: optionally queued, assigned by Doraemon, picked up by an agent; stopped when `doneMin` is given.
@@ -159,6 +167,12 @@ const snapshots = {
   [RECIPE]: { polledAt: {}, ci: [], prs: [], commits: {}, deploy: null, errors: [], problems: {} },
 };
 
+// The plan's rate-limit reading, in the shape board/limits.ts writes: a subscription with the 5-hour window well used.
+const limits = { v: 1, at: iso(1), sub: true, w: [
+  { id: '5h', pct: 62, end: new Date(now + 130 * 60_000).toISOString() },
+  { id: '7d', pct: 38, end: new Date(now + (3 * 24 + 4) * 60 * 60_000).toISOString() },
+] };
+
 // Safety: this script deletes files in <output-dir>, so it only works in a folder it made itself.
 const refuse = (why) => { console.error(`board-demo: refusing to use ${dir}: ${why}`); process.exit(1); };
 const home = resolve(homedir());
@@ -180,10 +194,11 @@ if (existsSync(dir)) {
 }
 
 // Start clean so a second run gives the same folder.
-for (const f of ['events.jsonl', 'projects.json', 'projects', 'server.json', 'server.log', 'main-busy.txt']) rmSync(join(dir, f), { recursive: true, force: true });
+for (const f of ['events.jsonl', 'projects.json', 'projects', 'server.json', 'server.log', 'main-busy.txt', 'limits.json']) rmSync(join(dir, f), { recursive: true, force: true });
 mkdirSync(dir, { recursive: true, mode: 0o700 });
 writeFileSync(MARKER, 'Made by scripts/board-demo.mjs; safe to overwrite.\n');
 writeFileSync(join(dir, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n') + '\n');
+writeFileSync(join(dir, 'limits.json'), JSON.stringify(limits) + '\n');
 writeFileSync(join(dir, 'projects.json'), JSON.stringify(registry, null, 1));
 for (const p of registry) {
   const d = join(dir, 'projects', key(p.path));

@@ -101,9 +101,11 @@ test("only numbers leave the transcript: planted secrets, paths and odd model id
   for (const s of [...secrets, root, base, "leak.jsonl"]) assert.ok(!json.includes(s), `leaks ${s}`);
   assert.deepEqual(e.rows.map((r) => [r.model, r.n]), [["claude-sonnet-5-5", 1], ["unknown", 2]]);
   // Allow-listed keys only, at both levels.
-  assert.deepEqual(Object.keys(e).sort(), ["final", "kind", "partial", "project", "rows", "scope", "sid", "since", "text"]);
+  assert.deepEqual(Object.keys(e).sort(), ["final", "hours", "kind", "partial", "project", "rows", "scope", "sid", "since", "text"]);
   assert.equal(e.since, "2026-10-27");
   for (const r of e.rows) assert.deepEqual(Object.keys(r).sort(), ["cr", "cw1h", "cw5m", "day", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
+  for (const r of e.hours ?? []) assert.deepEqual(Object.keys(r).sort(), ["cr", "cw1h", "cw5m", "hr", "in", "long", "model", "n", "out", "speed", "wf", "ws"]);
+  assert.deepEqual(e.hours?.map((r) => [r.model, r.hr, r.n]), [["claude-sonnet-5-5", "2026-10-27T09", 1], ["unknown", "2026-10-27T09", 2]]);
 });
 
 test("refused without a read: symlinks, paths outside the root, traversal, non-.jsonl and devices", () => {
