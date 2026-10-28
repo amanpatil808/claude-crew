@@ -24,4 +24,5 @@
 - The Bash guard blocks any command text containing the word "function" (even in a grep pattern); grep for other words instead. (seen 1) [crew]
 - A panel that hides parts of a section painted behind a `changed()` signature must re-assert the hides every poll in the later renderer, and on leaving the mode delete the signature and repaint, or stale `hidden` stays. (seen 1) [project]
 - One raw-CDP script (demo board + injecting node proxy + Chrome over WebSocket, setEmulatedMedia for dark and reduced motion) does shots and the poll probe; Node 26 has a global WebSocket. (seen 1) [crew]
+- Test browser JS without a DOM: slice a function out of room.js by text and build it with `new Function` plus stubs (see test/project-chips.test.ts). Add extra projects to a seeded demo by editing its projects.json. (seen 1) [project]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]

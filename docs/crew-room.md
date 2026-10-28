@@ -107,6 +107,8 @@ The plain, text view. It refreshes every 4 seconds. The header says "Live" with 
 
 Deploys and CI, and App errors, need polling, which you turn on per project ([setup](setup.md#optional-show-ci-pull-requests-commits-and-deploys-on-the-board)). Without it those cards say nothing has been read yet. App errors come from the containers named in the project's `deploy-containers` setting, redacted. A pull request opened, merged, closed or reopened with `gh pr` in a session is logged by the hooks without polling.
 
+GitHub is read every 20 seconds, and within about 2 seconds after the crew runs `gh pr create`, `merge`, `close`, `ready`, `reopen` or a push (the hook leaves a small marker holding only the project name, never the command). The page asks for the state every 2 seconds and the server answers "not modified" when nothing changed, so a quiet board costs almost no data.
+
 ## Tasks
 
 A task is one piece of work for one role in one project. The board works it out from the event log; nothing else is stored. Doraemon queues each planned piece with the `toon-crew:task` skill, which runs the `board.sh task` commands below. You can run them too.
