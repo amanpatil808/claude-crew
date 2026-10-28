@@ -17,7 +17,7 @@ flowchart TD
 
     subgraph CREW["(7) The crew works"]
         BE(["Backend<br/>kevin: lead, own worktree<br/>bob: developer, own worktree"])
-        FE(["Frontend<br/>nobita: UX review<br/>shinchan: screens, own worktree"])
+        FE(["Frontend<br/>nobita: styles and UX review, own worktree<br/>shinchan: behaviour and logic, own worktree"])
         DV(["DevOps<br/>mike-wazowski: CI, own worktree<br/>sulley: SRE, own worktree"])
         SE(["Security<br/>ninja-hattori: review"])
         QA(["QA<br/>joe-gardner: checks<br/>twenty-two: exploratory"])
@@ -135,8 +135,8 @@ Fifteen agents in nine teams, one job each. Every agent reads the project's `CLA
 |---|---|---|---|---|
 | Management | `doraemon` (Doraemon, Doraemon) | Engineering Manager: main agent; plans waves, assigns by team and title, verifies, commits, opens PRs | opus · high · none set | blue |
 | Management | `miguel-rivera` (Miguel Rivera, Coco) | Knowledge Manager: lessons pass (started by hand), confirmed crew records | sonnet · low · 30 | orange |
-| Frontend | `nobita` (Nobita, Doraemon) | UX & Design Lead: journey reviews with ranked findings, design direction (review only) | opus · high · 80 | yellow |
-| Frontend | `shinchan` (Shinchan + Shiro, Crayon Shin-chan) | Frontend Developer: screens to a design, token CSS, two screenshot rounds | sonnet · medium · 60 | red |
+| Frontend | `nobita` (Nobita, Doraemon) | UX & Design Lead: design direction, styles and visual assets (own worktree, edits style files only), journey reviews with ranked findings | opus · high · 80 | yellow |
+| Frontend | `shinchan` (Shinchan + Shiro, Crayon Shin-chan) | Frontend Developer: behaviour and logic to a design, two screenshot rounds | sonnet · medium · 60 | red |
 | Backend | `kevin` (Kevin, Minions) | Backend Lead: data, auth, secrets, APIs, integrations, guardrails, background jobs | opus · high · 80 | yellow |
 | Backend | `bob` (Bob, Minions) | Backend Developer: modules and routes from specs, ports with parity tests, lint and type fixes | sonnet · medium · 60 | blue |
 | DevOps | `mike-wazowski` (Mike Wazowski, Monsters University) | DevOps Engineer: CI, builds, Docker and images, local stack, setup scripts; carries out merges | sonnet · high · 100 | cyan |
@@ -151,9 +151,10 @@ Fifteen agents in nine teams, one job each. Every agent reads the project's `CLA
 
 ### How the roles are set up
 
-- **Own worktree** (`isolation: worktree`): kevin, bob, shinchan, mike-wazowski, sulley. Set `worktree.baseRef` so their worktrees start from your working branch ([setup](setup.md#recommended-make-builders-start-from-your-branch)).
-- **Read-only roles:** ninja-hattori, joe-gardner, twenty-two, nobita, dekisugi, olaf, stuart. Each has a fixed `tools` list plus `disallowedTools: Edit, MultiEdit, NotebookEdit, SendMessage, CronCreate, Workflow, RemoteTrigger`, and `Agent` for all but dekisugi.
-  - stuart: Read, Grep, Glob. joe-gardner and twenty-two: Read, Grep, Glob, Bash, Write. ninja-hattori: the same plus Skill. nobita: the same plus Skill and the web tools. olaf: Read, Grep, Glob, Write and the web tools. dekisugi: olaf's tools plus Agent.
+- **Own worktree** (`isolation: worktree`): kevin, bob, shinchan, nobita, mike-wazowski, sulley. Set `worktree.baseRef` so their worktrees start from your working branch ([setup](setup.md#recommended-make-builders-start-from-your-branch)).
+- **Nobita edits styles:** `tools` includes Edit, and `disallowedTools` keeps MultiEdit, NotebookEdit, Agent and the relay tools. Its prompt limits edits to style and visual files (CSS, tokens, sprites, images, `docs/design/`).
+- **Read-only roles:** ninja-hattori, joe-gardner, twenty-two, dekisugi, olaf, stuart. Each has a fixed `tools` list plus `disallowedTools: Edit, MultiEdit, NotebookEdit, SendMessage, CronCreate, Workflow, RemoteTrigger`, and `Agent` for all but dekisugi.
+  - stuart: Read, Grep, Glob. joe-gardner and twenty-two: Read, Grep, Glob, Bash, Write. ninja-hattori: the same plus Skill. olaf: Read, Grep, Glob, Write and the web tools. dekisugi: olaf's tools plus Agent.
   - `memory: project` adds Write back to a tool list, so these prompts tell the agent to read its memory file and write it back whole. The guard, not the list, keeps these roles read-only: [what it allows them to write](guards.md#the-rules).
 - **Who may merge, push, approve, spawn agents or use relay tools** is a guard rule, not a role setting: see [guards.md](guards.md#who-is-who).
 - **Models.** A per-call model beats the agent file, so Doraemon passes none, except `opus` for one run: sulley on production rollout or rollback design, shizuka on launch, trust or privacy copy, and any role after two failed reviews.
@@ -374,7 +375,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 ### What it does
 
 - Gives every session in a project a manager, **Doraemon**, who plans, briefs the crew, checks every hand-back and opens the pull request ([section 1](#1-the-flow)).
-- Runs five builders in their **own git worktrees** and keeps seven roles **read-only** ([section 2](#2-teams-and-roles)).
+- Runs six builders in their **own git worktrees** and keeps six roles **read-only** ([section 2](#2-teams-and-roles)).
 - Checks risky Bash, file, agent and MCP calls with the **guard** before they run, and fails closed: if it cannot decide, it blocks. It asks you before a merge, a push to `main`, or an edit of a project's `.claude/hooks`, `agents`, `skills` or `commands` ([guards.md](guards.md)).
 - Shows the **Crew Room** on `127.0.0.1` ([the Crew Room guide](crew-room.md)).
 - Keeps one memory folder per agent and one shared `project.md` in your project ([section 3](#3-where-things-live)).

@@ -1,6 +1,6 @@
 ---
 name: shinchan
-description: Frontend Developer, Frontend Team: builds screens and pages to an agreed design, refactors CSS onto tokens, and proves layouts with two screenshot rounds at phone, tablet and desktop widths in light and dark. Not for UX review or design direction: that is the UX & Design Lead (nobita).
+description: Frontend Developer, Frontend Team: builds behaviour and logic (JS/TS, HTML structure, scenes, data wiring) to an agreed design, and proves layouts with two screenshot rounds at phone, tablet and desktop widths in light and dark. Not for style-only work, UX review or design direction: those go to the UX & Design Lead (nobita).
 model: sonnet
 effort: medium
 color: red
