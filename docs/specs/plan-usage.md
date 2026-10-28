@@ -1,4 +1,6 @@
-# Plan usage panel (contract, 0.3.12)
+# Plan usage panel (contract, 0.3.13)
+
+Source: the plugin's mod (`plugin/hooks/plan-mod.mjs`) reads Claude Code's `session.measure` rate limits (Claude Code 2.1.287+, Pro and Max) and an async Stop hook (`plugin/board/limits.ts`) saves them to `limits.json` in the plugin data folder. No owner setup.
 
 The cost panel adapts to the owner's plan:
 - **Subscription (Max, Pro, Team):** show how much of the plan's 5-hour and weekly limits is used, and each agent's share of that usage. Flag agents that use much more than the others.
@@ -25,9 +27,9 @@ interface AgentShare {
 interface PlanShares { window: "5h" | "7d"; agents: AgentShare[] }   // agents sorted by sharePct, highest first
 interface PlanState {
   kind: "subscription" | "api" | "unknown";
-  name: string | null;      // "Max" | "Pro" | "Team" ... only when a source says so
-  source: "rate-limits" | "setting" | "none";
-  limits: PlanLimit[];      // [] for api
+  name: string | null;      // "Max" | "Pro" | "Team" ... only when a source says so (none does yet, so null)
+  source: "rate-limits" | "setting" | "none";   // "setting" is reserved; nothing produces it yet
+  limits: PlanLimit[];      // [] for api and unknown
   shares: PlanShares[];     // both windows; [] when there is no usage
   basis: string;            // one plain line on how shares are estimated
   updatedAt: string | null; // when the limits were last read
