@@ -21,4 +21,7 @@
 - Owner's travel rules (0.3.9): no character ever vanishes mid-trip (no cut path); trips 3-5.5 s; step frames at most about 3/s. The copy light: Doraemon flies to the desk to make the twin, and only the finished copy walks to submit, then poofs. Gate props on a role with `rKeyOf(role.id)`; dorayaki is Doraemon's alone. (seen 1) [project]
 - Use `perl -i -pe` on macOS for in-place edits (`sed -i` needs an empty suffix arg and leaves `file-e` otherwise). (seen 1) [crew]
 - Route bugs: probe with Chrome over raw CDP, sample the walker every frame, draw the polyline over the hall, and count y reversals. Rooms have doors only at the top, so a same-row cross-room trip is one U by design; anything more is a bug (the old rAccess lane under the desks made 3). (seen 1) [project]
+- The Bash guard blocks any command text containing the word "function" (even in a grep pattern); grep for other words instead. (seen 1) [crew]
+- A panel that hides parts of a section painted behind a `changed()` signature must re-assert the hides every poll in the later renderer, and on leaving the mode delete the signature and repaint, or stale `hidden` stays. (seen 1) [project]
+- One raw-CDP script (demo board + injecting node proxy + Chrome over WebSocket, setEmulatedMedia for dark and reduced motion) does shots and the poll probe; Node 26 has a global WebSocket. (seen 1) [crew]
 - Palette-quantise pixel-art UI PNGs (sharp, palette true, 128 colours) to cut about 1.5 MB to about 0.3 MB with no visible loss. (seen 1) [crew]
