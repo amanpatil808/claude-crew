@@ -64,6 +64,7 @@
     "Stop": [
       {
         "hooks": [
+          { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/remind.ts\"", "timeout": 5 },
           { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/hook.ts\"", "async": true },
           { "type": "command", "command": "node --no-warnings \"${CLAUDE_PLUGIN_ROOT}/board/limits.ts\"", "async": true }
         ]

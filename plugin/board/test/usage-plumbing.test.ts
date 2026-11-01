@@ -170,7 +170,7 @@ test("usage rows survive appendEvent and readEvents unchanged: no key is blanked
 
 test("a usage event is never treated as an assignment, a stop or anything else the hook logs", () => {
   assert.equal(toEvent({ ...base, hook_event_name: "Stop" }, () => false, () => undefined, ENV)?.kind, "turn-end");
-  assert.ok(QUIET_KINDS.has("usage") && QUIET_KINDS.has("needs-you") && QUIET_KINDS.size === 2);
+  assert.ok(QUIET_KINDS.has("usage") && QUIET_KINDS.has("needs-you") && QUIET_KINDS.has("compact-hint") && QUIET_KINDS.size === 3);
 });
 
 test("the optional modules: loaded when the file exists, absent means null, never a throw", async () => {
