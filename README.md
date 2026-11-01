@@ -19,7 +19,7 @@ In Claude Code, inside any project:
 Then ask Doraemon for anything. On your first request he writes `.claude/crew/project.md`; read it before you commit it.
 
 > [!NOTE]
-> Doraemon becomes your main agent. He runs on Opus and delegates, so a crew uses more of your plan than a plain chat. [How to turn him off](docs/setup.md#turn-doraemon-off).
+> Doraemon becomes your main agent. He runs on Opus and delegates, so a crew uses more of your plan than a plain chat; the board's Plan usage panel shows how much. [How to turn him off](docs/setup.md#turn-doraemon-off).
 
 ## How it works
 
@@ -35,7 +35,7 @@ You talk to Doraemon only; the diagram follows one request.
 ## What you get
 
 - **A crew, not one agent.** Each specialist has one job and its own project memory.
-- **A guard on risky steps.** It asks before merges, pushes to `main` and risky commands, and refuses the worst.
+- **A guard on risky steps.** Only DevOps may merge or push to `main`, and only after you say yes; the worst commands are refused.
 - **A hand-back for every task.** A short summary and a full report, so nothing is lost after `/clear`.
 - **A live board, if you want it.** Desks, the queue and, on Pro or Max, plan usage.
 - **You approve every merge.** No auto-merge, for any role.
@@ -59,7 +59,7 @@ You talk to Doraemon only; the diagram follows one request.
 
 ## Live board (optional)
 
-The crew works fine without it; the board only lets you watch. Run `/toon-crew:board` and open the address it prints, usually `http://127.0.0.1:8811` ([guide](docs/crew-room.md)).
+The crew works fine without it; the board only lets you watch. Run `/toon-crew:board`; it prints the port, usually 8811, so open `http://127.0.0.1:8811` ([guide](docs/crew-room.md)).
 
 <p align="center"><img src="docs/images/board.gif" alt="The Crew Room board: each team in its own room, crew at their desks, Ninja Hattori handing work to Doraemon. Demo data." width="820"><br><sub>The Crew Room: your crew at work (demo data)</sub></p>
 
