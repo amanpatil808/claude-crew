@@ -1,11 +1,17 @@
 <div align="center">
 <h1>toon-crew</h1>
-<p><b>Your AI engineering team in Claude Code: one manager, 14 specialists, guards on risky steps.</b></p>
+<p><b>An AI engineering team inside Claude Code: one manager, 14 specialists.</b><br>One agent doing everything in a single chat gets slow and hard to follow. Doraemon, the manager, plans the job and briefs the right specialist for each piece.<br>The specialists work in parallel, risky commands ask you first, every task ends with a written hand-back, and nothing merges until you approve it.</p>
 <p><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue?style=flat-square"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange?style=flat-square"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green?style=flat-square"></p>
 <p><code>/plugin marketplace add amanpatil808/claude-crew</code> then <code>/plugin install toon-crew@crew</code> (<a href="#quick-start">steps</a>)</p>
 </div>
 
+## How it works
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg"><img src="docs/images/architecture-light.svg" alt="How toon-crew works, in eight steps. You ask Doraemon in plain words. He plans the work and briefs the crew; agent memory and project.md feed every brief. The crew works inside the guard, which asks you or refuses risky calls: Backend, Frontend and DevOps build in their own git worktrees, Docs writes, and Security, QA, Research and Helpers review and test read-only. Each crew member writes a full report and a short summary. Doraemon reads the summary, checks the work, commits and opens a pull request. CI runs, you approve, and Mike or Sulley from DevOps merges. Add-on: the Crew Room board shows it live." width="820"></picture><br><sub>From your ask to a merged pull request: Doraemon plans and briefs, the crew works inside the guard, and every hand-back is checked before a PR.<br>Nothing merges until you approve. The Crew Room board is an optional add-on for watching it live.</sub></p>
+
+1. **You ask in plain words.** You talk to Doraemon only.
+2. **Doraemon plans and briefs.** He queues the work and briefs the right specialist; agent memory and `project.md` feed every brief.
+3. **The crew works in parallel.** Each member leaves a full report and a short summary; the guard asks you before risky steps and refuses the worst.
+4. **You approve, DevOps merges.** Doraemon reads the summaries, checks the work, commits and opens a pull request; CI runs; Mike or Sulley merges after you say yes.
 
 ## Quick start
 In Claude Code, inside any project:
@@ -22,7 +28,7 @@ Then ask Doraemon for anything. He is your main agent from now on. On your first
 <table>
 <tr>
 <td width="50%" valign="top">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-crew-dark.png"><img src="docs/images/card-crew-light.png" alt="Two rooms of the Crew Room board: Doraemon and Miguel in Management, Nobita and Shinchan in Frontend. Demo data." width="380"></picture><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-crew-dark.png"><img src="docs/images/card-crew-light.png" alt="The crew's teams: the manager on top, then Backend, Frontend, DevOps, Docs, Security, QA, Research and Helpers." width="380"></picture><br>
 <b>A crew, not one agent</b><br>
 Doraemon plans; 14 specialists each do one job.
 </td>
@@ -45,14 +51,6 @@ Every crew member leaves a written report you can reread.
 </td>
 </tr>
 </table>
-
-## How it works
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg"><img src="docs/images/how-it-works-light.svg" alt="Four comic panels: you ask Doraemon for a dark mode toggle; he queues it for Nobita, Shinchan and Joe; they work at their desks while the guard watches; a pull request is ready, you say merge, and Mike and Sulley merge it." width="820"></picture></p>
-
-1. **You ask in plain words.** You talk to Doraemon only.
-2. **Doraemon plans and briefs.** He queues each piece on the board and briefs the right specialist.
-3. **The crew works in parallel.** Doraemon checks every result; the guard asks you before risky steps.
-4. **You say merge, DevOps merges.** Doraemon opens a pull request; Mike or Sulley merges it after you approve.
 
 ## Live board (optional add-on)
 The crew works fine without it. The board only lets you watch. Run `/toon-crew:board`: it prints a line with a `"port"` number, usually `8811`. Open `http://127.0.0.1:<port>` in your browser, with your port.
