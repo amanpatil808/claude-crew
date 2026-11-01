@@ -1,3 +1,5 @@
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/crew-banner-dark.svg"><img src="docs/images/crew-banner-light.svg" alt="The toon-crew characters walking across: Doraemon, Nobita, Shizuka, Kevin, Ninja Hattori and Mike Wazowski" width="820"></picture></p>
+
 # toon-crew
 
 **Turn Claude Code into an AI engineering team.**
