@@ -23,6 +23,9 @@ const put = (file: string, text: string, ageDays = 0, now = NOW) => {
 const register = (data: string, ...paths: string[]) => writeFileSync(join(data, "projects.json"), JSON.stringify(paths.map((p) => ({ path: p, name: p.split("/").pop() }))));
 const mode = (p: string) => statSync(p).mode & 0o777;
 afterEach(() => mock.timers.reset());
+// --project must name an existing folder: a real project with a worktree and a src/ folder inside, and another one.
+const SHOP = fresh(), OTHER = fresh();
+for (const d of [".claude/worktrees/agent-1", "src"]) mkdirSync(join(SHOP, d), { recursive: true });
 
 test("the key is the board's: the deepest registered project holding the folder, else the folder itself", () => {
   assert.equal(handbackKey("/work/shop", []), projectKey("/work/shop"));
@@ -34,25 +37,25 @@ test("the key is the board's: the deepest registered project holding the folder,
 });
 
 test("dir prints the absolute folder for the project and creates handbacks/, full/ and summaries/ as 0700", () => {
-  const data = fresh(); register(data, "/work/shop");
-  const r = run(["dir", "--project", "/work/shop/.claude/worktrees/agent-1"], { CLAUDE_PLUGIN_DATA: data });
+  const data = fresh(); register(data, SHOP);
+  const r = run(["dir", "--project", join(SHOP, ".claude/worktrees/agent-1")], { CLAUDE_PLUGIN_DATA: data });
   assert.equal(r.code, 0, r.out);
-  const want = join(data, "projects", projectKey("/work/shop"), "handbacks");
+  const want = join(data, "projects", projectKey(SHOP), "handbacks");
   assert.equal(r.out, `${want}\n`);
   for (const p of [want, join(want, "full"), join(want, "summaries")]) assert.equal(mode(p), 0o700, p);
   // A looser folder made earlier is tightened; running it again is fine.
   chmodSync(join(want, "summaries"), 0o755);
-  assert.equal(run(["dir", "--project", "/work/shop"], { CLAUDE_PLUGIN_DATA: data }).out, `${want}\n`);
+  assert.equal(run(["dir", "--project", SHOP], { CLAUDE_PLUGIN_DATA: data }).out, `${want}\n`);
   assert.equal(mode(join(want, "summaries")), 0o700);
   // Without --project: CLAUDE_PROJECT_DIR, then the current folder.
-  assert.equal(run(["dir"], { CLAUDE_PLUGIN_DATA: data, CLAUDE_PROJECT_DIR: "/work/shop" }).out, `${want}\n`);
-  assert.equal(run(["dir"], { CLAUDE_PLUGIN_DATA: data }, "/work/shop/src").out, `${want}\n`);
+  assert.equal(run(["dir"], { CLAUDE_PLUGIN_DATA: data, CLAUDE_PROJECT_DIR: SHOP }).out, `${want}\n`);
+  assert.equal(run(["dir"], { CLAUDE_PLUGIN_DATA: data }, join(SHOP, "src")).out, `${want}\n`);
 });
 
 test("dir and list refuse without an absolute CLAUDE_PLUGIN_DATA and create nothing (never BOARD_LOG_DIR or ~/.toon-crew)", () => {
   const data = fresh();
   for (const env of [{}, { CLAUDE_PLUGIN_DATA: "" }, { CLAUDE_PLUGIN_DATA: "rel/data" }, { BOARD_LOG_DIR: data }]) for (const cmd of ["dir", "list"]) {
-    const r = run([cmd, "--project", "/work/shop"], env, data);
+    const r = run([cmd, "--project", SHOP], env, data);
     assert.equal(r.code, 2, `${cmd} ${JSON.stringify(env)}`);
     assert.match(r.out, /CLAUDE_PLUGIN_DATA is not set/);
   }
@@ -61,10 +64,10 @@ test("dir and list refuse without an absolute CLAUDE_PLUGIN_DATA and create noth
 
 test("dir refuses a link anywhere on the path and creates nothing through it", () => {
   for (const level of ["projects", "key", "handbacks", "summaries"]) {
-    const data = fresh(), outside = fresh(), key = projectKey("/work/shop");
+    const data = fresh(), outside = fresh(), key = projectKey(SHOP);
     const at = { projects: join(data, "projects"), key: join(data, "projects", key), handbacks: join(data, "projects", key, "handbacks"), summaries: join(data, "projects", key, "handbacks", "summaries") }[level]!;
     mkdirSync(dirname(at), { recursive: true }); symlinkSync(outside, at); chmodSync(outside, 0o755);
-    const r = run(["dir", "--project", "/work/shop"], { CLAUDE_PLUGIN_DATA: data });
+    const r = run(["dir", "--project", SHOP], { CLAUDE_PLUGIN_DATA: data });
     assert.equal(r.code, 2, level);
     assert.match(r.out, /link or not a folder/);
     assert.deepEqual(readdirSync(outside), [], `${level}: nothing created at the link's target`);
@@ -78,34 +81,62 @@ test("bad arguments are refused with the usage", () => {
     ["list", "--agent", "Kevin"], ["list", "--colour"], ["dir", "--agent", "kevin"], ["dir", "extra"]]) assert.equal(run(argv, env).code, 2, argv.join(" "));
 });
 
+test("--project must be an existing absolute folder: a missing one, a file, \"\" or a relative path is refused and nothing is created", () => {
+  const data = fresh(), file = join(OTHER, "a-file"); writeFileSync(file, "x");
+  for (const cmd of ["dir", "list"]) {
+    for (const p of [join(OTHER, "no-such-project"), file]) {
+      const r = run([cmd, "--project", p], { CLAUDE_PLUGIN_DATA: data });
+      assert.equal(r.code, 2, `${cmd} ${p}`);
+      assert.equal(r.out, "--project must be an existing folder\n");
+    }
+    for (const p of ["", "shop", "./shop", "../shop", "~/shop"]) {
+      const r = run([cmd, "--project", p], { CLAUDE_PLUGIN_DATA: data }, OTHER);
+      assert.equal(r.code, 2, `${cmd} ${JSON.stringify(p)}`);
+      assert.match(r.out, /^--project must be an absolute folder path\nusage: board\.sh handbacks dir/);
+    }
+  }
+  assert.deepEqual(readdirSync(data), [], "no hand-back folder for a project that is not there");
+  assert.equal(run(["dir", "--project", SHOP], { CLAUDE_PLUGIN_DATA: data }).code, 0, "an existing folder still works");
+});
+
+test("--limit is a plain whole number from 1 to 200: 1e2, 0x10, ' 5 ', +5 and 5.0 are refused", () => {
+  const env = { CLAUDE_PLUGIN_DATA: fresh() };
+  for (const v of ["1e2", "0x10", " 5 ", "5 ", "+5", "5.0", "-1", "0", "201", "1".repeat(400), "", "٥"]) {
+    const r = run(["list", "--project", SHOP, "--limit", v], env);
+    assert.equal(r.code, 2, JSON.stringify(v));
+    assert.equal(r.out, "--limit must be a whole number from 1 to 200\n", JSON.stringify(v));
+  }
+  for (const v of ["1", "200", "007"]) assert.equal(run(["list", "--project", SHOP, "--limit", v], env).code, 0, v);
+});
+
 test("list prints the newest summaries first: path, then the first 3 lines; --agent and --limit narrow it", () => {
-  const data = fresh(), key = projectKey("/work/shop");
+  const data = fresh(), key = projectKey(SHOP);
   const s = (id: string, name: string, age: number, text: string) => put(join(handbacksDir(data, key), "summaries", id, name), text, age);
   const a = s("kevin", "20261030-0900-guard.md", 2, "Verdict: done\nTask: guard rule\nFiles: guard.mjs\nChecks: 14 pass\n");
   const b = s("joe-gardner", "20261031-0900-qa.md", 1, "Verdict: blocked\nTask: QA\n");
   const c = s("kevin", "20261101-0900-cli.md", 0, "Verdict: needs decision\n");
   put(join(handbacksDir(data, key), "full", "kevin", "20261101-0900-cli.md"), "the full report, never listed", 0);
   const env = { CLAUDE_PLUGIN_DATA: data };
-  const all = run(["list", "--project", "/work/shop"], env);
+  const all = run(["list", "--project", SHOP], env);
   assert.equal(all.code, 0);
   assert.equal(all.out, `${c}\n  Verdict: needs decision\n\n${b}\n  Verdict: blocked\n  Task: QA\n\n${a}\n  Verdict: done\n  Task: guard rule\n  Files: guard.mjs\n`);
   assert.doesNotMatch(all.out, /\x1b\[/, "no colours");
-  assert.equal(run(["list", "--project", "/work/shop", "--agent", "kevin", "--limit", "1"], env).out, `${c}\n  Verdict: needs decision\n`);
-  assert.equal(run(["list", "--project", "/work/shop", "--limit", "2"], env).out.split("\n\n").length, 2);
-  assert.deepEqual(run(["list", "--project", "/work/shop", "--agent", "joe-gardner"], env).out.split("\n")[0], b);
-  assert.equal(run(["list", "--project", "/work/other"], env).out, "no summaries\n");
-  assert.equal(run(["list", "--project", "/work/shop", "--agent", "bob"], env).out, "no summaries\n");
+  assert.equal(run(["list", "--project", SHOP, "--agent", "kevin", "--limit", "1"], env).out, `${c}\n  Verdict: needs decision\n`);
+  assert.equal(run(["list", "--project", SHOP, "--limit", "2"], env).out.split("\n\n").length, 2);
+  assert.deepEqual(run(["list", "--project", SHOP, "--agent", "joe-gardner"], env).out.split("\n")[0], b);
+  assert.equal(run(["list", "--project", OTHER], env).out, "no summaries\n");
+  assert.equal(run(["list", "--project", SHOP, "--agent", "bob"], env).out, "no summaries\n");
 });
 
 test("list never follows links, skips odd names, and shows control characters escaped", () => {
-  const data = fresh(), outside = fresh(), key = projectKey("/work/shop"), sum = join(handbacksDir(data, key), "summaries");
+  const data = fresh(), outside = fresh(), key = projectKey(SHOP), sum = join(handbacksDir(data, key), "summaries");
   put(join(outside, "secret.md"), "outside-secret-line\n");
   mkdirSync(join(sum, "kevin"), { recursive: true });
   symlinkSync(join(outside, "secret.md"), join(sum, "kevin", "20261101-0000-link.md"));
   symlinkSync(outside, join(sum, "bob"));
   put(join(sum, "kevin", "run.sh"), "not a summary\n");
   put(join(sum, "kevin", "20261101-0100-esc.md"), "Verdict: \x1b[31mdone\x1b[0m\u2028x\n");
-  const out = run(["list", "--project", "/work/shop"], { CLAUDE_PLUGIN_DATA: data }).out;
+  const out = run(["list", "--project", SHOP], { CLAUDE_PLUGIN_DATA: data }).out;
   assert.doesNotMatch(out, /outside-secret-line|run\.sh|link\.md/);
   assert.match(out, /Verdict: \\u001b\[31mdone\\u001b\[0m\\u2028x/);
   assert.doesNotMatch(out, /\x1b/);
@@ -113,18 +144,18 @@ test("list never follows links, skips odd names, and shows control characters es
   const d2 = fresh(); mkdirSync(join(handbacksDir(d2, key)), { recursive: true });
   put(join(outside, "kevin", "20261101-0000-x.md"), "outside-secret-line\n");
   symlinkSync(outside, join(handbacksDir(d2, key), "summaries"));
-  assert.equal(run(["list", "--project", "/work/shop"], { CLAUDE_PLUGIN_DATA: d2 }).out, "no summaries\n");
+  assert.equal(run(["list", "--project", SHOP], { CLAUDE_PLUGIN_DATA: d2 }).out, "no summaries\n");
 });
 
 test("board.sh handbacks dir and list, end to end", () => {
-  const data = fresh(); register(data, "/work/shop");
+  const data = fresh(); register(data, SHOP);
   const sh = (...args: string[]) => spawnSync("bash", [BOARD_SH, "handbacks", ...args], { encoding: "utf8", env: { ...process.env, CLAUDE_PLUGIN_DATA: data, BOARD_LOG_DIR: fresh() } });
-  const dir = sh("dir", "--project", "/work/shop");
+  const dir = sh("dir", "--project", SHOP);
   assert.equal(dir.status, 0, dir.stderr);
-  assert.equal(dir.stdout, `${join(data, "projects", projectKey("/work/shop"), "handbacks")}\n`, "CLAUDE_PLUGIN_DATA wins over BOARD_LOG_DIR");
+  assert.equal(dir.stdout, `${join(data, "projects", projectKey(SHOP), "handbacks")}\n`, "CLAUDE_PLUGIN_DATA wins over BOARD_LOG_DIR");
   put(join(dir.stdout.trim(), "summaries", "kevin", "20261101-0900-x.md"), "Verdict: done\n");
-  assert.match(sh("list", "--project", "/work/shop").stdout, /20261101-0900-x\.md\n {2}Verdict: done/);
-  const unset = spawnSync("bash", [BOARD_SH, "handbacks", "dir", "--project", "/work/shop"], { encoding: "utf8", env: { ...process.env, CLAUDE_PLUGIN_DATA: "" } });
+  assert.match(sh("list", "--project", SHOP).stdout, /20261101-0900-x\.md\n {2}Verdict: done/);
+  const unset = spawnSync("bash", [BOARD_SH, "handbacks", "dir", "--project", SHOP], { encoding: "utf8", env: { ...process.env, CLAUDE_PLUGIN_DATA: "" } });
   assert.equal(unset.status, 2);
 });
 
