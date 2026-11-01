@@ -77,6 +77,7 @@ Plain files, per project. The guard blocks any lesson that looks like a key, tok
 | `/toon-crew:task add\|start\|done\|drop\|list` | Queues and moves tasks on the board |
 | `/toon-crew:project [board\|lessons] [on\|off]` | Allows or stops CI and deploy checks, or the lessons pass (both start off) |
 | `/toon-crew:forget [name or path]` | Removes a project from the board's list |
+| `/toon-crew:compact-setup` | Adds editable "Compact instructions" to your CLAUDE.md, after you approve the text |
 
 Crew members use the rest automatically; `/toon-crew:crew-lessons` is for the repo owner only.
 ## Good to know
