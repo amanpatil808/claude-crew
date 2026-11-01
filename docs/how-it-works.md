@@ -294,6 +294,7 @@ Measured once, in October 2026, on an early version (0.1.0) and not re-measured 
 - The manager is the cost: Doraemon runs on Opus and was 76 to 99 percent of each measured run, so he delegates reading and searching, keeps turns short and sends lookups to Stuart.
 - Cheapest model that fits: Opus where a wrong answer looks right (judgement, design review, security), Sonnet for building and writing, Haiku for checks and lookups.
 - Nobody passes a `model` on a call except the escalations in section 2.
+- To keep the manager's context useful when it compacts, `/toon-crew:compact-setup` adds an editable "Compact instructions" section to your CLAUDE.md (see `plugin/skills/compact-setup/SKILL.md`).
 
 Keep waves 2 to 4 wide: many agents cost many times the tokens of one chat.
 
