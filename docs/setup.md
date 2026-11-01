@@ -15,7 +15,7 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 1. **You talk to Doraemon.** The plugin makes him the main agent in every session (`"agent": "toon-crew:doraemon"`). If you have your own `agent` setting, yours wins.
 2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder, which Claude Code gives the plugin as `$CLAUDE_PLUGIN_DATA`. It is usually `~/.claude/plugins/data/toon-crew-crew/` (plugin name, a dash, marketplace name); run `ls ~/.claude/plugins/data/` to check. The event log lives there too. Polling and the lessons pass are both off.
 3. **He writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, Doraemon runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
-4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#live-board-optional-add-on)).
+4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#live-board-optional)).
 
 ## Per-project setup
 
@@ -103,6 +103,9 @@ The retired characters and who took over each job are listed in [the Crew Room g
 
 ## Troubleshooting
 
+- **The `/toon-crew:...` commands are missing.** Run `/reload-plugins`, then `/plugin` to check that `toon-crew` is installed and enabled.
+- **Doraemon is not the main agent.** Your own `agent` setting wins over the plugin's, and the plugin may be disabled in this project (`claude plugin list` shows it). To switch him off on purpose, set your own `agent`, or run `claude plugin disable toon-crew@crew --scope project`.
+- **Install or update fails.** Claude Code clones the marketplace from GitHub, so you need `git` and a network. Check `claude --version` (2.1.295 or later) and run `/plugin marketplace update crew`.
 - **The board is empty.** The hooks and the board must use the same [data folder](#what-happens-on-first-run). Start the board with `/toon-crew:board`. Started by hand without `CLAUDE_PLUGIN_DATA`, it reads `~/.toon-crew` instead.
 - **The board shows a project but no CI or deploys.** Polling is off until you run `/toon-crew:project board on` and the project's `project.md` has a `## Board` section. See [Show CI, pull requests, commits and deploys on the board](#optional-show-ci-pull-requests-commits-and-deploys-on-the-board).
 - **Nothing is logged at all.** Check `node --version`. The board's hook needs 24.2 or later. (On older Node it likely loads but writes no events; that has not been tested.)
