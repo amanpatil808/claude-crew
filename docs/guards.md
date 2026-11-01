@@ -50,6 +50,17 @@ For each call it gives one of three answers:
 | Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except Doraemon. |
 | Knowledge manager pushes | Miguel Rivera may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`, and only when `origin` is the crew repo. No merges, no other pushes. The guard accepts both `miguel-rivera` and `toon-crew:miguel-rivera` as his name. |
 
+## Hand-back files
+
+Each crew agent writes a full report and a short summary per task into the plugin's data folder (`$CLAUDE_PLUGIN_DATA`), so the main session can reread them after `/clear`. The guard lets every crew role, the read-only ones included, Write or Edit exactly these files, and nothing else in the data folder:
+
+```
+$CLAUDE_PLUGIN_DATA/projects/<project key>/handbacks/full/<its own id>/<name>.md
+$CLAUDE_PLUGIN_DATA/projects/<project key>/handbacks/summaries/<its own id>/<name>.md
+```
+
+`<name>` is lower-case letters, digits and `-`, up to 60 characters. Another role's folder, any other file type, a `..` in the path, a symlink or hard link anywhere below the data folder, NotebookEdit, and shell writes (`>`, `cp`, `tee`, `rm`, ...) into the data folder are refused for crew roles. So `events.jsonl`, `limits.json` and `projects.json` stay hook-only. The Write tool creates missing folders. If `CLAUDE_PLUGIN_DATA` is not set when the hook runs, nothing new is allowed. The main session's rules do not change. `board.sh handbacks dir|list` prints a project's folder and its newest summaries, and the board deletes hand-back files older than 60 days once a day.
+
 ## What the guard looks through
 
 It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` chains, subshells, `env`, `sudo`, `xargs` and `env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings, pipes into a shell, `find -exec`, and inline `python`, `node` or `perl` code given with `-c` or `-e`. It blocks shell functions and aliases that mention these programs, and programs named by a variable. A script that is written and run in the same command is blocked. `projects.mjs set` from a shell asks you.
