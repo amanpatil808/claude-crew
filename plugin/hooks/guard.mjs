@@ -288,6 +288,10 @@ function looksLikeGitDirFile(abs) {
 // A write target (or a deleted / linked file): returns a deny reason or null.
 function writeTargetReason(raw, ctx, { memory = true } = {}) {
   if (typeof raw !== 'string' || !raw) return null;
+  if (ctx.crew !== null && ctx.dataDirs) { // hand-backs go through Write/Edit only; the rest of the data folder is hook-only
+    const abs = resolveIn(ctx, raw);
+    if (abs && (inDataDir(abs, ctx) || inDataDir(real(abs), ctx))) return 'Shell writes into the plugin data folder are blocked for crew roles: write hand-back files with the Write tool.';
+  }
   if (ctx.role && !/^\/dev\/(null|stdout|stderr)$/.test(raw)) {
     const abs = resolveIn(ctx, raw);
     if (!abs || !ctx.writeRoots.some((r) => within(real(abs), r)) || hardLinked(abs)) return `${ctx.role} is a read-only role: shell writes are allowed only under the system temp dir or the session scratchpad.`;
@@ -1125,6 +1129,10 @@ function checkFileEdit(input, ctx) {
   if (typeof target !== 'string' || !target) return null;
   const abs = resolveIn(ctx, target) ?? path.resolve(ctx.cwd ?? '.', target);
   const r = real(abs);
+  // Checked before the ~/.claude/plugins rule: the data folder usually sits under it.
+  const hb = handbackRule(target, abs, r, ctx);
+  if (hb === HANDBACK_OWN) return ctx.isWrite || ctx.isEdit ? livePluginRule(r, ctx) ?? livePluginRule(abs, ctx) : `${ctx.crew}: hand-back files take Write or Edit only.`;
+  if (hb) return hb;
   const why = protectedPathReason(r, ctx) ?? protectedPathReason(abs, ctx);
   if (why) return `${why} cannot be edited by Claude: the owner changes them by hand.`;
   const live = livePluginRule(r, ctx) ?? livePluginRule(abs, ctx);
@@ -1167,6 +1175,32 @@ function roleStyleTarget(r, ctx) {
   return rule.dirs.some((d) => rel.toLowerCase().startsWith(`${d}/`)) ? { doc: true } : null;
 }
 
+// ---------- hand-back files ----------
+// <CLAUDE_PLUGIN_DATA>/projects/<key>/handbacks/(full|summaries)/<crew id>/<name>.md is the only place under the
+// data folder a crew role may write (read-only roles too). Everything else there (events.jsonl, limits.json,
+// projects.json) stays hook-only. Without CLAUDE_PLUGIN_DATA nothing new is allowed.
+const HANDBACK_REL = /^projects\/[a-z0-9-]{1,60}\/handbacks\/(?:full|summaries)\/([a-z0-9-]{1,40})\/[a-z0-9-]{1,60}\.md$/;
+const HANDBACK_OWN = Symbol('own hand-back');
+// Case-folded on purpose: a refusal must not be dodged by spelling the folder differently on a case-insensitive disk.
+const inDataDir = (p, ctx) => ctx.dataDirs.some((d) => { const a = p.toLowerCase(); const b = d.toLowerCase(); return a === b || within(a, b); });
+// Returns null (not in the data folder, or not a crew role), HANDBACK_OWN, or a refusal.
+function handbackRule(raw, abs, r, ctx) {
+  if (ctx.crew === null || !ctx.dataDirs || !(inDataDir(abs, ctx) || inDataDir(r, ctx))) return null;
+  const id = ctx.crew;
+  const deny = `${id || 'this crew role'}: in the plugin data folder a crew role may write only .md files in its own handbacks/full/${id || '<id>'}/ and handbacks/summaries/${id || '<id>'}/ folders.`;
+  if (!id || raw.split(/[\\/]/).includes('..')) return deny;
+  const base = ctx.dataDirs.find((d) => within(abs, d)); // exact case: the allow side never folds
+  if (!base) return deny; // reached through a link from outside the data folder
+  const rel = path.relative(base, abs).split(path.sep).join('/');
+  const m = HANDBACK_REL.exec(rel);
+  if (!m || m[1] !== id) return deny;
+  // No link anywhere below the data folder, checked per part with lstat: realpath misses a link that points
+  // inside the folder, and a dangling one (it falls back to the parent). A hard-linked file would change another name.
+  let p = base;
+  for (const part of rel.split('/')) { p = path.join(p, part); if (isSymlink(p)) return deny; }
+  return hardLinked(r) ? deny : HANDBACK_OWN;
+}
+
 // ---------- Agent (spawning) and relay tools ----------
 const crewId = (name) => (/^(?:toon-crew:)?([a-z0-9-]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
 // Any toon-crew: agent counts as crew, so a role added later is limited until it is listed in CREW.
@@ -1205,7 +1239,10 @@ export function evaluate(input, env = process.env) {
   const roots = [...sysRoots, ...projRoots];
   if (typeof input.scratchpad_dir === 'string' && input.scratchpad_dir && !isSymlink(input.scratchpad_dir)) roots.push(real(input.scratchpad_dir));
   const pluginRoot = env.CLAUDE_PLUGIN_ROOT ? real(env.CLAUDE_PLUGIN_ROOT) : null;
-  const ctx = { cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), devops: DEVOPS.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
+  // The data folder as given and as its real path; unset or relative means no hand-back allowance (fail closed).
+  const data = typeof env.CLAUDE_PLUGIN_DATA === 'string' && path.isAbsolute(env.CLAUDE_PLUGIN_DATA) ? path.resolve(env.CLAUDE_PLUGIN_DATA) : null;
+  const caller = crewCaller(input);
+  const ctx = { crew: caller && caller.id !== 'doraemon' ? caller.id : null, dataDirs: data ? [data, real(data)] : null, cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), devops: DEVOPS.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
     role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null,
     // agent_id marks a subagent; agent_type alone is also set for `claude --agent`, the main thread when it is Doraemon.
     subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', isEdit: ['Edit', 'MultiEdit'].includes(String(input.tool_name)), writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };

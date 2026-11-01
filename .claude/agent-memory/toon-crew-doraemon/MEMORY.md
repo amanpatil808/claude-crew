@@ -1,3 +1,4 @@
 - [Branch from origin](branch-from-origin.md) — fetch first; local main lagged origin by 15 commits; tasks.test.ts looks date-dependent
 - [Brief rules](brief-rules.md) — no repo edits for read-only roles; worktrees start from main; read the reference before prescribing a fix
 - [Short, tested docs](feedback-short-tested-docs.md) — README ~120 lines, detail in docs/, test every instruction with twenty-two
+- [Cost baseline](cost-baseline.md) — Doraemon 64.6% of plan usage before 0.3.14; measure about a week later for the owner's 30% target

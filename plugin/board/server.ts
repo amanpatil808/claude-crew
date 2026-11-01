@@ -4,7 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { SERVER_FILE } from "./lib/paths.ts";
+import { LOG_DIR, SERVER_FILE } from "./lib/paths.ts";
+import { startPrune } from "./lib/handbacks.ts";
 import { writePrivate } from "./lib/private-fs.ts";
 import { startPolling } from "./lib/pollers.ts";
 import { buildState } from "./lib/state.ts";
@@ -64,7 +65,8 @@ function listen(i = 0) {
     writePrivate(SERVER_FILE, JSON.stringify({ pid: process.pid, port: PORTS[i], startedAt: new Date().toISOString() }));
     console.log(`crew board on http://127.0.0.1:${PORTS[i]}`);
     const stopPolling = startPolling();
-    const shutdown = () => { stopPolling(); server.close(); rmSync(SERVER_FILE, { force: true }); process.exit(0); };
+    const stopPrune = startPrune(LOG_DIR); // hand-back files older than 60 days: now, then daily
+    const shutdown = () => { stopPolling(); stopPrune(); server.close(); rmSync(SERVER_FILE, { force: true }); process.exit(0); };
     process.on("SIGTERM", shutdown);
     process.on("SIGINT", shutdown);
   });
