@@ -32,20 +32,20 @@ Doraemon becomes your main agent in every project where the plugin is on. He run
 <table>
 <tr>
 <td width="50%" valign="top">
-<p><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-crew-dark.png"><img src="docs/images/card-crew-light.png" alt="The crew's teams: the manager on top, then Backend, Frontend, DevOps, Docs, Security, QA, Research and Helpers." width="380"></picture><br>
-<b>A crew, not one agent</b><br>
-Doraemon plans; 14 specialists each do one job.</p>
-<p><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-handback-dark.png"><img src="docs/images/card-handback-light.png" alt="A hand-back summary file: verdict, task, files, checks, risks and the path to the full report. Illustration." width="380"></picture><br>
-<b>A written hand-back for every task</b><br>
-A short summary and a full report you can reread.</p>
+<p><b>A crew, not one agent</b><br>
+Doraemon plans; 14 specialists each do one job.<br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-crew-dark.png"><img src="docs/images/card-crew-light.png" alt="The crew's teams: the manager on top, then Backend, Frontend, DevOps, Docs, Security, QA, Research and Helpers." width="380"></picture></p>
+<p><b>A written hand-back for every task</b><br>
+A short summary and a full report you can reread.<br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-handback-dark.png"><img src="docs/images/card-handback-light.png" alt="A hand-back summary file: verdict, task, files, checks, risks and the path to the full report. Illustration." width="380"></picture></p>
 </td>
 <td width="50%" valign="top">
-<p><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-guard-dark.png"><img src="docs/images/card-guard-light.png" alt="An approval prompt: Mike Wazowski wants to run gh pr merge 42 and waits for your yes or no. Illustration." width="380"></picture><br>
-<b>A guard on risky steps</b><br>
-It asks before risky commands; the worst are refused.</p>
-<p><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-plan-dark.png"><img src="docs/images/card-plan-light.png" alt="Plan usage panel: the 5-hour and weekly limits with the percent used and reset times. Demo data." width="380"></picture><br>
-<b>A live board, if you want one</b><br>
-Who is working, what is queued, how much plan is left.</p>
+<p><b>A guard on risky steps</b><br>
+It asks before risky commands; the worst are refused.<br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-guard-dark.png"><img src="docs/images/card-guard-light.png" alt="An approval prompt: Mike Wazowski wants to run gh pr merge 42 and waits for your yes or no. Illustration." width="380"></picture></p>
+<p><b>A live board, if you want one</b><br>
+Who is working, what is queued, how much plan is left.<br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-plan-dark.png"><img src="docs/images/card-plan-light.png" alt="Plan usage panel: the 5-hour and weekly limits with the percent used and reset times. Demo data." width="380"></picture></p>
 </td>
 </tr>
 </table>
