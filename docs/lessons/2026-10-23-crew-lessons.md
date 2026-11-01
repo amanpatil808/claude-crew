@@ -1,7 +1,7 @@
 # Crew lessons, 2026-10-23
 
 Harvested by Dorami (crew keeper; the role is now miguel-rivera) on 2026-10-22 18:47 UTC (`date -u`), one day before the India-time run date.
-Source: 17 agent memory files in the RupeeLens `.claude/agent-memory/*/MEMORY.md` (read-only; nothing changed there).
+Source: 17 agent memory files in the demo-app `.claude/agent-memory/*/MEMORY.md` (read-only; nothing changed there).
 Raw bullets: 300 (stuart's source, chip-and-dale, has only a "no lessons yet" placeholder, so it is not counted).
 
 Role mapping (cast v2, 23 Oct): dorami -> miguel-rivera; scrooge and shaktimaan -> kevin; bob-the-builder and ninja-hattori's old routes role -> bob; chhota-bheem and dekisugi's old SRE role -> mike-wazowski (CI, builds, local stack) or sulley (deploys, backups, incidents); scooby-doo -> ninja-hattori; tom -> joe-gardner; dexter -> dekisugi; velma -> olaf; chip-and-dale -> stuart; suneo -> shizuka. Source file names below are the old ones.

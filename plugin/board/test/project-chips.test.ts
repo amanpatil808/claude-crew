@@ -30,7 +30,7 @@ function harness() {
   return { env, render: (s: unknown) => { run(s); return painted; } };
 }
 
-const names = ["claude-crew", "deliveryApps-RupeeLens", "scratch-x", "amanpatil", "late-added"];
+const names = ["claude-crew", "demo-apps-demo-app", "scratch-x", "amanpatil", "late-added"];
 const state = (active: string[], queued: string[] = []) => ({
   projects: names.map((name) => ({ name })),
   tasks: { active: active.map((project) => ({ project })), queued: queued.map((project) => ({ project })) },
@@ -42,7 +42,7 @@ test("project chips keep registry order: selecting, activity and counts never re
   assert.deepEqual(before, names);
   h.env.rProj = "scratch-x";                                    // select the third chip
   assert.deepEqual(h.render(state([])), names);
-  assert.deepEqual(h.render(state(["amanpatil", "amanpatil", "late-added"], ["deliveryApps-RupeeLens"])), names);   // activity and counts change
+  assert.deepEqual(h.render(state(["amanpatil", "amanpatil", "late-added"], ["demo-apps-demo-app"])), names);   // activity and counts change
   h.env.rProj = "late-added";
   assert.deepEqual(h.render(state(["claude-crew"])), names);
 });
