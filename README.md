@@ -8,7 +8,7 @@
 
 <p align="center"><a href="#quick-start">Quick start</a> · <a href="#how-it-works">How it works</a> · <a href="#features">Features</a> · <a href="#the-crew">The crew</a> · <a href="#crew-room-optional">Crew Room</a> · <a href="#faq">FAQ</a> · <a href="#docs">Docs</a></p>
 
-toon-crew is a Claude Code plugin. A manager agent, Doraemon, plans your request and briefs 14 specialists a few at a time: backend, frontend, DevOps, security, QA, research and docs. Each does one job.
+toon-crew is a Claude Code plugin. A manager agent plans your request and briefs 14 specialists a few at a time: backend, frontend, DevOps, security, QA, research and docs. Each does one job.
 
 <p align="center"><b>One request in. A reviewed pull request out. Nothing merges without your yes.</b></p>
 
@@ -22,26 +22,26 @@ In Claude Code, inside any project:
 /reload-plugins
 ```
 
-Then turn Doraemon on for this project, one of two ways:
+Then turn the manager on for this project, one of two ways:
 
 - Add `"agent": "toon-crew:doraemon"` to the project's `.claude/settings.json`. Edit that file yourself; the crew's guard blocks it.
 - Or start a session with `claude --agent toon-crew:doraemon`.
 
-Now ask Doraemon for anything. On your first request he writes `.claude/crew/project.md`; read it before you commit it.
+Now ask the manager for anything. On your first request it writes `.claude/crew/project.md`; read it before you commit it.
 
 > [!NOTE]
-> Doraemon runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn him on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn Doraemon on or off](docs/setup.md#turn-doraemon-on-or-off).
+> The manager runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn it on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn the manager on or off](docs/setup.md#turn-doraemon-on-or-off).
 
 ## How it works
 
-You talk to Doraemon only; the diagram follows one request.
+You talk to the manager only; the diagram follows one request.
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img src="docs/images/flow-light.svg" alt="Flow of one request: you ask Doraemon; he plans and briefs the specialists; they work inside the guard and each hands back a report; Doraemon checks the work and opens a pull request; you approve and DevOps merges." width="820"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img src="docs/images/flow-light.svg" alt="Flow of one request: you ask the manager; it plans and briefs the specialists; they work inside the guard and each hands back a report; the manager checks the work and opens a pull request; you approve and DevOps merges." width="820"></picture></p>
 
-1. **Ask.** Tell Doraemon what you want, in plain words.
+1. **Ask.** Tell the manager what you want, in plain words.
 2. **Plan and brief.** He queues the work and briefs the right specialists.
 3. **Work and hand back.** Each writes a full report and a short summary.
-4. **Approve and merge.** Doraemon opens a pull request; you say yes, DevOps merges.
+4. **Approve and merge.** The manager opens a pull request; you say yes, DevOps merges.
 
 ## Features
 
@@ -50,7 +50,7 @@ You talk to Doraemon only; the diagram follows one request.
 <td width="33%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-crew-dark.svg"><img src="docs/images/icon-crew-light.svg" alt="" width="48"></picture><br>
 <b>A crew, not one agent</b><br>
-Doraemon plans; each specialist has one job.
+The manager plans; each specialist has one job.
 </td>
 <td width="33%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-guard-dark.svg"><img src="docs/images/icon-guard-light.svg" alt="" width="48"></picture><br>
@@ -84,7 +84,7 @@ See desks, the queue and your plan usage as the crew works.
 
 ## The crew
 
-You only ever talk to Doraemon.
+You only ever talk to the manager (Doraemon).
 
 <details>
 <summary>All 15 crew members, in nine teams</summary>
@@ -125,7 +125,7 @@ The crew runs the other skills; [Setup](docs/setup.md#other-skills) lists them.
 <details>
 <summary>How much of my plan does it use?</summary>
 
-More than a plain chat: Doraemon runs on Opus, with 2-4 agents at once (6-8 on heavy jobs). On Pro or Max, the Plan usage panel shows your limits. [Cost in three lines](docs/how-it-works.md#5-cost-in-three-lines).
+More than a plain chat: the manager runs on Opus, with 2-4 agents at once (6-8 on heavy jobs). On Pro or Max, the Plan usage panel shows your limits. [Cost in three lines](docs/how-it-works.md#5-cost-in-three-lines).
 
 </details>
 
@@ -137,9 +137,9 @@ The guard asks before merges and pushes to `main`, and refuses force pushes and 
 </details>
 
 <details>
-<summary>Do I have to use Doraemon everywhere?</summary>
+<summary>Do I have to use the manager everywhere?</summary>
 
-No. He is opt-in per project. Turn him on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn him off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-doraemon-on-or-off).
+No. The manager is opt-in per project. Turn it on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn it off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-doraemon-on-or-off).
 
 </details>
 
