@@ -1,23 +1,69 @@
 <div align="center">
 <h1>toon-crew</h1>
-<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
+<p><b>Your AI engineering team in Claude Code: one manager, 14 specialists, a live board.</b></p>
+<p><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue?style=flat-square"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange?style=flat-square"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green?style=flat-square"></p>
 </div>
 
-## Why toon-crew
-- **A real team, not one agent.** Doraemon plans the work; 14 specialists each do one job.
-- **You stay in control.** Only the DevOps Team merges, after you approve. A guard asks you or blocks risky commands.
-- **See everything.** The Crew Room board shows who is working and what is queued.
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.gif"><img src="docs/images/hero-light.gif" alt="The Crew Room board: each team in its own room, crew at their desks with their task, and the plan usage panel on the right. Demo data." width="820"></picture><br><sub>The Crew Room: your crew at work, live (demo data)</sub></p>
+
 ## Quick start
-1. **Install.** In Claude Code, inside any project (this repo is private: `gh auth status` must be green, or an SSH key set up, or the install fails with a clone error):
-   ```
-   /plugin marketplace add amanpatil808/claude-crew
-   /plugin install toon-crew@crew
-   /reload-plugins
-   ```
-2. **Open the board.** Run `/toon-crew:board`. It prints `{"pid":..,"port":..,"startedAt":..}`; open `http://127.0.0.1:<port>`. Stop it with `/toon-crew:board stop`.
-3. **Ask Doraemon for anything.** He is now your main agent. On your first request he writes `.claude/crew/project.md`: read it before you commit it.
+In Claude Code, inside any project:
+
+```
+/plugin marketplace add amanpatil808/claude-crew
+/plugin install toon-crew@crew
+/reload-plugins
+```
+
+Then ask Doraemon for anything. He is your main agent from now on. On your first request he writes `.claude/crew/project.md`: read it before you commit it. To watch the crew, run `/toon-crew:board` and open `http://127.0.0.1:<port>` (it prints the port).
+
+<details>
+<summary>Install fails with a clone error?</summary>
+
+This repo is private. Run `gh auth status`: it must be green. Or set up an SSH key. Then run the commands again.
+
+</details>
+
+## What you get
+<table>
+<tr>
+<td width="50%" valign="top">
+<b>A crew, not one agent</b><br>
+Doraemon plans; 14 specialists each do one job.
+</td>
+<td width="50%" valign="top">
+<b>Guards ask before risky steps</b><br>
+Risky commands ask you first; the worst are refused.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/plan-panel-dark.png"><img src="docs/images/plan-panel-light.png" alt="Plan usage panel with the 5-hour and weekly limits, then each crew member's share. Demo data." width="440"></picture><br>
+<b>A live board, plus plan usage</b><br>
+Who works, what is queued, plan usage (Pro or Max).
+</td>
+<td width="50%" valign="top">
+<b>Hand-back files, nothing lost</b><br>
+Every crew member leaves a written report you can reread.
+</td>
+</tr>
+</table>
+
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/needs-you-dark.png"><img src="docs/images/needs-you-light.png" alt="The board's Needs you list with two items: pull request 42 is ready for your review, and Bob is waiting for your permission. Demo data." width="820"></picture><br><sub>When the crew needs you, the board says so (demo data)</sub></p>
+
+## How it works
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg"><img src="docs/images/how-it-works-light.svg" alt="Four comic panels: you ask Doraemon for a dark mode toggle; he queues it for Nobita, Shinchan and Joe; they work at their desks while the guard watches; a pull request is ready, you say merge, and Mike and Sulley merge it." width="820"></picture></p>
+
+1. **You ask in plain words.** You talk to Doraemon only.
+2. **Doraemon plans and briefs.** He queues each piece on the board and briefs the right specialist.
+3. **The crew works in parallel.** Doraemon checks every result; the guard asks you before risky steps.
+4. **You say merge, DevOps merges.** Doraemon opens a pull request; Mike or Sulley merges it after you approve.
+
 ## Meet the crew
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.jpg"><img src="docs/images/hero-light.jpg" alt="The Crew Room board: each team in its own room, every crew member at a desk showing their model and current task." width="820"></picture><br><sub><b>The Crew Room</b>: the live board that shows your crew at work (demo data)</sub></p>
+Fifteen crew members in nine teams, one job each. Doraemon is the manager; you talk to him.
+
+<details>
+<summary>All 15 crew members</summary>
 
 | Team | Members | What they do |
 |---|---|---|
@@ -30,46 +76,9 @@
 | Research | Dekisugi, Olaf | Cited research and fact-checks |
 | Documentation | Shizuka | Docs, release notes, launch copy |
 | Helpers | Stuart | Quick code lookups |
-## How it works
-You talk to Doraemon only. Green dotted lines are what the board records.
-```mermaid
-flowchart LR
-  OWN(["👤 You"]):::ext -->|"1 ask"| DOR(["Doraemon<br/>plans, writes briefs"]):::mgmt
-  DOR -->|"2 brief per role"| TEAMS(["The crew<br/>specialists, one job each"]):::crew
-  TEAMS -->|"3 hand-back"| DOR
-  DOR -->|"4 checks, commits,<br/>opens a PR"| PR["🔀 pull request"]:::ext
-  PR -->|"5 you approve"| MG(["DevOps Team merges<br/>(guard asks you)"]):::devops
-  MG --> MAIN["main"]:::ext
-  DOR -.->|"queue and assign"| BD["Crew Room board"]:::board
-  TEAMS -.->|"start, stop, hand-back"| BD
 
-  classDef mgmt fill:#58a6ff,stroke:#1f6feb,color:#111,stroke-width:2px
-  classDef devops fill:#39c5cf,stroke:#0e7490,color:#111,stroke-width:2px
-  classDef crew fill:#b1bac4,stroke:#57606a,color:#111,stroke-width:2px
-  classDef board fill:#56d364,stroke:#1a7f37,color:#111,stroke-width:2px
-  classDef ext fill:#c5ccd4,stroke:#57606a,color:#111,stroke-width:2px,stroke-dasharray:5 3
-  linkStyle 6,7 stroke:#2da44e,stroke-width:2px
-```
-1. **You ask** in plain words.
-2. **Doraemon plans,** queues each piece on the board and briefs the right specialist.
-3. **The crew does the work,** and Doraemon checks every result.
-4. **Doraemon opens a pull request.** The DevOps Team merges it after you approve.
+</details>
 
-**Parallel work, kept cheap:**
-- **Waves of 2-4 crew at once for light work, 6-8 for heavy work.** More in parallel costs many times the tokens.
-- **A second copy of one role.** When a role has more work, Doraemon starts a twin (two Shinchans, say) on separate files, so they never overwrite each other.
-- **The whole plan is queued up front.** The board's Queued list shows what is coming; each copy takes the oldest queued task for its role.
-- **On the Crew Room:** a "Crew 3 / 4" meter shows how many are running. When Doraemon starts a copy, he uses his copy-light gadget and a twin appears at the desk with a ×2 badge.
-## Memory
-Plain files, per project. The guard blocks any lesson that looks like a key, token or password.
-
-| What | Where | Who sees it |
-|---|---|---|
-| Lessons, one file per agent | `.claude/agent-memory/toon-crew-<name>/MEMORY.md` | Your team, once you commit it |
-| Project facts | `.claude/crew/project.md` | Your team, once you commit it |
-| Event log, project list | The plugin's data folder, usually `~/.claude/plugins/data/toon-crew-crew/` | Only you, on this machine |
-| Hand-back reports and summaries | The plugin's data folder, `projects/<project>/handbacks/` | Only you, on this machine |
-| Shared crew lessons | `docs/lessons/` in this repo | The repo owner, by pull request |
 ## Commands
 | Command | What it does |
 |---|---|
@@ -77,13 +86,15 @@ Plain files, per project. The guard blocks any lesson that looks like a key, tok
 | `/toon-crew:task add\|start\|done\|drop\|list` | Queues and moves tasks on the board |
 | `/toon-crew:project [board\|lessons] [on\|off]` | Allows or stops CI and deploy checks, or the lessons pass (both start off) |
 | `/toon-crew:forget [name or path]` | Removes a project from the board's list |
+| `/toon-crew:handbacks [dir\|list]` | Shows the hand-back folder, or lists the newest summaries |
 | `/toon-crew:compact-setup` | Adds editable "Compact instructions" to your CLAUDE.md, after you approve the text |
 
 Crew members use the rest automatically; `/toon-crew:crew-lessons` is for the repo owner only.
+
 ## Good to know
 - **The guard is a seatbelt, not a sandbox.** An agent with a shell can get around it. Keep Claude Code's sandbox on.
 - **The board is local only.** It listens on `127.0.0.1`, has no login and no buttons, and shows India time (IST).
 - **Requirements:** Claude Code 2.1.295+, Node 24.2+ and git access to this private repo.
-- **Private and unlicensed.** It sends nothing by itself.
+- **Private and unlicensed.** The plugin has no server and sends nothing by itself.
 
-More: [Setup](docs/setup.md) · [How it works](docs/how-it-works.md) · [Guards](docs/guards.md)
+[Setup](docs/setup.md) · [How it works](docs/how-it-works.md) · [Guards](docs/guards.md)

@@ -220,13 +220,15 @@ flowchart LR
 ```
 
 
-| What | Where | Who uses it |
-|---|---|---|
-| Project facts: commands, docs per role, no-go areas, deploy rules | `.claude/crew/project.md` (written by the `project-profile` skill) | Every agent reads it first, with `CLAUDE.md` |
-| Memory: lessons for this project, one folder per agent | `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, checked into the project | The agent reads it at the start; Doraemon adds lessons from each hand-back |
-| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (`~/.toon-crew` if the board is started by hand) | Written by the plugin's hooks; read by the board |
-| The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass |
-| The board | a local page on `127.0.0.1`, started with the `board` skill | You |
+| What | Where | Who uses it | Who can see it |
+|---|---|---|---|
+| Project facts: commands, docs per role, no-go areas, deploy rules | `.claude/crew/project.md` (written by the `project-profile` skill) | Every agent reads it first, with `CLAUDE.md` | Your team, once you commit it |
+| Memory: lessons for this project, one folder per agent | `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, checked into the project | The agent reads it at the start; Doraemon adds lessons from each hand-back. The guard blocks any lesson that looks like a key, token or password | Your team, once you commit it |
+| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (`~/.toon-crew` if the board is started by hand) | Written by the plugin's hooks; read by the board | Only you, on this machine |
+| The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass | Only you, on this machine |
+| Hand-back reports and summaries | `projects/<project>/handbacks/` in the same folder (see below) | Written by each crew agent; Doraemon reads the summaries | Only you, on this machine |
+| Shared crew lessons | `docs/lessons/` in this repo | Written by the owner-only lessons pass | The repo owner, by pull request |
+| The board | a local page on `127.0.0.1`, started with the `board` skill | You | You |
 
 Hand-backs: when a crew member finishes, it writes two files in the project's folder under `projects/<project>/handbacks/` in the plugin data folder: the full report in `full/<agent>/` and a 12-line summary in `summaries/<agent>/`. Only the summary comes back into Doraemon's conversation. The reason is cost: Doraemon re-sends his whole conversation on every turn, so a long report in the chat is paid for again and again, while a file is not. The files survive `/clear` and new sessions, so Doraemon can read the summaries whenever he needs them. When something in a summary looks missing, he opens the full report and anything else he needs. The folders stay on your machine, and the board deletes files older than 60 days. The format is in `docs/specs/handbacks.md`.
 
