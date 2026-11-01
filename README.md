@@ -8,6 +8,8 @@
 
 toon-crew is a Claude Code plugin. A manager agent, Doraemon, plans your request and briefs 14 specialists, a few at a time: backend, frontend, DevOps, security, QA, research and docs. Each does one job.
 
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.svg"><img src="docs/images/demo-light.svg" alt="One request in the terminal: you ask for rate limiting on the checkout route; Doraemon plans 3 pieces and briefs Kevin, Ninja Hattori and Joe Gardner; Kevin builds it, Ninja finds nothing in an attack review, Joe runs the suites with 128 passed; Doraemon opens PR #42 with CI green; Mike Wazowski asks you before merging." width="820"></picture><br><sub>One request, start to finish (illustration)</sub></p>
+
 ## Quick start
 
 In Claude Code, inside any project:
@@ -36,11 +38,32 @@ You talk to Doraemon only; the diagram follows one request.
 
 ## What you get
 
-- **A crew, not one agent.** Each specialist has one job and its own project memory.
-- **A guard on risky steps.** Only DevOps may merge or push to `main`, and only after you say yes; the worst commands are refused.
-- **A hand-back for every task.** A short summary and a full report, so nothing is lost after `/clear`.
-- **A live board, if you want it.** Desks, the queue and, on Pro or Max, plan usage.
-- **You approve every merge.** No auto-merge, for any role.
+<table>
+<tr>
+<td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-crew-dark.svg"><img src="docs/images/icon-crew-light.svg" alt="" width="48"></picture><br>
+<b>A crew, not one agent</b><br>
+Doraemon plans; each specialist has one job and its own project memory.
+</td>
+<td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-guard-dark.svg"><img src="docs/images/icon-guard-light.svg" alt="" width="48"></picture><br>
+<b>A guard on risky steps</b><br>
+Only DevOps may merge or push to <code>main</code>, and only after you say yes. The worst commands are refused.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-handback-dark.svg"><img src="docs/images/icon-handback-light.svg" alt="" width="48"></picture><br>
+<b>A hand-back for every task</b><br>
+A short summary and a full report on disk, so nothing is lost after <code>/clear</code>.
+</td>
+<td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-approve-dark.svg"><img src="docs/images/icon-approve-light.svg" alt="" width="48"></picture><br>
+<b>You approve every merge</b><br>
+No auto-merge, for any role. Optional live board shows desks, the queue and plan usage.
+</td>
+</tr>
+</table>
 
 <details>
 <summary>All 15 crew members, in nine teams</summary>
