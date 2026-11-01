@@ -4,7 +4,7 @@ For the owner, and for anyone who has installed the `toon-crew` plugin. After re
 
 ## 1. The flow
 
-Doraemon is the main agent. You talk to him; he talks to everyone else. Follow the numbers from top to bottom. The right-hand lane shows what the board records at each step.
+In a project where you have turned him on ([setup](setup.md#turn-doraemon-on-or-off)), Doraemon is the main agent. You talk to him; he talks to everyone else. Follow the numbers from top to bottom. The right-hand lane shows what the board records at each step.
 
 ```mermaid
 flowchart TD
@@ -309,7 +309,7 @@ flowchart LR
   MP["marketplace.json<br/>(.claude-plugin/, marketplace crew)"] -->|"source: ./plugin"| SK
 
   subgraph PL["plugin/ : the toon-crew plugin (checked by .github/workflows/ci.yml)"]
-    AG(["agents/*.md<br/>15 crew agents; settings.json<br/>makes Doraemon the main agent"])
+    AG(["agents/*.md<br/>15 crew agents; Doraemon is the<br/>main agent where you opt in"])
     SK["skills/*<br/>board, task, project-profile, ..."]
     subgraph HK["hooks/hooks.json"]
       GD["hooks/guard.mjs<br/>+ inline-writes.mjs<br/>(PreToolUse)"]
@@ -371,7 +371,7 @@ flowchart LR
   linkStyle 14 stroke:#a371f7,stroke-width:2px
 ```
 
-Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue the whole plan up front and to drop pieces when the plan changes.
+Claude Code loads the plugin from the marketplace and runs the hooks around every session. Doraemon becomes the main agent only in projects where you opt in. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue the whole plan up front and to drop pieces when the plan changes.
 
 The Crew Room board is a separate local page. `board.sh start` runs `server.ts` on `127.0.0.1`; it reads the log and serves the page, which shows one room per project. Only if you opt a project in (`/toon-crew:project board on`) and the project's `project.md` has a `## Board` section does it also poll GitHub CI, pull requests, commits and a deploy host, read-only.
 
@@ -379,7 +379,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 
 ### What it does
 
-- Gives every session in a project a manager, **Doraemon**, who plans, briefs the crew, checks every hand-back and opens the pull request ([section 1](#1-the-flow)).
+- Gives a project a manager, **Doraemon**, when you turn him on there. He plans, briefs the crew, checks every hand-back and opens the pull request ([section 1](#1-the-flow)).
 - Runs six builders in their **own git worktrees** and keeps six roles **read-only** ([section 2](#2-teams-and-roles)).
 - Checks risky Bash, file, agent and MCP calls with the **guard** before they run, and fails closed: if it cannot decide, it blocks. It asks you before a merge, a push to `main`, or an edit of a project's `.claude/hooks`, `agents`, `skills` or `commands` ([guards.md](guards.md)).
 - Shows the **Crew Room** on `127.0.0.1` ([the Crew Room guide](crew-room.md)).
