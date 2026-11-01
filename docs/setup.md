@@ -12,9 +12,9 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 
 ## What happens on first run
 
-1. **You choose where Doraemon runs.** Installing the plugin does not make him your main agent. You [turn him on per project](#turn-doraemon-on-or-off); until then the guard and the crew agents are available, but your session is a plain Claude Code chat.
+1. **You choose where the manager (Doraemon) runs.** Installing the plugin does not make it your main agent. You [turn the manager on per project](#turn-the-manager-on-or-off); until then the guard and the crew agents are available, but your session is a plain Claude Code chat.
 2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder, which Claude Code gives the plugin as `$CLAUDE_PLUGIN_DATA`. It is usually `~/.claude/plugins/data/toon-crew-crew/` (plugin name, a dash, marketplace name); run `ls ~/.claude/plugins/data/` to check. The event log lives there too. Polling and the lessons pass are both off.
-3. **He writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, Doraemon runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
+3. **The manager writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, the manager runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
 4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#crew-room-optional)).
 
 ## Per-project setup
@@ -58,9 +58,9 @@ Then add a `## Board` section to the project's `.claude/crew/project.md` (the `p
 
 `github` turns on CI, pull request and commit polling through `gh`. The `deploy-ssh`, `deploy-result`, `deploy-log` and `deploy-containers` keys turn on a read-only deploy check over ssh. All keys and their formats are in [plugin/board/README.md](../plugin/board/README.md). With no section, or with the flag off, nothing is polled.
 
-## Turn Doraemon on or off
+## Turn the manager on or off
 
-Doraemon is opt-in per project. He runs on Opus and delegates, so a crew session uses more of your plan than a plain chat; turning him on only where you want a crew keeps that cost to those projects.
+The manager is opt-in per project. It runs on Opus and delegates, so a crew session uses more of your plan than a plain chat; turning it on only where you want a crew keeps that cost to those projects.
 
 **On.** Either of these:
 
@@ -70,7 +70,7 @@ Doraemon is opt-in per project. He runs on Opus and delegates, so a crew session
   { "agent": "toon-crew:doraemon" }
   ```
 
-- Or start one session with him: `claude --agent toon-crew:doraemon`.
+- Or start one session with it: `claude --agent toon-crew:doraemon`.
 
 **Off.** Remove the `agent` line from the project's `.claude/settings.json`, or start Claude Code without `--agent`. The guard and the crew agents stay available.
 
@@ -93,7 +93,7 @@ Then `/reload-plugins`. Read [CHANGELOG.md](../CHANGELOG.md) first. To remove th
 
 ## Upgrading from 0.x
 
-The memory folders are named `toon-crew-<id>`. Early versions used other names for the crew. Doraemon carries a map of the old names, and the board counts old events for the role that took over, so nothing breaks. Only a project that still holds old memory folders needs a one-time move.
+The memory folders are named `toon-crew-<id>`. Early versions used other names for the crew. The manager carries a map of the old names, and the board counts old events for the role that took over, so nothing breaks. Only a project that still holds old memory folders needs a one-time move.
 
 <details>
 <summary>Memory folder moves (old name to new)</summary>
@@ -126,7 +126,7 @@ The retired characters and who took over each job are listed in [the Crew Room g
 ## Troubleshooting
 
 - **The `/toon-crew:...` commands are missing.** Run `/reload-plugins`, then `/plugin` to check that `toon-crew` is installed and enabled.
-- **Doraemon is not the main agent.** He is opt-in: the project's `.claude/settings.json` needs `"agent": "toon-crew:doraemon"`, or start with `claude --agent toon-crew:doraemon`. The plugin may also be disabled in this project (`claude plugin list` shows it). See [Turn Doraemon on or off](#turn-doraemon-on-or-off).
+- **The manager is not the main agent.** It is opt-in: the project's `.claude/settings.json` needs `"agent": "toon-crew:doraemon"`, or start with `claude --agent toon-crew:doraemon`. The plugin may also be disabled in this project (`claude plugin list` shows it). See [Turn the manager on or off](#turn-the-manager-on-or-off).
 - **Install or update fails.** Claude Code clones the marketplace from GitHub, so you need `git` and a network. Check `claude --version` (2.1.295 or later) and run `/plugin marketplace update crew`.
 - **The board is empty.** The hooks and the board must use the same [data folder](#what-happens-on-first-run). Start the board with `/toon-crew:board`. Started by hand without `CLAUDE_PLUGIN_DATA`, it reads `~/.toon-crew` instead.
 - **The board shows a project but no CI or deploys.** Polling is off until you run `/toon-crew:project board on` and the project's `project.md` has a `## Board` section. See [Show CI, pull requests, commits and deploys on the board](#optional-show-ci-pull-requests-commits-and-deploys-on-the-board).
@@ -141,8 +141,8 @@ The [README](../README.md#commands) lists the four skills you will use most. The
 
 | Skill | Who runs it | What it does |
 |---|---|---|
-| `task` | Doraemon (you can type it too) | Queues and moves board tasks: `add`, `start`, `done`, `drop`, `list` |
-| `project-profile` | Doraemon, on first run or when `project.md` is stale | Writes `.claude/crew/project.md` |
+| `task` | The manager (you can type it too) | Queues and moves board tasks: `add`, `start`, `done`, `drop`, `list` |
+| `project-profile` | The manager, on first run or when `project.md` is stale | Writes `.claude/crew/project.md` |
 | `security-backend` | Kevin and Ninja Hattori (Bob when a task needs it) | Checklist for code that holds personal data, logins or secrets |
 | `integrations` | Kevin and Ninja Hattori (Bob when a task needs it) | Checklist for code that calls a third-party API |
 | `forget` | You | Removes a project from the board's list; with no argument it lists the projects |
