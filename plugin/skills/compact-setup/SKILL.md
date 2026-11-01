@@ -21,13 +21,13 @@ Drop old test output, diffs, screenshots and full hand-back reports (they live i
 ```
 
 Steps:
-1. Look for `CLAUDE.md` in the project root (`${CLAUDE_PROJECT_DIR}`). Read it all. Look for a heading called "Compact instructions" (any heading level, any capital letters). The section runs to the next heading of the same or a higher level.
+1. Look for `CLAUDE.md` in the project root (`${CLAUDE_PROJECT_DIR}`). Read it all. Look for a heading called "Compact instructions" (any heading level, any capital letters; a line inside a code fence is not a heading). The section runs to the next heading of the same or a higher level.
 2. Show the user the default section above. If the section already exists, show their current text next to it.
 3. Ask before writing. Offer only the choices that fit:
    - No `CLAUDE.md` yet: "Create CLAUDE.md with this section?" Create the file only on a yes.
    - File exists, no such section: "Add this section at the end of CLAUDE.md?"
    - Section exists: "Keep yours as it is", "add the default lines under yours", or "replace yours with the default". Replace only when the user picks replace. Never merge or reword their text on your own.
-4. Write with the Edit tool, only inside that section (or at the end of the file for a new one). Do not change any other section, spacing or heading. Show what changed.
+4. Create a new `CLAUDE.md` with the Write tool. In an existing file, use the Edit tool, only inside that section (or at the end of the file for a new section). Do not change any other section, spacing or heading. Show what changed.
 5. Tell the user:
    - The text is plain Markdown in `CLAUDE.md`; edit it any time, for example to add things this project must never lose.
    - The edit is certain to apply from the next session you start. The Claude Code docs do not say whether a session that is already open picks it up.
