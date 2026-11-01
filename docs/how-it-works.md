@@ -168,7 +168,7 @@ Fifteen agents in nine teams, one job each. Every agent reads the project's `CLA
 | `integrations` | kevin and ninja-hattori (preloaded), bob (for third-party APIs) | Read-only by default, allow-lists and host pinning, scopes and keys, rate limits, paging caps, redaction, background jobs, commit-time re-checks |
 | `crew-lessons` | miguel-rivera (when the owner starts the pass) | The lessons harvest and promotion procedure |
 
-The commands you type (`/toon-crew:board`, `task`, `project`, `forget`) are in the [README](../README.md#commands).
+The commands you type most (`/toon-crew:board`, `handbacks`, `project`, `compact-setup`) are in the [README](../README.md#commands); the other skills, including `task` and `forget`, are in [Setup](setup.md#other-skills).
 
 ## 3. Where things live
 
@@ -393,7 +393,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 - **The board has no remote view, no login and no buttons,** and does not start by itself ([the Crew Room guide](crew-room.md#good-to-know)).
 - **Polling is off until you turn it on** for a project, and a project's own files cannot turn it on. It supports GitHub (through `gh`) and one SSH deploy host only: no GitLab, no cloud provider APIs. Commits are read from local refs; it does not fetch. Deploy status needs a result file in a fixed format, and app errors come from the `docker logs` of the containers you name.
 - **The event log is not rotated.** It grows, and the board reads all of it on each refresh. How large it gets in practice has not been measured.
-- **The board has no cost or token tracking** yet.
+- **The board shows plan usage, not a bill.** On a Pro or Max plan, the Plan usage panel shows your 5-hour and weekly limits and each agent's share of that usage (added in 0.3.13; the limits need Claude Code 2.1.287 or later). API users get a dollar ledger instead ([CHANGELOG.md](../CHANGELOG.md)).
 - **Projects never share memory.** Only `[crew]` rules move up, through a pull request the owner merges ([section 4](#4-several-projects)). The lessons pass is owner-only and manual, with no schedule, and needs `gitleaks`.
 - **The evals are not run in CI.** CI runs the structure check, strict validation, the hook and board tests and a secrets scan (`.github/workflows/ci.yml`). The eval cases are run by hand and have not been re-measured since the cast was renamed.
 - **No Windows or Linux desktop setup is documented.** `board.sh` is bash. CI runs on Ubuntu; the evals ran on macOS.
