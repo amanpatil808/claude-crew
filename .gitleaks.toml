@@ -9,6 +9,8 @@ useDefault = true
 description = "Fake secrets used as test fixtures for the memory guard"
 paths = [
   '''plugin/hooks/test/guard\.test\.mjs''',
+  '''plugin/hooks/test/guard-handbacks\.test\.mjs''',
+  '''plugin/hooks/test/guard-data-shell\.test\.mjs''',
   '''plugin/hooks/test/guard-hardening\.test\.mjs''',
   '''plugin/hooks/test/guard-roles\.test\.mjs''',
   '''plugin/hooks/test/proof-recheck\.test\.mjs''',

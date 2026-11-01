@@ -2,6 +2,19 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 0.3.14 - 1 Nov 2026
+
+### Added
+
+- Hand-back files: every crew agent writes a full report and a short summary in two folders under the plugin's data folder (`projects/<project>/handbacks/full/` and `summaries/`). Only the summary comes back into Doraemon's conversation, so it stays smaller. He reads the summaries after `/clear` or in a new session, and opens the full report whenever something looks missing. Files older than 60 days are removed.
+- `/toon-crew:handbacks` finds the folder and lists the newest summaries.
+- A reminder to `/compact` or `/clear`: when the main session's context passes 200K tokens (then every 100K more), or after a PR merge, the terminal shows the options and the board shows a "Needs you" card. It uses no model and costs no tokens.
+- `/toon-crew:compact-setup` adds an editable "Compact instructions" section to a project's `CLAUDE.md`, so every compact keeps the branch, PRs, tasks, decisions and hand-back summaries.
+
+### Security
+
+- Crew roles may write only `.md` files in their own hand-back folders inside the data folder. Any crew shell command that names the data folder is read-only.
+
 ## 0.3.13 - 28 Oct 2026
 
 ### Added

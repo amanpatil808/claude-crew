@@ -507,6 +507,7 @@ function needCopy(x, s, who) {
     const pr = (own(s.snapshots, x.project)?.prs || []).find((p) => p.number === x.number);
     return { text: x.number != null ? `PR #${x.number}${pr?.title ? ` "${pr.title}"` : ""} is ready for your review` : x.text, green: pr ? pr.checks === "pass" : /checks green/i.test(x.text || "") };
   }
+  if (x.kind === "compact") return { text: x.why === "merge" ? "PR merged. Good time to `/clear` (the board and hand-back summaries keep the state), or `/compact` keep the next steps." : "Context is " + (Number.isFinite(x.ctx) ? x.ctx + "K tokens" : "large") + " (re-sent every turn). Run `/compact` or `/clear` in your Claude Code session." };
   if (x.kind === "permission") return { text: `${who} is waiting for your permission` };
   if (x.kind === "idle") return { text: `${who} is waiting for your reply` };
   return { text: x.text };

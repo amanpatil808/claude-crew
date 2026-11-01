@@ -1,6 +1,6 @@
 # claude-crew: crew notes
 
-Updated 2026-10-27 14:10 UTC by doraemon. Every crew member reads this page and `CLAUDE.md` (none yet) before starting.
+Updated 2026-10-27 14:10 UTC by doraemon. Every crew member reads this page and `CLAUDE.md` (only the Compact instructions section, since 0.3.14) before starting.
 Lines marked `(owner)` were set by the owner; agents keep them as they are.
 
 ## Project

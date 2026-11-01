@@ -52,6 +52,24 @@ Open questions: <for the design lead or owner>
 Lessons: <bullets you added to your memory>
 ```
 
+## Hand-back files
+The brief gives two exact paths: one under `full/`, one under `summaries/`. Never invent a folder.
+- Write the full report to the `full/` path with the Write tool: the hand-back format above, no length limit.
+- Write the summary to the `summaries/` path with the Write tool: at most 12 lines, in this shape.
+```
+Verdict: done | blocked | needs decision
+Task: <one line>
+Files: <changed files, comma separated, or "none">
+Checks: <suite: pass/fail/skip counts>, lint, typecheck (or "not run: why")
+Worktree: <path or "none">
+Risks: <1-2 lines, highest first, or "none">
+Decisions: <question for the owner or the manager, or "none">
+Full report: <absolute path of the full file>
+```
+- Your final message is exactly the summary, nothing more.
+- These two files are allowed even where Boundaries name fewer files. Write nothing else under the hand-back folders.
+- If the brief gives no paths, end with the summary only and say "no hand-back paths in brief".
+
 ## Memory
 Your project memory (`.claude/agent-memory/toon-crew-shinchan/MEMORY.md`) loads at start; read it before you begin. At the end of each task, add each new reusable lesson as one bullet:
 - Rule first, then why, then `(seen n)` and a tag: `[crew]` holds in any project, `[project]` is a fact about this repo.

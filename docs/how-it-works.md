@@ -228,6 +228,8 @@ flowchart LR
 | The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass |
 | The board | a local page on `127.0.0.1`, started with the `board` skill | You |
 
+Hand-backs: when a crew member finishes, it writes two files in the project's folder under `projects/<project>/handbacks/` in the plugin data folder: the full report in `full/<agent>/` and a 12-line summary in `summaries/<agent>/`. Only the summary comes back into Doraemon's conversation. The reason is cost: Doraemon re-sends his whole conversation on every turn, so a long report in the chat is paid for again and again, while a file is not. The files survive `/clear` and new sessions, so Doraemon can read the summaries whenever he needs them. When something in a summary looks missing, he opens the full report and anything else he needs. The folders stay on your machine, and the board deletes files older than 60 days. The format is in `docs/specs/handbacks.md`.
+
 How the hooks work:
 - A session start, a subagent start or stop, a Bash, Agent or SendMessage call, and a turn end each send one small message to `board/hook.ts`. It appends at most one line to `events.jsonl`.
 - The hooks run in the background (`async`), so they cannot slow a session. They add no model tokens.
@@ -292,6 +294,7 @@ Measured once, in October 2026, on an early version (0.1.0) and not re-measured 
 - The manager is the cost: Doraemon runs on Opus and was 76 to 99 percent of each measured run, so he delegates reading and searching, keeps turns short and sends lookups to Stuart.
 - Cheapest model that fits: Opus where a wrong answer looks right (judgement, design review, security), Sonnet for building and writing, Haiku for checks and lookups.
 - Nobody passes a `model` on a call except the escalations in section 2.
+- To keep the manager's context useful when it compacts, `/toon-crew:compact-setup` adds an editable "Compact instructions" section to your CLAUDE.md (see `plugin/skills/compact-setup/SKILL.md`).
 
 Keep waves 2 to 4 wide: many agents cost many times the tokens of one chat.
 

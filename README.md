@@ -1,6 +1,6 @@
 <div align="center">
 <h1>toon-crew</h1>
-<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.13" src="https://img.shields.io/badge/version-0.3.13-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
+<p><b>Your AI engineering team inside Claude Code: a manager, 14 specialists, and a live board to watch them work.</b><br><br><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue"> <img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-orange"> <img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-green"></p>
 </div>
 
 ## Why toon-crew
@@ -68,6 +68,7 @@ Plain files, per project. The guard blocks any lesson that looks like a key, tok
 | Lessons, one file per agent | `.claude/agent-memory/toon-crew-<name>/MEMORY.md` | Your team, once you commit it |
 | Project facts | `.claude/crew/project.md` | Your team, once you commit it |
 | Event log, project list | The plugin's data folder, usually `~/.claude/plugins/data/toon-crew-crew/` | Only you, on this machine |
+| Hand-back reports and summaries | The plugin's data folder, `projects/<project>/handbacks/` | Only you, on this machine |
 | Shared crew lessons | `docs/lessons/` in this repo | The repo owner, by pull request |
 ## Commands
 | Command | What it does |
@@ -76,6 +77,7 @@ Plain files, per project. The guard blocks any lesson that looks like a key, tok
 | `/toon-crew:task add\|start\|done\|drop\|list` | Queues and moves tasks on the board |
 | `/toon-crew:project [board\|lessons] [on\|off]` | Allows or stops CI and deploy checks, or the lessons pass (both start off) |
 | `/toon-crew:forget [name or path]` | Removes a project from the board's list |
+| `/toon-crew:compact-setup` | Adds editable "Compact instructions" to your CLAUDE.md, after you approve the text |
 
 Crew members use the rest automatically; `/toon-crew:crew-lessons` is for the repo owner only.
 ## Good to know
