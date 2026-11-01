@@ -397,7 +397,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 - **Projects never share memory.** Only `[crew]` rules move up, through a pull request the owner merges ([section 4](#4-several-projects)). The lessons pass is owner-only and manual, with no schedule, and needs `gitleaks`.
 - **The evals are not run in CI.** CI runs the structure check, strict validation, the hook and board tests and a secrets scan (`.github/workflows/ci.yml`). The eval cases are run by hand and have not been re-measured since the cast was renamed.
 - **No Windows or Linux desktop setup is documented.** `board.sh` is bash. CI runs on Ubuntu; the evals ran on macOS.
-- **It is private and unlicensed.** There is no public install and no licence to reuse the code.
+- **The code is MIT licensed; the characters are not ours.** See [LICENSE](../LICENSE). Character names and likenesses belong to their owners, and this is an unofficial fan project ([NOTICE](../NOTICE)).
 
 ### Privacy and your data
 

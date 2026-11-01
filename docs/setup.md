@@ -6,7 +6,6 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 
 - **Claude Code 2.1.295 or later.** The guard hook uses `"onFailure": "block"`, which older versions do not support.
 - **Node 24.2 or later, with `node` on your PATH** (the hooks and the board both run it). The board scripts are TypeScript run directly by Node, and the board's hook uses `import.meta.main`, which Node added in 24.2.
-- **git access to this private repo**, to install (`gh auth status` is green, or an SSH key is set up).
 - **`gh`**, only if you turn on CI and pull request polling.
 - **`gitleaks`**, only for the owner's lessons pass.
 - There is nothing to `npm install`: the plugin has no dependencies.
@@ -16,7 +15,7 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 1. **You talk to Doraemon.** The plugin makes him the main agent in every session (`"agent": "toon-crew:doraemon"`). If you have your own `agent` setting, yours wins.
 2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder, which Claude Code gives the plugin as `$CLAUDE_PLUGIN_DATA`. It is usually `~/.claude/plugins/data/toon-crew-crew/` (plugin name, a dash, marketplace name); run `ls ~/.claude/plugins/data/` to check. The event log lives there too. Polling and the lessons pass are both off.
 3. **He writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, Doraemon runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
-4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#quick-start)).
+4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#live-board-optional-add-on)).
 
 ## Per-project setup
 
