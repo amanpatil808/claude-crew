@@ -28,21 +28,24 @@ This repo is private. Run `gh auth status`: it must be green. Or set up an SSH k
 <table>
 <tr>
 <td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-crew-dark.png"><img src="docs/images/card-crew-light.png" alt="Two rooms of the Crew Room board: Doraemon and Miguel in Management, Nobita and Shinchan in Frontend. Demo data." width="380"></picture><br>
 <b>A crew, not one agent</b><br>
 Doraemon plans; 14 specialists each do one job.
 </td>
 <td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-guard-dark.png"><img src="docs/images/card-guard-light.png" alt="An approval prompt: Mike Wazowski wants to run gh pr merge 42 and waits for your yes or no. Illustration." width="380"></picture><br>
 <b>Guards ask before risky steps</b><br>
 Risky commands ask you first; the worst are refused.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/plan-panel-dark.png"><img src="docs/images/plan-panel-light.png" alt="Plan usage panel with the 5-hour and weekly limits, then each crew member's share. Demo data." width="440"></picture><br>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-plan-dark.png"><img src="docs/images/card-plan-light.png" alt="Plan usage panel: the 5-hour and weekly limits with the percent used and reset times. Demo data." width="380"></picture><br>
 <b>A live board, plus plan usage</b><br>
 Who works, what is queued, plan usage (Pro or Max).
 </td>
 <td width="50%" valign="top">
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/card-handback-dark.png"><img src="docs/images/card-handback-light.png" alt="A hand-back summary file: verdict, task, files, checks, risks and the path to the full report. Illustration." width="380"></picture><br>
 <b>Hand-back files, nothing lost</b><br>
 Every crew member leaves a written report you can reread.
 </td>
