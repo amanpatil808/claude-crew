@@ -1,10 +1,10 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/crew-banner-dark.svg"><img src="docs/images/crew-banner-light.svg" alt="The toon-crew characters walking across: Doraemon, Nobita, Shizuka, Kevin, Ninja Hattori and Mike Wazowski" width="820"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.svg"><img src="docs/images/hero-light.svg" alt="toon-crew: Turn Claude Code into an AI engineering team." width="820"></picture></p>
 
-# toon-crew
-
-**Turn Claude Code into an AI engineering team.**
-
-[![version](https://img.shields.io/badge/version-0.3.14-blue?style=flat-square)](CHANGELOG.md) [![Claude_Code](https://img.shields.io/badge/Claude_Code-2.1.295%2B-blue?style=flat-square)](https://code.claude.com/docs/en/overview) [![Node](https://img.shields.io/badge/Node-24.2%2B-blue?style=flat-square)](docs/setup.md#requirements)
+<p align="center">
+<a href="CHANGELOG.md"><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue?style=flat-square"></a>
+<a href="https://code.claude.com/docs/en/overview"><img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-blue?style=flat-square"></a>
+<a href="docs/setup.md#requirements"><img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-blue?style=flat-square"></a>
+</p>
 
 toon-crew is a Claude Code plugin. A manager agent, Doraemon, plans your request and briefs 14 specialists, a few at a time: backend, frontend, DevOps, security, QA, research and docs. Each does one job.
 
