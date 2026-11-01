@@ -15,6 +15,8 @@ Replace `<args>` with one of:
 
 The action given to the skill is: $ARGUMENTS
 
+If no action is given, use `list --limit 10`.
+
 Rules:
 - `<id>` is a crew id such as `kevin`; `<n>` is a number. Refuse, and run nothing, if any argument contains a backtick, `$(`, `;`, `$`, `\`, `&`, `|`, `<`, `>`, a quote or a newline.
 - Never build a second command or chain commands.
