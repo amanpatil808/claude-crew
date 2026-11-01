@@ -63,7 +63,7 @@ You talk to Doraemon only; the diagram follows one request.
 
 The crew works fine without it; the board only lets you watch. Run `/toon-crew:board`; it prints the port, usually 8811, so open `http://127.0.0.1:8811` ([guide](docs/crew-room.md)).
 
-<p align="center"><img src="docs/images/board.gif" alt="The Crew Room board: each team in its own room, crew at their desks, Ninja Hattori handing work to Doraemon. Demo data." width="820"><br><sub>The Crew Room: your crew at work (demo data)</sub></p>
+<p align="center"><img src="docs/images/board.gif" alt="The Crew Room board at night: each team in its own room, Doraemon walking to Kevin to give him work, Ninja Hattori handing his work to Doraemon, and the plan usage panel on the right. Demo data." width="820"><br><sub>The Crew Room: your crew at work (demo data)</sub></p>
 
 ## Commands
 
