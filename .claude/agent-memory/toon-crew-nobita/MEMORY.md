@@ -28,3 +28,6 @@
 - Check where "must be prominent" sections land at every breakpoint. A single-column fallback can push the rail below a very tall hero. (seen 1) [crew]
 - A list with a max-height and overflow scroll on phone cuts rows mid-line with no sign of more. Check every list panel at 390 px for nested scrollers. (seen 1) [crew]
 - An empty "needs attention" area must say what it tracks, or an absent data source looks like "nothing needs you". (seen 1) [crew]
+- To reuse board sprites in an illustration, render them on the demo board with rDesk/rAvatar, hide everything else (`visibility:hidden`, transparent default background over CDP), capture with a transparent background and embed as WebP in the SVG. That kept the README comic at about 160 KB with no external files. (seen 1) [project]
+- Test any text inside an image with the font forced to a wide fallback such as Verdana: GitHub renders SVG as an image with no web fonts, so a narrow font that fits locally can overflow there. (seen 1) [crew]
+- In 0.3.14 the guard refused Nobita's Edit on his own MEMORY.md and on scratch .mjs files while he worked in a worktree. Until it's fixed, list lessons in the hand-back for the manager to file. (seen 1) [project]
