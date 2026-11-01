@@ -21,6 +21,9 @@ interface State { size: number; merge: string }   // last reminded context (0: n
 
 const obj = (x: unknown): Record<string, unknown> => (x && typeof x === "object" && !Array.isArray(x) ? x as Record<string, unknown> : {});
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
+// One transcript token field, capped: a corrupt or hostile line (1e300) never prints as "1e+297K tokens".
+export const TOKEN_FIELD_MAX = 1_000_000_000;
+const tokens = (x: unknown) => Math.min(num(x), TOKEN_FIELD_MAX);
 
 function tailOf(file: string, bytes: number): string {
   const fd = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK);
@@ -45,8 +48,8 @@ export function contextTokens(path: unknown, root?: string): number {
     const msg = obj(rec.message), u = obj(msg.usage);
     if (rec.type !== "assistant" || rec.isSidechain === true || msg.model === "<synthetic>" || !Object.keys(u).length) continue;
     const cc = obj(u.cache_creation);
-    const created = u.cache_creation_input_tokens === undefined ? num(cc.ephemeral_5m_input_tokens) + num(cc.ephemeral_1h_input_tokens) : num(u.cache_creation_input_tokens);
-    return num(u.input_tokens) + num(u.cache_read_input_tokens) + created;
+    const created = u.cache_creation_input_tokens === undefined ? tokens(cc.ephemeral_5m_input_tokens) + tokens(cc.ephemeral_1h_input_tokens) : tokens(u.cache_creation_input_tokens);
+    return tokens(u.input_tokens) + tokens(u.cache_read_input_tokens) + created;
   }
   return 0;
 }

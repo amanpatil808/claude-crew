@@ -10,7 +10,7 @@ import { loadRoles } from "../lib/crew.ts";
 import { DROP_AFTER_MS, deriveNeeds } from "../lib/needs.ts";
 import { EVENTS_FILE, LOG_DIR } from "../lib/paths.ts";
 import { transcriptRoot } from "../lib/usage.ts";
-import { run } from "../remind.ts";
+import { contextTokens, run } from "../remind.ts";
 
 const SETTINGS = join(process.env.CLAUDE_CONFIG_DIR ?? "", "settings.json");   // the temp config folder from env.ts
 const ENV = { CLAUDE_PROJECT_DIR: "/work/acme", CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR };
@@ -107,6 +107,28 @@ test("a broken, missing, outside or empty transcript gives nothing and does not 
   writeFileSync(bad, '{"type":"assistant","message":{"usage":\n\u0000garbage\n');
   for (const p of [bad, join(dir, "missing.jsonl"), "/etc/passwd", "relative.jsonl", undefined, 42]) assert.equal(go(stop(p as string)), "");
   assert.equal(go({ hook_event_name: "Stop" }), "");
+});
+
+test("absurd token counts are capped per field at 1e9, so the message never shows exponents or huge numbers", () => {
+  const usageFile = (usage: Record<string, unknown>) => {
+    const p = join(dir, `big${++n}.jsonl`);
+    writeFileSync(p, JSON.stringify({ type: "assistant", message: { id: "m1", model: "claude-opus-4-1", usage } }) + "\n");
+    return p;
+  };
+  const cases: [Record<string, unknown>, number][] = [
+    [{ input_tokens: 1e300, cache_read_input_tokens: 1e300, cache_creation_input_tokens: 1e300 }, 3_000_000],
+    [{ input_tokens: 1e300, cache_read_input_tokens: 1e300, cache_creation: { ephemeral_5m_input_tokens: 1e300, ephemeral_1h_input_tokens: 1e300 } }, 4_000_000],
+    [{ input_tokens: 5e9, cache_read_input_tokens: 1000, cache_creation_input_tokens: 100 }, 1_000_001],   // each field on its own, not the sum
+    [{ input_tokens: 1_000_000_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }, 1_000_000], // the cap itself is kept
+  ];
+  for (const [usage, k] of cases) {
+    rmSync(join(LOG_DIR, "remind"), { recursive: true, force: true });
+    const file = usageFile(usage);
+    if (k % 1_000_000 === 0) assert.equal(contextTokens(file), k * 1000, `exact count ${JSON.stringify(usage)}`);
+    const m = msg(go(stop(file)));
+    assert.equal(m, head(k), JSON.stringify(usage));
+    assert.doesNotMatch(m, /e\+|Infinity|NaN/);
+  }
 });
 
 test("the compact-hint event: quiet, fixed text, numbers in numeric fields", () => {

@@ -1201,6 +1201,65 @@ function handbackRule(raw, abs, r, ctx) {
   return hardLinked(r) ? deny : HANDBACK_OWN;
 }
 
+// ---------- the data folder from a crew role's shell ----------
+// From Bash or Monitor a crew role (not Doraemon) may only read the data folder: hand-back files go in through
+// Write/Edit, where handbackRule checks them. A command line that names the folder is refused unless every
+// command on it is a plain read. Naming it: CLAUDE_PLUGIN_DATA in any spelling, the folder's path or real path
+// (also as ~/ or $HOME/, glued to an option like -C/path), or any word or path piece that resolves into it
+// from the tracked current folder.
+// Text-based like the rest: a path built at run time (printf, base64) is not seen.
+const PLAIN_READS = new Set(['cat', 'head', 'tail', 'ls', 'grep', 'wc']);
+const DATA_VAR = /CLAUDE_PLUGIN_DATA/;
+const PATH_PIECES = /[\s'"`,;()[\]{}=<>|&:]+/;
+function dataForms(ctx) {
+  const home = os.homedir(); const forms = new Set();
+  for (const d of ctx.dataDirs ?? []) {
+    forms.add(d);
+    if (within(d, home)) { const rel = path.relative(home, d); for (const h of ['~', '$HOME', '${HOME}']) forms.add(`${h}/${rel}`); }
+  }
+  return [...forms].map((f) => f.toLowerCase());
+}
+// The form followed by the end or a path separator: /data-2 is another folder, /data/x and /data are not.
+const namesForm = (text, forms) => { const t = text.toLowerCase(); return forms.some((f) => { for (let i = t.indexOf(f); i !== -1; i = t.indexOf(f, i + 1)) if (!/[\w.-]/.test(t[i + f.length] ?? '')) return true; return false; }); };
+function dataShellRule(src, ctx) {
+  const forms = dataForms(ctx); const seen = new Map(); const all = []; let names = DATA_VAR.test(src);
+  const resolves = (piece, cwd) => {
+    const abs = ctx.dataDirs ? resolveIn({ ...ctx, cwd }, piece) : null;
+    if (!abs) return false;
+    if (inDataDir(abs, ctx)) return true; // fast path; the real-path check below would find it too
+    if (!seen.has(abs)) seen.set(abs, inDataDir(real(abs), ctx)); // links from elsewhere into the folder
+    return seen.get(abs);
+  };
+  const touches = (word, cwd) => DATA_VAR.test(word) || namesForm(word, forms)
+    || [word, ...word.split(PATH_PIECES)].some((p) => p && resolves(p, cwd));
+  const walk = (text, startCwd, depth) => {
+    if (depth > 6 || Date.now() > ctx.deadline) return false;
+    const { commands, nested, heredocs } = tokenize(text);
+    let cwd = startCwd; const stack = []; let level = 0;
+    for (const cmd of commands) {
+      while (level > cmd.depth) { cwd = stack.pop(); level--; }
+      while (level < cmd.depth) { stack.push(cwd); level++; }
+      all.push(cmd);
+      if (!names && [...cmd.words, ...cmd.redirects].some((w) => touches(w, cwd))) names = true;
+      const prog = cmd.words[0];
+      if (prog === 'cd' || prog === 'pushd' || prog === 'popd') {
+        const arg = cmd.words.slice(1).find((a) => !a.startsWith('-'));
+        cwd = prog === 'popd' || !arg || arg === '-' ? null : resolveIn({ ...ctx, cwd }, arg);
+      }
+    }
+    for (const body of heredocs) if (!names && body.split(PATH_PIECES).some((p) => p && resolves(p, startCwd))) names = true;
+    for (const body of nested) if (!walk(body, startCwd, depth + 1)) return false;
+    return true;
+  };
+  const who = ctx.crew || 'this crew role';
+  // Fails closed: a walk cut short (too deep, out of time) may not have reached the part that names the folder.
+  if (!walk(src, ctx.cwd, 0)) return `${who}: this command is too complex to check against the plugin data folder; blocked.`;
+  if (!names) return null;
+  const plain = (cmd) => PLAIN_READS.has(cmd.words[0] ?? '') && cmd.redirects.every((r) => r === '/dev/null');
+  return all.every(plain) ? null
+    : `${who}: from Bash a crew role may only read the plugin data folder (cat, head, tail, ls, grep or wc, with no redirection or other command on the line). Write hand-back files with the Write tool.`;
+}
+
 // ---------- Agent (spawning) and relay tools ----------
 const crewId = (name) => (/^(?:toon-crew:)?([a-z0-9-]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
 // Any toon-crew: agent counts as crew, so a role added later is limited until it is listed in CREW.
@@ -1256,6 +1315,7 @@ export function evaluate(input, env = process.env) {
     const cmd = typeof ti.command === 'string' ? ti.command : '';
     if (cmd.length > MAX_COMMAND) return { deny: 'Command too long to verify; blocked.' };
     if (CRED_TEXT.test(cmd)) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
+    if (ctx.crew !== null) { const d = dataShellRule(cmd, ctx); if (d) return { deny: d }; }
     let result = checkCommands(cmd, ctx);
     if (typeof result === 'string') return { deny: result };
     for (const lazy of ctx.pending) { // git lookups run only after every pure check has passed

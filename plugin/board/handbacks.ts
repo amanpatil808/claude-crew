@@ -1,5 +1,6 @@
 // `board.sh handbacks dir|list`: where a project's hand-back files live, and its newest summaries.
 // The folder is always under CLAUDE_PLUGIN_DATA, the only place the guard lets crew roles write them.
+import { statSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { readRegistry } from "./lib/projects.ts";
 import { AGENT_ID, LinkError, ensureHandbacks, handbackKey, listSummaries } from "./lib/handbacks.ts";
@@ -11,6 +12,7 @@ const NO_DATA = "CLAUDE_PLUGIN_DATA is not set to an absolute folder. Hand-back 
 
 export interface Result { code: number; out: string }
 const fail = (msg: string): Result => ({ code: 2, out: `${msg}\n` });
+const isFolder = (p: string) => { try { return statSync(p).isDirectory(); } catch { return false; } };
 
 function parse(args: string[]): Record<string, string> | string {
   const flags: Record<string, string> = {};
@@ -30,6 +32,12 @@ export function run(argv: string[], env: Record<string, string | undefined> = pr
   const flags = parse(args);
   if (typeof flags === "string") return fail(`${flags}\n${USAGE}`);
   if (cmd === "dir" && (flags.agent !== undefined || flags.limit !== undefined)) return fail(USAGE);
+  // A mistyped --project would otherwise get a hand-back folder of its own under a key nobody reads.
+  if (flags.project !== undefined) {
+    if (!flags.project || !isAbsolute(flags.project)) return fail(`--project must be an absolute folder path\n${USAGE}`);
+    if (!isFolder(flags.project)) return fail("--project must be an existing folder");
+  }
+  if (flags.limit !== undefined && !/^[0-9]+$/.test(flags.limit)) return fail("--limit must be a whole number from 1 to 200");
   const data = env.CLAUDE_PLUGIN_DATA;
   if (!data || !isAbsolute(data)) return fail(NO_DATA);
   const project = flags.project ?? env.CLAUDE_PROJECT_DIR ?? cwd;

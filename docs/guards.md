@@ -59,7 +59,28 @@ $CLAUDE_PLUGIN_DATA/projects/<project key>/handbacks/full/<its own id>/<name>.md
 $CLAUDE_PLUGIN_DATA/projects/<project key>/handbacks/summaries/<its own id>/<name>.md
 ```
 
-`<name>` is lower-case letters, digits and `-`, up to 60 characters. Another role's folder, any other file type, a `..` in the path, a symlink or hard link anywhere below the data folder, NotebookEdit, and shell writes (`>`, `cp`, `tee`, `rm`, ...) into the data folder are refused for crew roles. So `events.jsonl`, `limits.json` and `projects.json` stay hook-only. The Write tool creates missing folders. If `CLAUDE_PLUGIN_DATA` is not set when the hook runs, nothing new is allowed. The main session's rules do not change. `board.sh handbacks dir|list` prints a project's folder and its newest summaries, and the board deletes hand-back files older than 60 days once a day.
+`<name>` is lower-case letters, digits and `-`, up to 60 characters. Another role's folder, any other file type, a `..` in the path, a symlink or hard link anywhere below the data folder, and NotebookEdit are refused for crew roles. So `events.jsonl`, `limits.json` and `projects.json` stay hook-only. The Write tool creates missing folders. If `CLAUDE_PLUGIN_DATA` is not set when the hook runs, nothing new is allowed. `board.sh handbacks dir|list` prints a project's folder and its newest summaries (`--project` must be an existing absolute folder, `--limit` a whole number from 1 to 200), and the board deletes hand-back files older than 60 days once a day.
+
+### The data folder from the shell
+
+A crew role (every role except Doraemon) may only **read** the data folder from Bash or Monitor. If a command line names the folder, it is refused unless every command on the line is `cat`, `head`, `tail`, `ls`, `grep` or `wc`, with no redirection except to `/dev/null`. So `cat <its hand-back file>` and `ls <folder> | wc -l` work. `cat <file> > /tmp/copy`, `cat <file> | sh` and `ls <folder> && git status` are refused, so split them into separate calls.
+
+A command line names the folder when it contains any of these:
+
+- **The variable.** `CLAUDE_PLUGIN_DATA` in any spelling the shell reads the same way: `$CLAUDE_PLUGIN_DATA`, `"${CLAUDE_PLUGIN_DATA}"`, split by quotes, escaped with `\`, written as `$'...'`, or inside a here-doc or `$(...)`. This counts whether or not the variable is set.
+- **The path.** The folder's path or real path in any letter case, also written as `~/...`, `$HOME/...` or `${HOME}/...`, and also when it is glued to an option (`-C/path`).
+- **A path that leads there.** Any word, or path inside a word (inline `python`, `node`, `perl` or `ruby` code included), that resolves into the folder. Relative paths are resolved from the current folder after each `cd`, and symlinks that point into the folder are followed.
+
+So these are all refused, along with `>`, `cp`, `tee`, `rm`, `mv` and `sed -i`, which were refused before: `echo x > $CLAUDE_PLUGIN_DATA/events.jsonl`, `D=<folder>; echo x > $D/x`, `cd <folder>` followed by anything, `touch`, `mkdir -p`, `chmod`, `chown`, `sort -o`, `git -C <folder> init`, `tar -C <folder>`, `python3 -c "open('<folder>/x','w')"`, a here-doc that writes a script naming the folder, `ls <folder> | xargs rm`, and `board.sh` run with `CLAUDE_PLUGIN_DATA=...`. Doraemon, the main session and agents that are not crew keep their earlier rules.
+
+**This is a seatbelt, not a sandbox, here too.** The guard reads the command's text. It does not catch:
+
+- a path built while the command runs, for example with `printf`, `base64 -d`, string joins in inline code, or a variable that holds only part of the path;
+- a script written to another place in an earlier call and then run (`bash /tmp/w.sh`);
+- a program that finds the folder by itself, for example from its own environment. When this was written (2026-11-01), Claude Code did not set `CLAUDE_PLUGIN_DATA` in an agent's shell;
+- moving or replacing a folder that holds the data folder, unless that folder is under `~/.claude/plugins`, which stays protected.
+
+The Write and Edit rules above do not depend on the text, because those tools name their file directly.
 
 ## What the guard looks through
 
@@ -68,6 +89,7 @@ It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` c
 ## What the guard cannot do
 
 - **It cannot see inside a script file.** If a role writes `/tmp/w.sh` and then runs `bash /tmp/w.sh`, the guard sees only the second command.
+- **It cannot see a path that is built while a command runs.** This applies to the plugin data folder too (see [The data folder from the shell](#the-data-folder-from-the-shell)).
 - **It cannot see what a tool does by itself.** It checks the call, not what the program does afterwards.
 - **It does not check your own commands.** Commands you type with `!` and actions on GitHub's website skip the guard, so you can always merge yourself.
 - **A tool list alone does not make a role read-only.** Turning on `memory: project` adds Write back to an agent's tools. On Claude Code 2.1.309, Stuart (declared Read, Grep, Glob) got Read, Write, Grep and Glob. So for read-only roles, the guard is the lock on writes.
