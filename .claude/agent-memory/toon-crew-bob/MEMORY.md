@@ -11,3 +11,5 @@
 - The guard blocks inline python/node whose text contains "git push": edit with Edit/Write. Browser scripts (room.js) are tested by slicing the loop out of the file and running it with `new Function` and stubs. (seen 1) [project]
 - Timings: GitHub poll every 20 s plus a marker-triggered poll (hook writes refresh/<hash>.json with the project name only). (seen 1) [project]
 - To prove a test fails on old code without git stash, copy the file aside, `git show HEAD:path > path`, run, copy back. (seen 1) [crew]
+- Subagent transcripts carry their agent type in `subagents/agent-<id>.meta.json` (agentType, finished), so there's no need to parse the transcript for it. Worktree agents' transcripts sit under the parent project's slug. (seen 1) [crew]
+- To audit a live board, compare against only what the board had logged at fetch time, then separately against the full recount. Otherwise in-flight agents (no usage event until SubagentStop) look like arithmetic bugs. (seen 1) [crew]
