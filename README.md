@@ -1,7 +1,7 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.svg"><img src="docs/images/hero-light.svg" alt="toon-crew: Turn Claude Code into an AI engineering team." width="820"></picture></p>
 
 <p align="center">
-<a href="CHANGELOG.md"><img alt="version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-blue?style=flat-square"></a>
+<a href="CHANGELOG.md"><img alt="version 0.3.15" src="https://img.shields.io/badge/version-0.3.15-blue?style=flat-square"></a>
 <a href="https://code.claude.com/docs/en/overview"><img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-blue?style=flat-square"></a>
 <a href="docs/setup.md#requirements"><img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-blue?style=flat-square"></a>
 </p>
@@ -22,10 +22,15 @@ In Claude Code, inside any project:
 /reload-plugins
 ```
 
-Then ask Doraemon for anything. On your first request he writes `.claude/crew/project.md`; read it before you commit it.
+Then turn Doraemon on for this project, one of two ways:
+
+- Add `"agent": "toon-crew:doraemon"` to the project's `.claude/settings.json`. Edit that file yourself; the crew's guard blocks it.
+- Or start a session with `claude --agent toon-crew:doraemon`.
+
+Now ask Doraemon for anything. On your first request he writes `.claude/crew/project.md`; read it before you commit it.
 
 > [!NOTE]
-> Doraemon becomes your main agent. He runs on Opus and delegates, so a crew uses more of your plan than a plain chat; the board's Plan usage panel shows how much. [How to turn him off](docs/setup.md#turn-doraemon-off).
+> Doraemon runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn him on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn Doraemon on or off](docs/setup.md#turn-doraemon-on-or-off).
 
 ## How it works
 
@@ -132,9 +137,9 @@ The guard asks before merges and pushes to `main`, and refuses force pushes and 
 </details>
 
 <details>
-<summary>Can I turn Doraemon off?</summary>
+<summary>Do I have to use Doraemon everywhere?</summary>
 
-Yes. Set your own `agent` in Claude Code settings, or disable the plugin for one project (this also switches off the guard). [Steps](docs/setup.md#turn-doraemon-off).
+No. He is opt-in per project. Turn him on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn him off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-doraemon-on-or-off).
 
 </details>
 
