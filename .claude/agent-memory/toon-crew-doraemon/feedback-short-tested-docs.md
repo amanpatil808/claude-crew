@@ -11,4 +11,6 @@ The owner pushed back three times on 2026-10-27, at 503, 120 and then 150 lines 
 
 **Why:** on 2026-10-27 the owner called a 503-line README "very big" and asked whether the quick start had been tested. Nobody had run it.
 
+For the public launch (2026-11-01) the owner rejected a README that had passed every check ("not looking good", "not production ready"). The bar is how it looks next to the cleanest popular READMEs: start every README redesign with a side-by-side teardown of 10 or more of them (raw markdown plus first-screen screenshots), and show him the comparison before writing. Passing link and fact checks is not enough.
+
 **How to apply:** for any docs task, brief a length target and send Twenty-two to follow the instructions literally, using a throwaway config and demo data, in the same wave as the writer.
