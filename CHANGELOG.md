@@ -6,7 +6,7 @@ All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-p
 
 ### Changed
 
-- Doraemon is opt-in per project: the plugin no longer makes him the main agent of every session. Turn him on with `"agent": "toon-crew:doraemon"` in the project's `.claude/settings.json` or `claude --agent toon-crew:doraemon` ([setup](docs/setup.md#turn-doraemon-on-or-off)). The guard and the crew agents work in every project with the plugin on.
+- Doraemon is opt-in per project: the plugin no longer makes him the main agent of every session. Turn him on with `"agent": "toon-crew:doraemon"` in the project's `.claude/settings.json` or `claude --agent toon-crew:doraemon` ([setup](docs/setup.md#turn-the-manager-on-or-off)). The guard and the crew agents work in every project with the plugin on.
 - README redesign: hero, flow picture, features grid, FAQ.
 - Crew prompts stop re-reading context and keep test output to counts.
 - Builder worktrees are removed after the commit.

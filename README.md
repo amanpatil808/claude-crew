@@ -30,7 +30,7 @@ Then turn the manager on for this project, one of two ways:
 Now ask the manager for anything. On your first request it writes `.claude/crew/project.md`; read it before you commit it.
 
 > [!NOTE]
-> The manager runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn it on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn the manager on or off](docs/setup.md#turn-doraemon-on-or-off).
+> The manager runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn it on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn the manager on or off](docs/setup.md#turn-the-manager-on-or-off).
 
 ## How it works
 
@@ -139,7 +139,7 @@ The guard asks before merges and pushes to `main`, and refuses force pushes and 
 <details>
 <summary>Do I have to use the manager everywhere?</summary>
 
-No. The manager is opt-in per project. Turn it on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn it off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-doraemon-on-or-off).
+No. The manager is opt-in per project. Turn it on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn it off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-the-manager-on-or-off).
 
 </details>
 
