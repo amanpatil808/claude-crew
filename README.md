@@ -68,6 +68,7 @@ Plain files, per project. The guard blocks any lesson that looks like a key, tok
 | Lessons, one file per agent | `.claude/agent-memory/toon-crew-<name>/MEMORY.md` | Your team, once you commit it |
 | Project facts | `.claude/crew/project.md` | Your team, once you commit it |
 | Event log, project list | The plugin's data folder, usually `~/.claude/plugins/data/toon-crew-crew/` | Only you, on this machine |
+| Hand-back reports and summaries | The plugin's data folder, `projects/<project>/handbacks/` | Only you, on this machine |
 | Shared crew lessons | `docs/lessons/` in this repo | The repo owner, by pull request |
 ## Commands
 | Command | What it does |
