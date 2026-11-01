@@ -10,10 +10,11 @@ import { redactDeep } from "./redact.ts";
 export type EventKind = "agent-start" | "agent-stop" | "commit" | "pr" | "turn-end" | "session-start" | "session-end" | "ci" | "deploy" | "main-busy" | "assign"
   | "task-queue" | "task-start" | "task-done" | "task-drop"   // board v2 tasks, see lib/tasks.ts
   | "usage"                                                   // cost ledger: cumulative numbers for one transcript
-  | "needs-you";                                              // the owner is the blocker (see lib/needs.ts)
+  | "needs-you"                                               // the owner is the blocker (see lib/needs.ts)
+  | "compact-hint";                                           // the manager's context is big, or a PR was merged (board/remind.ts)
 
 // Bookkeeping kinds, not history: kept out of the page's event list and out of task activity.
-export const QUIET_KINDS: ReadonlySet<EventKind> = new Set<EventKind>(["usage", "needs-you"]);
+export const QUIET_KINDS: ReadonlySet<EventKind> = new Set<EventKind>(["usage", "needs-you", "compact-hint"]);
 
 // What someone is waiting for. The hook maps Claude Code's notification_type through this allow-list only.
 export type Need = "permission" | "input" | "idle" | "agent-input";
@@ -27,6 +28,9 @@ export const needOf = (type: unknown): Need | undefined => (typeof type === "str
 export const NEED_TEXT: Readonly<Record<Need, string>> = {
   permission: "Waiting for your permission", input: "Waiting for your answer", idle: "Waiting for your reply", "agent-input": "Waiting for your input",
 };
+
+// The only text a compact-hint event carries; its numbers live in `ctx`.
+export const COMPACT_TEXT = "Time to run /compact or /clear";
 
 // One usage row: cumulative numbers for one (model, speed, long-prompt, day) group of one transcript.
 // Short key names on purpose: redactDeep blanks any value whose key says token, session, secret and so on.
@@ -141,6 +145,8 @@ export interface BoardEvent {
   priority?: "P0" | "P1" | "P2";   // task-queue
   taskId?: string;     // task-start/done/drop: which task ("t-<ms>-<hex>"; a queued or assign task's id is its event id with "t" for "e")
   need?: Need;         // needs-you: what the owner is asked for
+  why?: "size" | "merge";   // compact-hint: the context grew past its limit, or a PR was merged
+  ctx?: number;        // compact-hint (size): the context in thousands, kept out of text
   scope?: "main" | "agent";   // usage: the main session's transcript or one subagent's
   final?: boolean;     // usage: that transcript is finished (SubagentStop, SessionEnd)
   partial?: boolean;   // usage: a read budget stopped the sum early

@@ -5,12 +5,13 @@ import { roleFor, typesById, type Role } from "./crew.ts";
 import type { Pr } from "./sources.ts";
 import { getOwn } from "./records.ts";
 
-export type NeedKind = Need | "pr";
+export type NeedKind = Need | "pr" | "compact";
 export interface NeedItem {
   id: string; kind: NeedKind; text: string; since: string; project?: string;
   role?: string;      // the waiting role's id, when known
   ref?: string;       // pr: the PR's https URL
   number?: number;    // pr: the PR number (kept out of text)
+  why?: "size" | "merge"; ctx?: number;   // compact: the reason, and the context in thousands (kept out of text)
   stale?: true;       // a wait with no clear for STALE_AFTER_MS: shown, but marked old
 }
 
@@ -55,6 +56,28 @@ export function eventNeeds(events: BoardEvent[], roles: Map<string, Role>, now: 
   return out;
 }
 
+// The manager's context is big, or a PR was merged: asked for by board/remind.ts at Stop. It clears on the next
+// session start of that session or project (a /compact or /clear starts one) and after DROP_AFTER_MS. Only the
+// session's newest hint shows. A later turn-end does not clear it: the Stop that wrote it ends a turn too.
+export function compactNeeds(events: BoardEvent[], roles: Map<string, Role>, now: number): NeedItem[] {
+  const open = new Map<string, BoardEvent>();
+  for (const e of events) {
+    if (e.kind === "compact-hint" && e.sid && (e.why === "size" || e.why === "merge")) { open.set(e.sid, e); continue; }
+    if (e.kind !== "session-start") continue;
+    for (const [key, h] of open) if (h.sid === e.sid || (!!e.project && h.project === e.project)) open.delete(key);
+  }
+  const out: NeedItem[] = [];
+  for (const e of open.values()) {
+    if (!(now - Date.parse(e.ts) <= DROP_AFTER_MS)) continue;
+    out.push({
+      id: `n-${e.id}`, kind: "compact", text: "The manager's context is big. Run /compact or /clear in your Claude Code session", since: e.ts,
+      ...(e.project ? { project: e.project } : {}), ...(roles.has(MANAGER) ? { role: MANAGER } : {}),
+      why: e.why, ...(typeof e.ctx === "number" && Number.isSafeInteger(e.ctx) && e.ctx > 0 ? { ctx: e.ctx } : {}),
+    });
+  }
+  return out;
+}
+
 const PR_PATH = /^\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/pull\/([1-9]\d{0,9})$/;
 
 // The page's link: exactly https://github.com/<owner>/<repo>/pull/<this PR's number>, else none. The URL is parsed,
@@ -90,6 +113,6 @@ export function prNeeds(projects: { name: string; board?: boolean }[], snapshots
 
 // Oldest first: the longest wait is the most urgent.
 export function deriveNeeds(events: BoardEvent[], roles: Map<string, Role>, projects: { name: string; board?: boolean }[], snapshots: Record<string, { prs?: Partial<Pr>[] } | undefined>, now: number): NeedItem[] {
-  return [...eventNeeds(events, roles, now), ...prNeeds(projects, snapshots)]
+  return [...eventNeeds(events, roles, now), ...compactNeeds(events, roles, now), ...prNeeds(projects, snapshots)]
     .sort((a, b) => (Date.parse(a.since) || 0) - (Date.parse(b.since) || 0) || a.id.localeCompare(b.id));
 }
