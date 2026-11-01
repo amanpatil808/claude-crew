@@ -1,5 +1,7 @@
 # README direction (go-live)
 
+> Superseded on 2026-11-01 by the teardown in `docs/research/readme-teardown.md`: the README now has 2 pictures (architecture diagram, board.gif), no picture cards, and a left-aligned header. Kept for the capture notes.
+
 By Nobita, 2026-11-01. For Shizuka (copy) and Shinchan (captures). Builds on `docs/research/readme-redesign.md`.
 Goal: the README reads like a landing page in one visual language, the Crew Room board. Pixel board, comic and cards share its palette; no Mermaid, no emoji, no grey boxes.
 
