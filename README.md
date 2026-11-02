@@ -30,54 +30,43 @@ Then turn the manager on for this project, one of two ways:
 Now ask the manager for anything. On your first request it writes `.claude/crew/project.md`; read it before you commit it.
 
 > [!NOTE]
-> The manager runs on Opus and delegates, so a crew session uses more of your plan than a plain chat. Only projects you turn it on in pay that; the board's Plan usage panel shows how much. The guard and the crew agents work in every project that has the plugin on. [Turn the manager on or off](docs/setup.md#turn-the-manager-on-or-off).
+> A crew session uses more of your plan than a plain chat, but only in projects where you turn the manager on. The guard and the crew agents work in every project that has the plugin. [Turn the manager on or off](docs/setup.md#turn-the-manager-on-or-off).
 
 ## How it works
 
-You talk to the manager only; the diagram follows one request.
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img src="docs/images/flow-light.svg" alt="Flow of one request: you ask the manager; it plans and briefs the specialists; they work inside the guard and each hands back a report; the manager verifies each hand-back and opens a pull request; you approve and DevOps merges." width="820"></picture></p>
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img src="docs/images/flow-light.svg" alt="Flow of one request: you ask the manager; it plans and briefs the specialists; they work inside the guard and each hands back a report; the manager checks the work and opens a pull request; you approve and DevOps merges." width="820"></picture></p>
-
-1. **Ask.** Tell the manager what you want, in plain words.
-2. **Plan and brief.** He queues the work and briefs the right specialists.
-3. **Work and hand back.** Each writes a full report and a short summary.
-4. **Approve and merge.** The manager opens a pull request; you say yes, DevOps merges.
+1. **Ask.** You tell the manager what you want.
+2. **Plan and brief.** The manager plans the work and briefs the right specialists.
+3. **Work and hand back.** They work inside the guard; each hands back a full report and a summary.
+4. **Manager verifies.** The manager checks each hand-back and opens a pull request.
+5. **You approve, DevOps merges.** The guard asks you before DevOps merges; your yes is the approval.
 
 ## Features
 
 <table>
 <tr>
-<td width="33%" valign="top">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-crew-dark.svg"><img src="docs/images/icon-crew-light.svg" alt="" width="48"></picture><br>
-<b>A crew, not one agent</b><br>
-The manager plans; each specialist has one job.
-</td>
-<td width="33%" valign="top">
+<td width="50%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-guard-dark.svg"><img src="docs/images/icon-guard-light.svg" alt="" width="48"></picture><br>
 <b>A guard on risky steps</b><br>
-Only DevOps may merge, and the guard asks you first. No auto-merge. The worst commands are refused.
+Only DevOps may merge, and only after you say yes. Force pushes and recursive deletes are refused.
 </td>
-<td width="33%" valign="top">
+<td width="50%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-handback-dark.svg"><img src="docs/images/icon-handback-light.svg" alt="" width="48"></picture><br>
-<b>A hand-back for every task</b><br>
-A short summary and a full report on disk, so nothing is lost after <code>/clear</code>.
+<b>Nothing lost after <code>/clear</code></b><br>
+Every task leaves its report on disk.
 </td>
 </tr>
 <tr>
-<td width="33%" valign="top">
+<td width="50%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-worktree-dark.svg"><img src="docs/images/icon-worktree-light.svg" alt="" width="48"></picture><br>
 <b>Isolated builds</b><br>
 Builders work in their own git worktree. Reviewers are read-only.
 </td>
-<td width="33%" valign="top">
+<td width="50%" valign="top">
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-memory-dark.svg"><img src="docs/images/icon-memory-light.svg" alt="" width="48"></picture><br>
 <b>Lessons that stick</b><br>
-Each agent keeps its own project memory in your repo, so lessons carry over to the next session.
-</td>
-<td width="33%" valign="top">
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-board-dark.svg"><img src="docs/images/icon-board-light.svg" alt="" width="48"></picture><br>
-<b>A live board, if you want it</b><br>
-See desks, the queue and your plan usage as the crew works.
+Each agent keeps its own memory in your repo, so lessons carry over to the next session.
 </td>
 </tr>
 </table>
@@ -105,7 +94,7 @@ You only ever talk to the manager (Doraemon).
 
 ## Crew Room (optional)
 
-The board only lets you watch. Run `/toon-crew:board`; it prints the port, usually 8811, so open `http://127.0.0.1:8811` ([guide](docs/crew-room.md)).
+A watch-only page for your crew. Run `/toon-crew:board` and open the address it prints, usually `http://127.0.0.1:8811`. [Guide](docs/crew-room.md).
 
 <p align="center"><img src="docs/images/board.gif" alt="The Crew Room board at night: each team in its own room, Doraemon walking to Kevin to give him work, Ninja Hattori handing his work to Doraemon, and the plan usage panel on the right. Demo data." width="820"><br><sub>The Crew Room: your crew at work (demo data)</sub></p>
 
@@ -114,8 +103,8 @@ The board only lets you watch. Run `/toon-crew:board`; it prints the port, usual
 | Command | What it does |
 |---|---|
 | `/toon-crew:board` | Starts, stops or checks the board: `start`, `stop`, `status` |
-| `/toon-crew:handbacks` | Shows the hand-back folder (`dir`) or lists newest summaries (`list`) |
-| `/toon-crew:project` | Turns board CI and deploy checks (`board`) or the lessons pass (`lessons`) `on` or `off`; both start off |
+| `/toon-crew:handbacks` | Prints where hand-backs are saved (`dir`) or lists the newest summaries (`list`) |
+| `/toon-crew:project` | Turns extras on or off: board CI and deploy checks (`board`), the lessons pass (`lessons`). Both start off. |
 | `/toon-crew:compact-setup` | Adds editable "Compact instructions" to your `CLAUDE.md`, after you approve |
 
 The crew runs the other skills; [Setup](docs/setup.md#other-skills) lists them.
@@ -125,21 +114,14 @@ The crew runs the other skills; [Setup](docs/setup.md#other-skills) lists them.
 <details>
 <summary>How much of my plan does it use?</summary>
 
-More than a plain chat: the manager runs on Opus, with 2-4 agents at once (6-8 on heavy jobs). On Pro or Max, the Plan usage panel shows your limits. [Cost in three lines](docs/how-it-works.md#5-cost-in-three-lines).
+The manager runs on Opus, with 2-4 agents at once (6-8 on heavy jobs). On Pro or Max, the board's Plan usage panel shows your limits. [Cost in three lines](docs/how-it-works.md#5-cost-in-three-lines).
 
 </details>
 
 <details>
 <summary>Is it safe to let it run?</summary>
 
-The guard asks before merges and pushes to `main`, and refuses force pushes and recursive deletes. It is a seatbelt, not a sandbox: it does not check commands you type. Keep Claude Code's sandbox on. [Guards](docs/guards.md).
-
-</details>
-
-<details>
-<summary>Do I have to use the manager everywhere?</summary>
-
-No. The manager is opt-in per project. Turn it on with `"agent": "toon-crew:doraemon"` in that project's `.claude/settings.json`, or with `claude --agent toon-crew:doraemon`; turn it off by removing the setting. The guard keeps working either way. [Steps](docs/setup.md#turn-the-manager-on-or-off).
+Safer, not safe. The guard is a seatbelt, not a sandbox: it does not check commands you type. Keep Claude Code's sandbox on. [What it asks and refuses](docs/guards.md).
 
 </details>
 
@@ -164,19 +146,12 @@ Update with `/plugin marketplace update crew`, then `/plugin update toon-crew@cr
 
 </details>
 
-<details>
-<summary>Where do hand-backs go?</summary>
-
-Into the plugin's data folder, one `full` and one `summaries` file per task. `/toon-crew:handbacks dir` prints the path. [Guards](docs/guards.md#hand-back-files).
-
-</details>
-
 ## Docs
 
 - [Setup](docs/setup.md): update, uninstall, troubleshooting
-- [How it works](docs/how-it-works.md): flow, roles, privacy
-- [Guards](docs/guards.md)
-- [The Crew Room](docs/crew-room.md)
+- [How it works](docs/how-it-works.md): flow, roles, cost, privacy
+- [Guards](docs/guards.md): what the guard asks and refuses
+- [The Crew Room](docs/crew-room.md): the live board
 - [Changelog](CHANGELOG.md)
 
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
