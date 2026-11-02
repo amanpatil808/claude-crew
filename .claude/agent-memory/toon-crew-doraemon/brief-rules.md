@@ -24,5 +24,7 @@ metadata:
 
 - The owner wants WORKING characters lively (bobbing, pacing, typing). Calm only done and idle desks, and never apply research advice that removes the board's life without showing it to the owner first. 0.3.8/0.3.9 removed working motion and the owner said "you fucked up the animations". [project] (seen 1)
 
+- Before writing a file I think is new (LICENSE, NOTICE, config), run `git ls-files <path>` and read what's there. On 2026-11-01 I overwrote a proprietary LICENSE that carried a character-rights note, without reading it. [crew] (seen 1)
+
 **Why:** each of these cost an extra round on 2026-10-27.
 **How to apply:** check all three while writing a brief.

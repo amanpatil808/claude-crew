@@ -1,6 +1,6 @@
 // The JSONL event log: one line per event, appended with a single write so concurrent hooks
 // (several subagents finishing at once) never interleave half-lines.
-import { existsSync, readFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { EVENTS_FILE, LOG_DIR } from "./paths.ts";
@@ -227,15 +227,242 @@ function isEvent(x: unknown): x is BoardEvent {
   return STRING_FIELDS.every((k) => typeof r[k] === "string") && OPTIONAL_STRING_FIELDS.every((k) => r[k] === undefined || typeof r[k] === "string");
 }
 
-// Skips a torn or hand-edited line instead of failing the whole page.
+// One log line, or null for a torn or hand-edited one.
+export function parseEvent(line: string): BoardEvent | null {
+  if (!line.trim()) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(line); } catch { return null; }   // a torn line
+  return isEvent(parsed) ? parsed : null;
+}
+
+// Skips a torn or hand-edited line instead of failing the whole page. In the board server (cacheLiveLog), the live
+// log comes from the incremental cache below; hooks and CLIs run once and read the file.
 export function readEvents(file = EVENTS_FILE): BoardEvent[] {
+  if (liveCached && file === EVENTS_FILE) return sharedEvents();
   if (!existsSync(file)) return [];
   const out: BoardEvent[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    let parsed: unknown;
-    try { parsed = JSON.parse(line); } catch { continue; }   // a torn line
-    if (isEvent(parsed)) out.push(parsed);
+    const e = parseEvent(line);
+    if (e) out.push(e);
   }
   return out;
+}
+
+// Exactly [pos, pos + len), or less when the file is shorter.
+function readAt(fd: number, pos: number, len: number): Buffer {
+  const buf = Buffer.alloc(len);
+  let got = 0;
+  while (got < len) {
+    const n = readSync(fd, buf, got, len - got, pos + got);
+    if (n <= 0) break;
+    got += n;
+  }
+  return got === len ? buf : buf.subarray(0, got);
+}
+function writeAll(fd: number, buf: Buffer): void {
+  for (let done = 0; done < buf.length;) done += writeSync(fd, buf, done, buf.length - done);
+}
+
+// ---- The board server's reader: parsed events kept in memory, only appended bytes read ----
+// A new inode (compaction renamed a new file in), a shorter file, or changed bytes just before the old end (the file
+// was rewritten in place) mean one full re-read. Bytes after the last newline wait for the rest of their line.
+export interface EventCache { read(): BoardEvent[]; readonly stats: { full: number; bytes: number } }
+const EDGE_BYTES = 64;
+export function eventCache(file = EVENTS_FILE): EventCache {
+  let ino = -1, dev = -1, offset = 0, edge = Buffer.alloc(0), rest = Buffer.alloc(0), events: BoardEvent[] = [];
+  const stats = { full: 0, bytes: 0 };
+  const reset = () => { ino = -1; dev = -1; offset = 0; edge = Buffer.alloc(0); rest = Buffer.alloc(0); events = []; };
+  const read = (): BoardEvent[] => {
+    let fd: number;
+    try { fd = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK); } catch { reset(); return []; }
+    try {
+      const st = fstatSync(fd);
+      if (!st.isFile()) { reset(); return []; }
+      const same = st.ino === ino && st.dev === dev && st.size >= offset && readAt(fd, offset - edge.length, edge.length).equals(edge);
+      if (!same) { reset(); ino = st.ino; dev = st.dev; stats.full++; }
+      if (st.size > offset) {
+        const chunk = readAt(fd, offset, st.size - offset);
+        stats.bytes += chunk.length;
+        offset += chunk.length;
+        const data = rest.length ? Buffer.concat([rest, chunk]) : chunk, nl = data.lastIndexOf(10);
+        edge = Buffer.from(data.subarray(Math.max(0, data.length - EDGE_BYTES)));
+        if (nl >= 0) for (const line of data.toString("utf8", 0, nl).split("\n")) { const e = parseEvent(line); if (e) events.push(e); }
+        rest = Buffer.from(data.subarray(nl + 1));
+      }
+    } finally { closeSync(fd); }
+    return events.slice();   // a copy: no caller can change the cache
+  };
+  return { read, stats };
+}
+// One cache per process for EVENTS_FILE: the server's /api/state and its pollers share it.
+let shared: EventCache | undefined, liveCached = false;
+export const sharedEvents = (): BoardEvent[] => (shared ??= eventCache()).read();
+export function cacheLiveLog(on = true): void { liveCached = on; }
+
+// ---- Compaction: the board server runs it at start, then daily ----
+// Usage events are cumulative per transcript and about 90% of the bytes, so only the newest per reader key is kept
+// (plus the capped reads before it that it is folded with). Other events are kept for KEEP_EVENT_DAYS, turn ends
+// and manager heartbeats for a day. A task still queued or active keeps its own task events whatever their age.
+export const KEEP_EVENT_DAYS = 30;
+const DAY_MS = 86_400_000;
+const BEAT_KINDS: ReadonlySet<string> = new Set(["turn-end", "main-busy"]);
+const TASK_KINDS: ReadonlySet<string> = new Set(["task-start", "task-done", "task-drop"]);
+const LOCK_STALE_MS = 10 * 60_000;
+const CHUNK = 1 << 20;
+
+// The key cost.ts and plan.ts group usage by; null for a usage event neither counts.
+export function usageKey(e: Pick<BoardEvent, "sid" | "scope" | "agentId">): string | null {
+  const agent = e.scope === "agent" && e.agentId ? e.agentId : e.scope === "main" ? "main" : null;
+  return agent === null ? null : `${e.sid ?? ""}\0${agent}`;
+}
+
+export interface CompactPlan { keep: boolean[]; fill: Map<number, string> }   // fill: line -> agentType to add
+
+// Pure: one entry per complete line (null for a line no reader keeps). `openTasks` holds task ids ("t-...").
+export function planCompaction(events: readonly (BoardEvent | null)[], now: number, openTasks: ReadonlySet<string> = new Set()): CompactPlan {
+  const keep = events.map(() => false), fill = new Map<number, string>();
+  const cutoff = now - KEEP_EVENT_DAYS * DAY_MS, beatCutoff = now - DAY_MS;
+  const usage = new Map<string, { ms: number; i: number; partial: boolean }[]>(), types = new Map<string, string>();
+  events.forEach((e, i) => {
+    if (!e) return;
+    if (e.agentId && e.agentType && e.agentType !== "agent") types.set(e.agentId, e.agentType);
+    const ms = Date.parse(e.ts);
+    if (!Number.isFinite(ms)) return;
+    if (e.kind === "usage") {
+      const key = usageKey(e);
+      if (key === null) return;
+      if (ms > now) { keep[i] = true; return; }   // readers skip it until then; it may be the newest later
+      const list = usage.get(key) ?? [];
+      list.push({ ms, i, partial: e.partial === true });
+      usage.set(key, list);
+      return;
+    }
+    if (BEAT_KINDS.has(e.kind)) { keep[i] = ms >= beatCutoff; return; }
+    // tasks.ts taskIdOf: a queued task's id is its event id with "t" for "e".
+    const task = e.kind === "task-queue" ? `t${e.id.slice(1)}` : TASK_KINDS.has(e.kind) ? e.taskId : undefined;
+    keep[i] = ms >= cutoff || (!!task && openTasks.has(task));
+  });
+  for (const list of usage.values()) {
+    list.sort((a, b) => a.ms - b.ms);   // stable, like the readers: equal times keep log order
+    // A capped (partial) read is folded with the one before it, back to the last full read: keep that whole run.
+    let k = list.length - 1;
+    while (k > 0 && list[k].partial) k--;
+    for (let j = k; j < list.length; j++) keep[list[j].i] = true;
+  }
+  // The start that named a kept usage event's agent may go: the event carries the type itself (cost by role).
+  events.forEach((e, i) => {
+    if (!keep[i] || !e || e.kind !== "usage" || !e.agentId || (e.agentType && e.agentType !== "agent")) return;
+    const t = agentTypeOf(types.get(e.agentId));
+    if (t) fill.set(i, t);
+  });
+  return { keep, fill };
+}
+
+// A usage event without its rows: all the plan needs, so a big log is not held in memory twice.
+const slim = (e: BoardEvent | null): BoardEvent | null => (e && e.kind === "usage"
+  ? { id: e.id, ts: e.ts, kind: e.kind, text: "", sid: e.sid, scope: e.scope, agentId: e.agentId, agentType: e.agentType, partial: e.partial }
+  : e);
+
+// Tasks the compacted log must still know: queued, active, or finished inside the kept window.
+async function openTaskIds(events: BoardEvent[], now: number): Promise<Set<string>> {
+  const { deriveTasks } = await import("./tasks.ts");   // loaded here only: hooks import this file on every call
+  const t = deriveTasks(events, undefined, now), cutoff = now - KEEP_EVENT_DAYS * DAY_MS;
+  return new Set([...t.queued, ...t.active, ...t.done.filter((x) => Date.parse(x.doneAt ?? "") >= cutoff)].map((x) => x.id));
+}
+
+function takeLock(lock: string, now: number): boolean {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { writeFileSync(lock, String(now), { flag: "wx", mode: 0o600 }); return true; } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") return false;
+      try { if (now - lstatSync(lock).mtimeMs < LOCK_STALE_MS) return false; unlinkSync(lock); } catch { return false; }
+    }
+  }
+  return false;
+}
+
+export interface CompactResult { before: number; after: number; dropped: number }
+
+// Rewrites the log through a temp file and a rename. Hooks keep appending meanwhile: whatever they added after the
+// read (and a line cut off at its end) is copied over right before the rename. A line written between that last
+// copy and the rename (microseconds) is lost. null: another compaction holds the lock, or there is no plain file.
+export async function compactEventLog(file = EVENTS_FILE, now = Date.now()): Promise<CompactResult | null> {
+  const lock = `${file}.lock`;
+  if (!takeLock(lock, now)) return null;
+  let fd: number | null = null;
+  const tmp = `${file}.compact.tmp`;
+  try {
+    try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); } catch { return null; }
+    const src = fd, st = fstatSync(src);
+    if (!st.isFile()) return null;
+    const spans: [number, number][] = [], events: (BoardEvent | null)[] = [];
+    let end = 0;   // just after the last newline read
+    for (let pos = 0, rest = Buffer.alloc(0); pos < st.size;) {
+      const chunk = readAt(src, pos, Math.min(CHUNK, st.size - pos));
+      if (!chunk.length) break;
+      const data = rest.length ? Buffer.concat([rest, chunk]) : chunk, base = pos - rest.length;
+      pos += chunk.length;
+      let from = 0;
+      for (let nl = data.indexOf(10); nl >= 0; from = nl + 1, nl = data.indexOf(10, from)) {
+        spans.push([base + from, nl - from]);
+        events.push(slim(parseEvent(data.toString("utf8", from, nl))));
+      }
+      end = base + from;
+      rest = Buffer.from(data.subarray(from));
+    }
+    const plan = planCompaction(events, now, await openTaskIds(events.filter((e): e is BoardEvent => !!e), now));
+    const dropped = plan.keep.filter((k) => !k).length;
+    if (!dropped) return { before: st.size, after: st.size, dropped: 0 };
+    rmSync(tmp, { force: true });
+    // O_EXCL: never a file or link someone else put there; 0600 like every board file.
+    const out = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
+    let after = 0, copied = end;
+    try {
+      let parts: Buffer[] = [], size = 0;
+      const flush = () => { if (size) { writeAll(out, Buffer.concat(parts)); after += size; parts = []; size = 0; } };
+      plan.keep.forEach((k, i) => {
+        if (!k) return;
+        let line = readAt(src, spans[i][0], spans[i][1] + 1);   // with its newline
+        const t = plan.fill.get(i);
+        if (t) line = Buffer.from(JSON.stringify({ ...JSON.parse(line.toString("utf8")), agentType: t }) + "\n");
+        parts.push(line);
+        size += line.length;
+        if (size >= CHUNK) flush();
+      });
+      flush();
+      // Until the file stops growing: hooks append whole lines with one write each.
+      for (let size = fstatSync(src).size; size > copied; size = fstatSync(src).size) {
+        const b = readAt(src, copied, size - copied);
+        if (!b.length) break;
+        writeAll(out, b);
+        copied += b.length;
+        after += b.length;
+      }
+    } finally { closeSync(out); }
+    renameSync(tmp, file);
+    return { before: st.size, after, dropped };
+  } finally {
+    if (fd !== null) closeSync(fd);
+    rmSync(tmp, { force: true });
+    rmSync(lock, { force: true });
+  }
+}
+
+// Once now, then every `every` ms (a day by default); the timer does not keep the process alive. Fixed log lines.
+export function startCompaction(opts: { file?: string; every?: number; now?: () => number; log?: (line: string) => void } = {}): () => void {
+  const file = opts.file ?? EVENTS_FILE, now = opts.now ?? Date.now, log = opts.log ?? ((l: string) => console.log(l));
+  let busy = false;
+  const pass = () => {
+    if (busy) return;
+    busy = true;
+    let at: number;
+    try { at = now(); } catch { busy = false; log("crew board: event log compaction failed; it will try again tomorrow"); return; }
+    compactEventLog(file, at)
+      .then((r) => { if (r?.dropped) log(`crew board: compacted the event log (${r.dropped} old lines removed)`); },
+        () => log("crew board: event log compaction failed; it will try again tomorrow"))
+      .finally(() => { busy = false; });
+  };
+  pass();
+  const timer = setInterval(pass, opts.every ?? DAY_MS);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }

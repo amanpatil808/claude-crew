@@ -2,6 +2,20 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 1.0.0 - 2 Nov 2026
+
+First public release. Everything below is new since 0.3.14.
+
+### Changed
+
+- Doraemon is opt-in per project: the plugin no longer makes him the main agent of every session. Turn him on with `"agent": "toon-crew:doraemon"` in the project's `.claude/settings.json` or `claude --agent toon-crew:doraemon` ([setup](docs/setup.md#turn-the-manager-on-or-off)). The guard and the crew agents work in every project with the plugin on.
+- README redesign: hero, flow picture, features grid, FAQ.
+- Crew prompts stop re-reading context and keep test output to counts.
+- Builder worktrees are removed after the commit.
+- Guard: a wildcard in a shell write target (`d?ta/`, `cach?/`) can no longer reach protected files; too many matches fails closed. A hand-back can only be written into the session's own project, and its text gets the secret scan.
+- Redaction also covers `-p<password>`, `-u user:pass`, api-key headers, 4-4-4 ID numbers, `npm_`, `pypi-` and `hf_` tokens, and hex values after key, token or secret labels.
+- Board: the event log is compacted on start and daily, and the server reads only new lines (a 51.5 MB log: 671 ms to 14 ms per refresh). GitHub and ssh checks run only while a page is open, and the board stops itself after 2 hours with no viewer. Old hand-back files are pruned daily even if the board never runs. The page can't be framed by other sites.
+
 ## 0.3.14 - 1 Nov 2026
 
 ### Added

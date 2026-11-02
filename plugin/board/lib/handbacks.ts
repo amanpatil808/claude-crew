@@ -2,7 +2,7 @@
 // <data>/projects/<key>/handbacks/(full|summaries)/<agent id>/<name>.md. The guard decides who may write there;
 // this module finds the folder, lists summaries for the manager, and deletes files older than 60 days.
 // Nothing here follows a symlink: the folder is written by agents, so a link could point anywhere.
-import { chmodSync, closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, rmdirSync, unlinkSync, type Dirent, type Stats } from "node:fs";
+import { chmodSync, closeSync, constants, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, rmdirSync, unlinkSync, writeSync, type Dirent, type Stats } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { projectKey, type Project } from "./projects.ts";
 
@@ -137,6 +137,25 @@ export function sweep(dir: string, cutoff: number, out: PruneResult, depth = 0):
     try { unlinkSync(p); out.files++; } catch { kept++; }
   }
   return kept === 0;
+}
+
+// The SessionStart hook's daily prune, so files go even when the board never runs. The stamp (in the data folder)
+// holds the last run's time; it is written first, so sessions starting together do not all sweep. It is read and
+// written through one O_NOFOLLOW open: a link there is never followed, and there is no prune then.
+// null: not due, no data folder, or no usable stamp.
+export const PRUNE_STAMP = "handbacks-pruned.txt";
+export function pruneIfDue(dataDir: string, nowMs: number, every = DAY_MS): PruneResult | null {
+  const dir = resolve(dataDir);
+  let fd: number;
+  try { fd = openSync(join(dir, PRUNE_STAMP), constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600); } catch { return null; }
+  try {
+    if (!fstatSync(fd).isFile()) return null;
+    const buf = Buffer.alloc(32), n = readSync(fd, buf, 0, buf.length, 0), last = Number(buf.toString("utf8", 0, n).trim());
+    if (n > 0 && Number.isFinite(last) && last <= nowMs && nowMs - last < every) return null;
+    ftruncateSync(fd, 0);
+    writeSync(fd, String(nowMs), 0);
+  } catch { return null; } finally { closeSync(fd); }
+  return pruneHandbacks(dir, nowMs);
 }
 
 // Once now, then every `every` ms (a day by default). The timer does not keep the process alive.

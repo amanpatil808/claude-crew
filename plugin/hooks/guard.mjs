@@ -9,6 +9,7 @@
 // For roles that have Bash, the Claude Code sandbox is the real boundary: a script written to temp and then
 // run (bash /tmp/w.sh) does what it likes, and no text check can see inside it.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -85,7 +86,7 @@ const CRED_TEXT = /\.config\/gh(?![\w.-])|\bgh\/hosts\.ya?ml\b|\.git-credentials
 const ask = (reason) => ({ ask: reason });
 
 // ---------- shell tokenizer ----------
-// Returns { commands: [{words, redirects, depth}], nested: string[], heredocs: string[] }.
+// Returns { commands: [{words, redirects, depth}], nested: string[], heredocs: string[], groups: string[] }.
 // Quotes are removed; separators split commands; ( ) change depth; $(...) and `...` bodies go to `nested`;
 // ${IFS}, $'..' and {a,b} are expanded the way a shell would; here-doc / here-string bodies are returned
 // separately; redirect targets are collected per command.
@@ -106,23 +107,35 @@ function braceExpand(w, budget = { n: 64 }) {
   return out;
 }
 
+// The shell writes \x and octal escapes as raw bytes, so $'\xc5\xbf' is the UTF-8 long s that APFS folds to "s".
+// Collect bytes, then decode the whole word as UTF-8; fold() then sees the real letter.
+const ANSI_ESC = /\\(x[0-9a-fA-F]{1,2}|[0-7]{1,3}|u[0-9a-fA-F]{1,4}|U[0-9a-fA-F]{1,8}|c[\s\S]|[\s\S])?|[^\\]+/g;
 function ansiC(body) {
-  return body.replace(/\\(x[0-9a-fA-F]{1,2}|[0-7]{1,3}|u[0-9a-fA-F]{1,4}|.)/g, (_, e) => {
-    if (e[0] === 'x') return String.fromCharCode(parseInt(e.slice(1), 16));
-    if (e[0] === 'u') return String.fromCharCode(parseInt(e.slice(1), 16));
-    if (/^[0-7]+$/.test(e)) return String.fromCharCode(parseInt(e, 8));
-    return { n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', e: '\x1b', f: '\f', v: '\v' }[e] ?? e;
-  });
+  const bytes = [];
+  const text = (s) => { for (const b of Buffer.from(s, 'utf8')) bytes.push(b); };
+  for (const [m, e] of body.matchAll(ANSI_ESC)) {
+    if (e === undefined) text(m);
+    else if (e[0] === 'x') bytes.push(parseInt(e.slice(1), 16));
+    else if (/^[0-7]+$/.test(e)) bytes.push(parseInt(e, 8) & 0xff);
+    else if ((e[0] === 'u' || e[0] === 'U') && e.length > 1) {
+      const cp = parseInt(e.slice(1), 16);
+      text(cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff) ? String.fromCodePoint(cp) : '�');
+    } else if (e[0] === 'c' && e.length === 2) bytes.push(e.charCodeAt(1) & 0x1f);
+    else text({ n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', e: '\x1b', E: '\x1b', f: '\f', v: '\v' }[e] ?? e);
+  }
+  return Buffer.from(bytes).toString('utf8');
 }
 
 export function tokenize(src) {
-  const commands = []; const nested = []; const heredocs = [];
+  const commands = []; const nested = []; const heredocs = []; const groups = [];
   let words = []; let redirects = []; let cur = ''; let inWord = false; let depth = 0;
   let nextIs = null; // 'redirect' | 'herestring' | 'heredoc'
+  let group = 0; // open pattern groups in the current word: zsh (a|b) and *(D), extglob @(x)
   const pendingHeredocs = [];
   const endWord = () => {
+    group = 0;
     if (!inWord) return;
-    if (nextIs === 'redirect') redirects.push(cur);
+    if (nextIs === 'redirect') redirects.push(cur); // braces left here are pattern syntax (EXOTIC) to the checks
     else if (nextIs === 'herestring') heredocs.push(cur);
     else if (nextIs === 'heredoc') pendingHeredocs.push(cur);
     else words.push(...braceExpand(cur));
@@ -199,6 +212,15 @@ export function tokenize(src) {
       }
       continue;
     }
+    // A ( glued to a word, or after a command's first word or a redirect, is pattern syntax (zsh *(D) or (a|b),
+    // extglob @(x)): it stays in the word, so the write-target checks see it. Its body goes to `groups`, which the
+    // guard also checks as commands, in case it is a subshell after all. name() stays a function definition, a=( an array.
+    if (c === '(' && src[i + 1] !== ')' && (inWord ? !/^[A-Za-z_]\w*(\[[^\]]*\])?\+?=$/.test(cur)
+      : nextIs === 'redirect' || (words.length > 0 && !words.every((w) => LEADING_KEYWORDS.has(w) || w === 'time')))) {
+      groups.push(grab(i + 1, '(', ')').body);
+      cur += c; inWord = true; group++; i++; continue;
+    }
+    if (group > 0 && (c === '|' || c === ')')) { cur += c; if (c === ')') group--; i++; continue; }
     if (c === '(') { endCmd(); depth++; i++; continue; }
     if (c === ')') { endCmd(); depth = Math.max(0, depth - 1); i++; continue; }
     if (c === ';' || c === '&' || c === '|') { endCmd(); i++; continue; }
@@ -206,7 +228,7 @@ export function tokenize(src) {
     cur += c; inWord = true; i++;
   }
   endCmd();
-  return { commands, nested, heredocs };
+  return { commands, nested, heredocs, groups };
 }
 
 // ---------- path helpers ----------
@@ -221,6 +243,13 @@ const real = (p) => {
   }
 };
 const within = (child, root) => child !== root && child.startsWith(root.endsWith(path.sep) ? root : root + path.sep);
+// APFS matches names with full Unicode case folding and ignores NFC/NFD: U+017F (long s) is "s", U+212A (Kelvin) "k",
+// U+00DF "ss", ligatures their letters. toLowerCase does none of that, so every protected-path rule compares this form.
+// NFKC first (NFD -> composed, ligatures), then lower -> upper -> lower, which also takes U+1E9E to "ss". A probe of
+// every BMP letter on APFS found no fold this misses; it folds more than the disk does (dotless i -> i), which can
+// only refuse more.
+const isAscii = (s) => { for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) > 127) return false; return true; };
+const fold = (s) => (isAscii(s) ? s.toLowerCase() : s.normalize('NFKC').toLowerCase().toUpperCase().toLowerCase());
 const isShortCluster = (w) => /^-[A-Za-z]+$/.test(w);
 const clusterHas = (w, ch) => isShortCluster(w) && w.slice(1).includes(ch);
 const isSymlink = (p) => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
@@ -242,16 +271,17 @@ const resolveIn = (ctx, p) => {
   if (path.isAbsolute(x)) return path.normalize(x);
   return ctx.cwd ? path.resolve(ctx.cwd, x) : null;
 };
-const globRe = (g) => new RegExp(`^${g.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*\*?/g, '.*').replace(/\?/g, '.').replace(/\[[^\]]*\]/g, '.')}$`, 'i');
 
 // ---------- protected files ----------
 function protectedPathReason(abs, ctx) {
-  const lower = abs.toLowerCase();
-  const home = os.homedir().toLowerCase();
+  const lower = fold(abs);
+  const home = fold(os.homedir());
   if (/\/\.claude\/settings(\.[^/]*)?\.json$/.test(lower)) return 'Settings files (.claude/settings*.json)';
-  if (ctx.pluginRoot && ctx.pluginRoot.includes('/.claude/plugins/') && (lower === ctx.pluginRoot.toLowerCase() || lower.startsWith(`${ctx.pluginRoot.toLowerCase()}/`))) return 'The toon-crew plugin files';
+  if (ctx.pluginRoot && fold(ctx.pluginRoot).includes('/.claude/plugins/') && (lower === fold(ctx.pluginRoot) || lower.startsWith(`${fold(ctx.pluginRoot)}/`))) return 'The toon-crew plugin files';
   if (/\/\.claude\/plugins(\/|$)/.test(lower)) return 'Installed plugin files (~/.claude/plugins)';
   if (/\/\.git\/(config$|hooks(\/|$))/.test(lower)) return '.git/config and .git/hooks';
+  // A .git itself: a gitfile written there (gitdir: /tmp/x) or a folder moved there brings its own hooks.
+  if (/\/\.git\/?$/.test(lower)) return 'A .git folder or file';
   if (looksLikeGitDirFile(abs)) return 'Git directory config and hooks (any copy of a .git dir)';
   if (lower === `${home}/.claude.json` || /\/\.claude\.json$/.test(lower)) return '~/.claude.json';
   if (path.basename(lower) === '.mcp.json') return '.mcp.json';
@@ -261,7 +291,7 @@ function protectedPathReason(abs, ctx) {
 // A subagent that rewrites it switches the guard off for everyone: subagents are refused, the main thread is asked.
 function livePluginRule(abs, ctx) {
   if (!ctx.pluginRoot) return null;
-  const a = abs.toLowerCase().replace(/\/+$/, ''); const root = ctx.pluginRoot.toLowerCase();
+  const a = fold(abs).replace(/\/+$/, ''); const root = fold(ctx.pluginRoot);
   if (a !== root && !a.startsWith(root.endsWith('/') ? root : `${root}/`)) {
     // A folder that holds the plugin: moving or replacing it (mv repo, ln -sfn over it) swaps the plugin out.
     return ctx.subagent && root.startsWith(`${a}/`) ? 'Moving or replacing a folder that holds the live toon-crew plugin is blocked for subagents.' : null;
@@ -272,8 +302,8 @@ function livePluginRule(abs, ctx) {
 // A file with other hard links: writing it changes the other names too (a temp-dir link to a project file).
 const hardLinked = (p) => { try { const st = fs.lstatSync(p); return st.isFile() && st.nlink > 1; } catch { return false; } };
 // Project hook/agent/skill/command definitions: normal project work, so the owner is asked rather than blocked.
-const crewConfigAsk = (abs) => (/\/\.claude\/(hooks|agents|skills|commands)(\/|$)/.test(abs.toLowerCase()) ? ask('Editing .claude hooks, agents, skills or commands changes how Claude behaves: confirm.') : null);
-const isMemoryPath = (abs) => /\/agent-memory[^/]*\//i.test(abs);
+const crewConfigAsk = (abs) => (/\/\.claude\/(hooks|agents|skills|commands)(\/|$)/.test(fold(abs)) ? ask('Editing .claude hooks, agents, skills or commands changes how Claude behaves: confirm.') : null);
+const isMemoryPath = (abs) => /\/agent-memory[^/]*\//.test(fold(abs));
 // Text fallback for paths that still hold a variable.
 const PROTECTED_TEXT = /\.claude\/(settings|hooks|agents|skills|commands|plugins)|\.claude\.json|\.mcp\.json|\.git\/(config|hooks)|toon-crew\/|agent-memory/i;
 
@@ -286,7 +316,7 @@ function looksLikeGitDirFile(abs) {
   } catch { return false; }
 }
 // A write target (or a deleted / linked file): returns a deny reason or null.
-function writeTargetReason(raw, ctx, { memory = true } = {}) {
+function writeTargetReason(raw, ctx, { memory = true, literal = false } = {}) {
   if (typeof raw !== 'string' || !raw) return null;
   if (ctx.crew !== null && ctx.dataDirs) { // hand-backs go through Write/Edit only; the rest of the data folder is hook-only
     const abs = resolveIn(ctx, raw);
@@ -297,24 +327,10 @@ function writeTargetReason(raw, ctx, { memory = true } = {}) {
     if (!abs || !ctx.writeRoots.some((r) => within(real(abs), r)) || hardLinked(abs)) return `${ctx.role} is a read-only role: shell writes are allowed only under the system temp dir or the session scratchpad.`;
   }
   const x = expandVars(raw, ctx);
-  if (/[*?[]/.test(x)) {
-    const base = resolveIn(ctx, x.replace(/[*?[][^/]*$/, ''));
-    const probe = [];
-    const proj = ctx.project; const home = os.homedir();
-    for (const d of [proj, home, ctx.cwd].filter(Boolean)) {
-      probe.push(path.join(d, '.claude/settings.json'), path.join(d, '.claude/settings.local.json'), path.join(d, '.mcp.json'), path.join(d, '.claude.json'),
-        path.join(d, '.git/config'), path.join(d, '.git/hooks/x'));
-    }
-    if (ctx.pluginRoot && (ctx.subagent || ctx.pluginRoot.includes('/.claude/plugins/'))) probe.push(path.join(ctx.pluginRoot, 'hooks/guard.mjs'), path.join(ctx.pluginRoot, 'hooks/hooks.json'));
-    probe.push(path.join(home, '.claude/plugins/x'));
-    const abs = path.isAbsolute(x) ? x : (ctx.cwd ? path.join(ctx.cwd, x) : null);
-    const re = abs ? globRe(abs) : null;
-    if (re && probe.some((p) => re.test(p))) return 'Writing to protected files (glob matches settings, hooks, plugin files or git config)';
-    void base;
-    return null;
-  }
+  if (!literal && EXOTIC.test(x)) return exoticTargetReason(raw, x, ctx, { memory });
+  if (!literal && GLOB_CHAR.test(x)) return globTargetReason(raw, x, ctx, { memory });
   const abs = resolveIn(ctx, raw);
-  if (!abs) return PROTECTED_TEXT.test(x) && !/^\$/.test(x) ? `Writing to "${raw}" is blocked: the path uses a variable I cannot verify.` : null;
+  if (!abs) return PROTECTED_TEXT.test(fold(x)) && !/^\$/.test(x) ? `Writing to "${raw}" is blocked: the path uses a variable I cannot verify.` : null;
   const r = real(abs);
   const why = protectedPathReason(r, ctx) ?? protectedPathReason(abs, ctx);
   if (why) return `${why} cannot be changed from here: the owner edits them by hand.`;
@@ -325,6 +341,319 @@ function writeTargetReason(raw, ctx, { memory = true } = {}) {
   if (memory && (isMemoryPath(r) || isMemoryPath(abs))) return 'Shell writes into agent-memory are blocked: use the Edit/Write tools so the secret scan runs.';
   ctx.written.add(r);
   return null;
+}
+
+// ---------- wildcard write targets ----------
+// A shell expands a wildcard in a redirect target or a cp/tee/mv destination whenever it matches existing paths,
+// so `d?ta/events.jsonl` writes the data folder. Three checks, each with its own test: (1) the pattern can reach a
+// protected root (every part matches the root's path at that level, or the pattern stops at a folder above it);
+// (2) the plain-path rules on the text, each wildcard part made a harmless name; (3) the pattern expanded the way
+// the shell does it, following links (fs.globSync does not), with every match through the plain-path rules.
+const GLOB_CHAR = /[*?[]/;
+// A leading wildcard matches dot names too. Dot-name matching can be switched on in ways no text check sees (a
+// GLOBIGNORE name built at run time, zsh options[], a setopt in ~/.zshrc), so the guard always assumes it is on.
+const GLOB_CAP = 1000;
+const GLOB_DIR_CAP = 20_000;
+const segReCache = new Map();
+// One path part as a regex. Case-insensitive (a superset on a case-sensitive disk); an odd bracket matches any character.
+function segRe(seg) {
+  if (segReCache.has(seg)) return segReCache.get(seg);
+  let out = '';
+  for (let i = 0; i < seg.length; i++) {
+    const c = seg[i];
+    if (c === '*') out += '.*';
+    else if (c === '?') out += '.';
+    else if (c === '[') {
+      const end = seg.indexOf(']', i + 2);
+      if (end === -1) { out += '\\['; continue; }
+      const body = seg.slice(i + 1, end);
+      out += /^[!^]?[\w. -]+$/.test(body) ? `[${body.replace(/^!/, '^')}]` : '.';
+      i = end;
+    } else out += c.replace(/[.+^${}()|\\\]]/g, '\\$&');
+  }
+  let re; try { re = new RegExp(`^${out}$`, 'is'); } catch { re = /^/; }
+  segReCache.set(seg, re);
+  return re;
+}
+const nameMatches = (seg, name) => segRe(fold(seg)).test(fold(name));
+// The pattern as absolute parts. `..` before the first wildcard is applied as path.resolve does; after one, where it
+// lands depends on which links match, so the caller refuses (null).
+function globParts(abs) {
+  const out = []; let wild = false;
+  for (const p of abs.split('/')) {
+    if (!p || p === '.') continue;
+    if (p === '..') { if (wild) return null; out.pop(); continue; }
+    if (GLOB_CHAR.test(p)) wild = true;
+    out.push(p);
+  }
+  return out;
+}
+const splitAbs = (p) => p.split('/').filter(Boolean);
+// Also with the literal prefix as its real path: /tmp/link/d?ta is checked as <link target>/d?ta too.
+function globVariants(parts) {
+  const first = parts.findIndex((p) => GLOB_CHAR.test(p));
+  const prefix = `/${parts.slice(0, first).join('/')}`;
+  return [parts, [...splitAbs(real(prefix)), ...parts.slice(first)]];
+}
+function globReaches(parts, root, ctx) {
+  for (let i = 0; i < root.length; i++) {
+    const g = parts[i];
+    if (g === undefined) return true; // the pattern names a folder above the root
+    // zsh `**/` spans zero or more folders.
+    if (/^\*\*+$/.test(g)) return nameMatches('*', root[i]) || globReaches([...parts.slice(0, i), ...parts.slice(i + 1)], root, ctx);
+    if (GLOB_CHAR.test(g) ? !nameMatches(g, root[i]) : fold(g) !== fold(root[i])) return false;
+  }
+  return true; // the root itself or something below it
+}
+// [parts, reason]: a string refuses, an object asks (as the plain-path rule does for the same folder).
+function protectedRoots(ctx, memory) {
+  const roots = [];
+  const add = (p, why) => { for (const v of new Set([path.resolve(p), real(p)])) roots.push([splitAbs(v), why]); };
+  const bases = new Set([os.homedir(), ctx.project, roleRoot(ctx), ctx.cwd, ctx.startCwd].filter(Boolean));
+  for (const b of bases) {
+    add(path.join(b, '.git'), '.git (config and hooks)');
+    add(path.join(b, '.mcp.json'), '.mcp.json');
+    add(path.join(b, '.claude.json'), '~/.claude.json');
+    add(path.join(b, '.claude/plugins'), 'Installed plugin files (~/.claude/plugins)');
+    for (const f of ['settings.json', 'settings.local.json']) add(path.join(b, '.claude', f), 'Settings files (.claude/settings*.json)');
+    if (memory) for (const d of ['agent-memory', 'agent-memory-local']) add(path.join(b, '.claude', d), 'agent-memory (memory files take Edit/Write, where the secret scan runs)');
+    for (const d of ['hooks', 'agents', 'skills', 'commands']) add(path.join(b, '.claude', d), crewConfigAsk(path.join(b, '.claude', d)));
+  }
+  // The data folder is not listed: for crew roles dataShellRule refuses any non-read command whose wildcard reaches it.
+  if (ctx.pluginRoot) add(ctx.pluginRoot, livePluginRule(ctx.pluginRoot, ctx) ?? 'The toon-crew plugin files');
+  return roots;
+}
+// Every path the pattern can name now, links followed. null: too many to check (or out of time).
+// A `**` part is expanded as one level, links followed: bash 3.2 (no globstar) reads it as *, so lnk/**/config
+// writes through lnk/l. zsh's deeper **/ follows no links, and checks (1) and (2) cover its real folders.
+function expandGlob(parts, ctx) {
+  let paths = ['/'];
+  for (const seg of parts) {
+    if (!GLOB_CHAR.test(seg)) { paths = paths.map((p) => path.join(p, seg)); continue; }
+    const next = [];
+    for (const dir of paths) {
+      if (Date.now() > ctx.deadline) return null;
+      let names; try { names = fs.readdirSync(dir); } catch { continue; }
+      if (names.length > GLOB_DIR_CAP) return null;
+      for (const n of names) if (nameMatches(seg, n)) next.push(path.join(dir, n));
+      if (next.length > GLOB_CAP) return null;
+    }
+    paths = next;
+  }
+  return paths;
+}
+const globDeny = (why) => `${why} cannot be written through a wildcard that can reach it: name the file without wildcards.`;
+// Names a wildcard part may stand for when the rest of the path is a variable the guard cannot resolve.
+const PROTECTED_NAMES = ['.git', '.claude', '.claude.json', '.mcp.json', 'plugins', 'hooks', 'agents', 'skills', 'commands', 'config', 'settings.json', 'settings.local.json', 'agent-memory', 'agent-memory-local'];
+function globTargetReason(raw, x, ctx, { memory }) {
+  const abs = path.isAbsolute(x) ? x : ctx.cwd ? `${ctx.cwd}/${x}` : null;
+  if (!abs || unresolved(x)) {
+    const parts = x.split('/');
+    const names = [...PROTECTED_NAMES, ...(ctx.dataDirs ?? []).map((d) => path.basename(d))];
+    const plain = parts.map((p) => (GLOB_CHAR.test(p) ? 'x' : p)).join('/');
+    return PROTECTED_TEXT.test(fold(plain)) || parts.some((p) => GLOB_CHAR.test(p) && names.some((n) => nameMatches(p, n)))
+      ? `Writing to "${raw}" is blocked: a wildcard in a path with a variable I cannot verify may name a protected file.` : null;
+  }
+  const parts = globParts(abs);
+  if (!parts) return `Writing to "${raw}" is blocked: a wildcard followed by .. lands wherever its matches' links lead.`;
+  let asked = null;
+  const variants = globVariants(parts);
+  for (const [root, why] of protectedRoots(ctx, memory)) {
+    if (!variants.some((v) => globReaches(v, root, ctx))) continue;
+    if (typeof why === 'string') return globDeny(why);
+    asked ??= why;
+  }
+  const plain = `/${parts.map((p) => (GLOB_CHAR.test(p) ? 'x' : p)).join('/')}`;
+  const why = protectedPathReason(plain, ctx);
+  if (why) return globDeny(why);
+  if (memory && isMemoryPath(plain)) return globDeny('agent-memory (memory files take Edit/Write, where the secret scan runs)');
+  asked ??= crewConfigAsk(plain);
+  const matches = expandGlob(parts, ctx);
+  if (!matches) return `Writing to "${raw}" is blocked: the wildcard matches too many paths to check.`;
+  for (const m of matches) {
+    const r = writeTargetReason(m, ctx, { memory, literal: true });
+    if (typeof r === 'string') return r;
+    asked ??= r;
+  }
+  return asked;
+}
+
+// ---------- shell pattern syntax outside the wildcard model ----------
+// zsh groups and qualifiers ((a|b), *(D)), extglob (@(x), !(x)), extendedglob (^x, x#), POSIX classes ([[:alpha:]]),
+// *** (follows links) and braces left after expansion are not modelled. A write target holding one is refused when the
+// part before it is at, above or inside a protected root. Otherwise every path below that part must pass the plain
+// rules, and a link or too many entries there refuses.
+const EXOTIC = /[(){}^#]|\[\[|\*\*\*/;
+const SPECIAL = (p) => GLOB_CHAR.test(p) || EXOTIC.test(p);
+// The wildcard roots, plus the data folder for crew roles (their shell writes there are refused anyway).
+function placeRoots(ctx, memory) {
+  const roots = protectedRoots(ctx, memory);
+  if (ctx.crew !== null && ctx.dataDirs) for (const d of ctx.dataDirs) roots.push([splitAbs(d), 'The plugin data folder (crew roles write hand-backs with the Write tool only)']);
+  return roots;
+}
+// Each root that `abs` (as given or as its real path) is at, above (rel: the parts from abs down to the root) or inside.
+function rootRelations(abs, ctx, memory = true) {
+  const forms = [...new Set([path.resolve(abs), real(abs)])].map((f) => splitAbs(f).map(fold));
+  const out = [];
+  for (const [root, why] of placeRoots(ctx, memory)) {
+    const r = root.map(fold);
+    const f = forms.find((x) => { for (let i = 0; i < Math.min(x.length, r.length); i++) if (x[i] !== r[i]) return false; return true; });
+    if (f) out.push({ rel: root.slice(f.length), inside: f.length > r.length, why });
+  }
+  return out;
+}
+// Every path below `dir` (lstat, links not followed); null when a link is found or the walk is too big or too slow.
+function walkBelow(dir, ctx) {
+  const out = []; const queue = [dir];
+  while (queue.length) {
+    if (Date.now() > ctx.deadline) return null;
+    const d = queue.shift();
+    let names; try { names = fs.readdirSync(d); } catch { continue; }
+    for (const n of names) {
+      const p = path.join(d, n);
+      let st; try { st = fs.lstatSync(p); } catch { continue; }
+      if (st.isSymbolicLink()) return null;
+      out.push(p);
+      if (out.length > GLOB_DIR_CAP) return null;
+      if (st.isDirectory()) queue.push(p);
+    }
+  }
+  return out;
+}
+// The literal folder in front of the first pattern part, or null when .. follows a pattern part.
+function patternPrefix(abs) {
+  const parts = abs.split('/').filter((p) => p && p !== '.');
+  const first = parts.findIndex(SPECIAL);
+  if (first === -1) return { prefix: path.resolve('/', ...parts), parts };
+  if (parts.slice(first).some((p) => p.includes('..'))) return null;
+  return { prefix: path.resolve('/', ...parts.slice(0, first)), parts };
+}
+const exoticDeny = (raw, why) => `Writing to "${raw}" is blocked: ${why}. Name the file without shell pattern syntax.`;
+function exoticTargetReason(raw, x, ctx, { memory }) {
+  const abs = path.isAbsolute(x) ? x : ctx.cwd ? `${ctx.cwd}/${x}` : null;
+  if (!abs || unresolved(x)) return exoticDeny(raw, 'pattern syntax (groups, qualifiers, classes, ***) in a path with a variable I cannot verify');
+  const pp = patternPrefix(abs);
+  if (!pp) return exoticDeny(raw, '.. after pattern syntax lands wherever the matches lead');
+  let asked = null;
+  for (const { why } of rootRelations(pp.prefix, ctx, memory)) {
+    if (typeof why === 'string') return exoticDeny(raw, `${why} lies at, above or below the folder in front of the pattern`);
+    asked ??= why;
+  }
+  const plain = `/${pp.parts.map((p) => (SPECIAL(p) ? 'x' : p)).join('/')}`;
+  const why = protectedPathReason(plain, ctx) ?? (memory && isMemoryPath(plain) ? 'agent-memory (memory files take Edit/Write, where the secret scan runs)' : null);
+  if (why) return exoticDeny(raw, why);
+  asked ??= crewConfigAsk(plain);
+  const below = walkBelow(pp.prefix, ctx);
+  if (!below) return exoticDeny(raw, 'the folder in front of the pattern holds a link, or too many entries to check');
+  for (const p of below) {
+    const r = writeTargetReason(p, ctx, { memory, literal: true });
+    if (typeof r === 'string') return r;
+    asked ??= r;
+  }
+  return asked;
+}
+
+// ---------- whole folders put in place (cp -r, mv, rsync, ditto, ln) ----------
+// Each source lands at the destination itself (a rename, or a contents copy of src/ or src/.) or inside it as
+// dest/<source name>. Either place may be a protected root, or hold one the source brings along (a whole .git, a
+// .claude with settings.json): checked per root with lstat, no walk. A link put there can be filled later, and a source
+// a variable or pattern hides can be anything, so both are refused.
+const PLACERS = new Set(['cp', 'mv', 'rsync', 'ditto', 'install', 'scp', 'ln']);
+const PLACE_VALUE_OPTS = {
+  rsync: new Set(['-e', '--rsh', '--exclude', '--include', '--filter', '-f', '--files-from', '--exclude-from', '--include-from', '--rsync-path', '--log-file', '--partial-dir', '--temp-dir', '-T', '--compare-dest', '--copy-dest', '--link-dest', '--backup-dir', '--suffix', '--chmod', '--chown', '--port', '--timeout', '--bwlimit', '--max-size', '--min-size']),
+  install: new Set(['-m', '-o', '-g', '-S', '-B', '-f']), ln: new Set(['-S', '--suffix']), mv: new Set(['-S', '--suffix']), cp: new Set(['-S', '--suffix']),
+  ditto: new Set(['--arch', '--bom']), scp: new Set(['-P', '-i', '-o', '-F', '-c', '-l', '-S', '-J']),
+};
+const placeDeny = (why) => (typeof why === 'string' ? `${why} cannot be put in place by cp, mv, rsync, ditto or ln: the owner changes them by hand.` : why);
+// A source as concrete paths, or null when a variable, pattern syntax or a capped wildcard hides it.
+function concreteSources(raw, ctx) {
+  const x = expandVars(raw, ctx);
+  if (unresolved(x) || EXOTIC.test(x)) return null;
+  const abs = resolveIn(ctx, raw);
+  if (!abs) return null;
+  if (!GLOB_CHAR.test(x)) return [abs];
+  const parts = globParts(abs);
+  if (!parts || parts.some((p) => p.includes('**'))) return null;
+  return expandGlob(parts, ctx);
+}
+// Does the source bring the entry at `rel` (or a link on the way to it)?
+function brings(src, rel) {
+  if (isSymlink(src)) return true;
+  let p = src;
+  for (const part of rel) { p = path.join(p, part); if (isSymlink(p)) return true; }
+  try { fs.lstatSync(p); return true; } catch { return false; }
+}
+function placementReason(prog, words, ctx) {
+  const args = words.slice(1); const pos = []; let dest = null;
+  const valued = PLACE_VALUE_OPTS[prog] ?? new Set();
+  if (prog === 'install' && args.includes('-d')) return null; // makes folders only; writeTargets checks them
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k];
+    if (a === '--') { pos.push(...args.slice(k + 1)); break; }
+    if ((a === '-t' || a === '--target-directory') && !['rsync', 'scp'].includes(prog)) { dest = args[++k] ?? ''; continue; }
+    if (a.startsWith('--target-directory=')) { dest = a.slice(19); continue; }
+    if (valued.has(a)) { k++; continue; }
+    if (!a.startsWith('-')) pos.push(a);
+  }
+  if (dest === null) { if (pos.length === 1 && prog === 'ln') dest = '.'; else if (pos.length < 2) return null; else dest = pos.pop(); }
+  const recursive = ['mv', 'rsync', 'ditto'].includes(prog) || (['cp', 'scp'].includes(prog) && args.some((a) => /^-[A-Za-z]*[rRa]/.test(a) || /^--(recursive|archive)$/.test(a)));
+  const xd = expandVars(dest, ctx);
+  let asked = null;
+  const take = (r) => { if (typeof r === 'string') return r; asked ??= r; return null; };
+  // mv takes its sources away: moving a protected root, or a folder holding one, out of place changes it.
+  if (prog === 'mv') {
+    for (const s of pos) {
+      for (const sAbs of concreteSources(s, ctx) ?? []) {
+        for (const rr of rootRelations(sAbs, ctx)) { if (rr.inside) continue; const why = placeDeny(rr.why); if (take(why)) return why; }
+      }
+    }
+  }
+  // A variable in the destination hides where things land: only the sources' own names are left to check. (A wildcard
+  // or pattern destination that can reach a protected root is refused by writeTargetReason on the destination.)
+  const dests = unresolved(xd) ? null : [resolveIn(ctx, dest)].filter(Boolean);
+  for (const s of pos) {
+    const xs = expandVars(s, ctx);
+    // src/, src/. and . copy the folder's contents (BSD cp, rsync, ditto), not the folder.
+    const contents = /(^|\/)\.?$/.test(xs);
+    const textBase = xs.replace(/(\/\.?)+$/, '').split('/').pop() ?? '';
+    const dotBase = textBase === '.' || textBase === '..';
+    const found = concreteSources(s, ctx);
+    // [name it gets under the destination, source path]; a hidden source has a null path, and a null name when its
+    // own name is hidden too.
+    const items = found ? found.map((p) => [dotBase ? '.' : path.basename(p), p])
+      : [[textBase && !unresolved(textBase) && !SPECIAL(textBase) ? (dotBase ? '.' : textBase) : null, null]];
+    if (dests === null) {
+      // The destination is a variable: only a protected name as the source's own name is visible.
+      for (const [name] of items) if (name && PROTECTED_NAMES.includes(fold(name))) return placeDeny(`A ${name} folder`);
+      continue;
+    }
+    for (const d of dests) {
+      const free = !isSymlink(d) && !fs.existsSync(d);
+      const linkHere = prog === 'ln' && free;
+      const atDest = linkHere || (recursive && (contents || prog === 'ditto' || free));
+      for (const [name, src] of items) {
+        // dest/<source name>
+        if (name === null) {
+          if (rootRelations(d, ctx).some((rr) => !rr.inside && rr.rel.length)) return placeDeny('A file or folder whose name a variable or pattern hides, put above a protected folder,');
+        } else if (name !== '.') {
+          const t = path.join(d, name);
+          const r = writeTargetReason(t, ctx, { literal: true });
+          if (take(r)) return r;
+          for (const rr of rootRelations(t, ctx)) {
+            if (rr.inside) continue;
+            if (!rr.rel.length || prog === 'ln' || (recursive && (src === null || brings(src, rr.rel)))) { const why = placeDeny(rr.why); if (take(why)) return why; }
+          }
+        }
+        // dest itself: a contents copy, a rename to a name not taken yet, or a link created there.
+        if (!atDest) continue;
+        for (const rr of rootRelations(d, ctx)) {
+          if (rr.inside || !rr.rel.length) continue; // at the root itself: writeTargetReason(dest) decides
+          if (linkHere || src === null || brings(src, rr.rel)) { const why = placeDeny(rr.why); if (take(why)) return why; }
+        }
+      }
+    }
+  }
+  return asked;
 }
 
 // ---------- git ----------
@@ -808,9 +1137,9 @@ function checkInlineCode(code, ctx) {
   if (/\bgh\b.{0,40}\b(merge|delete|alias)\b/.test(flat) || /\bgh auth token\b/.test(flat)) return 'gh merge/delete from inline code is blocked.';
   // A write request from inline code: refused when it names GitHub or when its URL is not a literal the guard can read.
   if (HTTP_WRITE.test(code) && (/github\.com/i.test(code) || !/['"`]https?:\/\/[^'"`$]+['"`]/.test(code))) return 'Inline code sending a write request to GitHub, or to a URL in a variable, is blocked.';
-  if (CRED_TEXT.test(code)) return 'Reading the gh hosts file or git credentials is blocked for every role.';
+  if (CRED_TEXT.test(code) || CRED_TEXT.test(fold(code))) return 'Reading the gh hosts file or git credentials is blocked for every role.';
   if (/\brmtree\b|\brmSync\b|\brmdirSync\b|\bunlinkSync\b|\bos\.(remove|unlink|rmdir)\b|\brm -[a-z]*r|\bunlink\(|\bFile\.delete|\bFileUtils\.rm/.test(code)) return 'Deleting files from inline code is blocked.';
-  if (PROTECTED_TEXT.test(code)) return 'Inline code touching settings, hooks, plugin files, git config or agent-memory is blocked.';
+  if (PROTECTED_TEXT.test(fold(code))) return 'Inline code touching settings, hooks, plugin files, git config or agent-memory is blocked.';
   if (!ctx || !(ctx.role || (ctx.subagent && ctx.pluginRoot))) return null;
   const sites = inlineWriteSites(code);
   for (const p of sites.flatMap((x) => x.paths)) {
@@ -867,6 +1196,83 @@ function archiveTargets(prog, words) {
   if (extract) out.push(valueOf('-C', '--directory') ?? '.');
   if (create) { const f = valueOf('-f', '--file') ?? (/^[A-Za-z]*f[A-Za-z]*$/.test(args[0] ?? '') ? args[1] : null); if (f && f !== '-') out.push(f); }
   return out;
+}
+
+// ---------- unpacking and file-list copies ----------
+// An archive or a file list names its own paths (.git/hooks/pre-commit, .claude/settings.json) below the destination,
+// and the guard cannot see them. So for every caller the destination (or the cwd) may not be at or above a protected
+// root; a subfolder such as ./build, or a scratch folder, is fine.
+const UNPACKERS = /^(tar|gtar|bsdtar|unzip|cpio|pax|ditto|rsync|7z|7za|7zz)$/;
+const PAX_VALUE = /^-[A-Za-z]*[fsoxbBGTUp]$/;
+function unpackDests(prog, words) {
+  const args = words.slice(1);
+  const operands = (skip) => {
+    const pos = [];
+    for (let k = 0; k < args.length; k++) {
+      if (args[k] === '--') { pos.push(...args.slice(k + 1)); break; }
+      if (skip(args[k])) k++; else if (!args[k].startsWith('-')) pos.push(args[k]);
+    }
+    return pos;
+  };
+  const flag = (ch) => args.some((a) => /^-[^-]/.test(a) && a.slice(1).includes(ch));
+  if (prog === 'rsync') {
+    const listed = args.some((a) => /^--(files-from|relative)(=|$)/.test(a)) || flag('R');
+    return listed ? operands((a) => PLACE_VALUE_OPTS.rsync.has(a)).slice(-1) : [];
+  }
+  if (prog === 'ditto') return flag('x') || args.includes('--extract') ? operands((a) => PLACE_VALUE_OPTS.ditto.has(a)).slice(-1) : [];
+  if (prog === 'pax') {
+    if (!flag('r')) return [];
+    return flag('w') ? operands((a) => PAX_VALUE.test(a)).slice(-1) : ['.'];
+  }
+  if (/^7z/.test(prog)) {
+    if (!/^[ex]$/.test(args[0] ?? '')) return [];
+    const o = args.find((a) => /^-o./.test(a));
+    return [o ? o.slice(2) : '.'];
+  }
+  if (prog === 'unzip') {
+    if (args.some((a) => /^-[ltvZp]/.test(a))) return [];
+    const out = [];
+    for (let k = 0; k < args.length; k++) {
+      if (/^-[A-Za-z]*d$/.test(args[k])) out.push(args[++k] ?? '');
+      else if (/^-d./.test(args[k])) out.push(args[k].slice(2));
+    }
+    return out.length ? out : ['.'];
+  }
+  if (prog === 'cpio') {
+    if (flag('p') || args.includes('--pass-through')) return operands(() => false).slice(-1);
+    if (!flag('i') && !args.includes('--extract')) return [];
+    const d = args.findIndex((a) => a === '-D' || a === '--directory');
+    const eq = args.find((a) => a.startsWith('--directory='));
+    return [d !== -1 ? args[d + 1] ?? '' : eq ? eq.slice(12) : '.'];
+  }
+  // tar: every -C folder counts (tar applies them in turn), and with none the cwd.
+  const bundled = /^[A-Za-z]+$/.test(args[0] ?? '') ? args[0] : '';
+  if (!/x/.test(bundled) && !flag('x') && !args.some((a) => /^--(extract|get)$/.test(a))) return [];
+  const out = [];
+  for (let k = 0; k < args.length; k++) {
+    const a = args[k];
+    if (a === '-C' || a === '--directory' || (isShortCluster(a) && a.endsWith('C'))) out.push(args[++k] ?? '');
+    else if (a.startsWith('--directory=')) out.push(a.slice(12));
+    else if (/^-C./.test(a)) out.push(a.slice(2));
+  }
+  return out.length ? out : ['.'];
+}
+function unpackReason(prog, words, ctx) {
+  for (const raw of unpackDests(prog, words)) {
+    const x = expandVars(raw || '.', ctx);
+    const abs = SPECIAL(x) ? null : resolveIn(ctx, raw || '.');
+    if (!abs) return `Unpacking with ${prog} into "${raw}" is blocked: a variable or pattern hides the folder. Name a fresh subfolder.`;
+    // Inside a folder rm -rf may clear (system temp, scratch) every root below is a throwaway copy.
+    if (ctx.rmRoots.some((r) => real(abs) === r || within(real(abs), r))) continue;
+    // The roots also hang off the cwd. An unpack into a plain folder elsewhere counts only roots that exist there; at or
+    // above the project, the role's checkout or home every root counts (an archive may create .claude/settings.json).
+    const ra = real(abs);
+    const base = [ctx.project, roleRoot(ctx), os.homedir()].filter(Boolean).some((b) => [path.resolve(b), real(b)].some((v) => v === abs || v === ra || within(v, abs) || within(v, ra)));
+    const exists = (rel) => [abs, ra].some((d) => { try { fs.lstatSync(path.join(d, ...rel)); return true; } catch { return false; } });
+    const hit = rootRelations(abs, ctx).find((rr) => !rr.inside && (base || exists(rr.rel)));
+    if (hit) return `Unpacking with ${prog} into "${raw || '.'}" is blocked: the folder is at or above ${typeof hit.why === 'string' ? hit.why : 'a protected folder'}, and the archive or file list can put files there. Unpack into a fresh subfolder (for example ./build) instead.`;
+  }
+  return null;
 }
 
 // ---------- command walker ----------
@@ -963,6 +1369,7 @@ function scanWords(inputWords, ctx, viaIn, depth) {
     for (const t of roleWriteTargets(prog, words)) { const why = writeTargetReason(t || '.', ctx); if (typeof why === 'string') return why; }
     if (/^[gmn]?awk$/.test(prog) && AWK_WRITES.test(words.slice(1).join(' '))) return `${ctx.role} is a read-only role: awk may not write files or run programs.`;
   }
+  if (UNPACKERS.test(prog)) { const u = unpackReason(prog, words, ctx); if (u) return u; }
   // Unpacking and patching write where they are told: every subagent's targets go through the plugin rule too.
   if ((ctx.role || ctx.subagent) && (ARCHIVERS.test(prog) || prog === 'patch')) {
     const targets = prog === 'patch' ? patchTargets(words) : archiveTargets(prog, words);
@@ -1008,6 +1415,11 @@ function scanWords(inputWords, ctx, viaIn, depth) {
     const linkPath = resolveIn(ctx, pos[pos.length - 1] ?? '');
     if (linkPath && ctx.rmRoots.some((root) => within(real(linkPath), root) || within(linkPath, root))) return 'Creating links inside tmp/scratch dirs is blocked: they defeat the rm -rf check.';
   }
+  if (PLACERS.has(prog)) {
+    const p = placementReason(prog, words, ctx);
+    if (typeof p === 'string') return p;
+    if (p) result ??= p;
+  }
   for (const t of writeTargets(prog, words)) {
     const why = writeTargetReason(t, ctx);
     if (typeof why === 'string') return why;
@@ -1018,7 +1430,7 @@ function scanWords(inputWords, ctx, viaIn, depth) {
 
 function checkCommands(src, ctx, depth = 0) {
   if (depth > 6) return 'Command nesting too deep to verify; blocked.';
-  const { commands, nested, heredocs } = tokenize(src);
+  const { commands, nested, heredocs, groups } = tokenize(src);
   let asked = null; // an "ask" is remembered, but a later hard block in the same command wins
   const stack = []; let level = 0;
   const startCwd = ctx.cwd;
@@ -1046,7 +1458,7 @@ function checkCommands(src, ctx, depth = 0) {
     if (reason?.lazy) ctx.pending.push(reason.lazy);
     else if (reason) asked ??= reason;
   }
-  for (const body of nested) {
+  for (const body of [...nested, ...groups]) {
     const saved = ctx.cwd;
     const r = checkCommands(body, ctx, depth + 1);
     ctx.cwd = saved;
@@ -1131,7 +1543,14 @@ function checkFileEdit(input, ctx) {
   const r = real(abs);
   // Checked before the ~/.claude/plugins rule: the data folder usually sits under it.
   const hb = handbackRule(target, abs, r, ctx);
-  if (hb === HANDBACK_OWN) return ctx.isWrite || ctx.isEdit ? livePluginRule(r, ctx) ?? livePluginRule(abs, ctx) : `${ctx.crew}: hand-back files take Write or Edit only.`;
+  if (hb === HANDBACK_OWN) {
+    if (!ctx.isWrite && !ctx.isEdit) return `${ctx.crew}: hand-back files take Write or Edit only.`;
+    const live = livePluginRule(r, ctx) ?? livePluginRule(abs, ctx);
+    if (live) return live;
+    // Reports are kept 60 days and read back by the manager: the same secret scan as docs and memory.
+    for (const p of newTexts(r, input)) { const hit = findSecret(p); if (hit) return `Hand-back files must not hold secrets: ${hit} pattern found in the new content. Remove it and retry.`; }
+    return null;
+  }
   if (hb) return hb;
   const why = protectedPathReason(r, ctx) ?? protectedPathReason(abs, ctx);
   if (why) return `${why} cannot be edited by Claude: the owner changes them by hand.`;
@@ -1179,21 +1598,47 @@ function roleStyleTarget(r, ctx) {
 // <CLAUDE_PLUGIN_DATA>/projects/<key>/handbacks/(full|summaries)/<crew id>/<name>.md is the only place under the
 // data folder a crew role may write (read-only roles too). Everything else there (events.jsonl, limits.json,
 // projects.json) stays hook-only. Without CLAUDE_PLUGIN_DATA nothing new is allowed.
-const HANDBACK_REL = /^projects\/[a-z0-9-]{1,60}\/handbacks\/(?:full|summaries)\/([a-z0-9-]{1,40})\/[a-z0-9-]{1,60}\.md$/;
+const HANDBACK_REL = /^projects\/([a-z0-9-]{1,60})\/handbacks\/(?:full|summaries)\/([a-z0-9-]{1,40})\/[a-z0-9-]{1,60}\.md$/;
 const HANDBACK_OWN = Symbol('own hand-back');
+// The session's own <key>, computed as lib/handbacks.ts handbackKey does: the deepest registered project that holds
+// CLAUDE_PROJECT_DIR or the cwd, else that folder. Another project's key (or an invented one) is refused, so an agent
+// in one repo cannot plant a "summary" that the manager of another project reads as its own crew's result.
+const projectKeyOf = (p) => `${path.basename(p).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project'}-${createHash('sha256').update(path.resolve(p)).digest('hex').slice(0, 8)}`;
+function registryPaths(ctx) {
+  for (const d of ctx.dataDirs ?? []) {
+    try {
+      const file = path.join(d, 'projects.json');
+      const st = fs.statSync(file);
+      if (!st.isFile() || st.size > 1_000_000) continue;
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const rows = Array.isArray(raw) ? raw : raw?.projects;
+      if (Array.isArray(rows)) return rows.filter((p) => p && typeof p.path === 'string' && typeof p.name === 'string').map((p) => path.resolve(p.path));
+    } catch { /* missing or unreadable: no registry, as the board treats it */ }
+  }
+  return [];
+}
+function sessionKeys(ctx) {
+  const reg = registryPaths(ctx); const keys = new Set();
+  for (const dir of [ctx.projectDirEnv, ctx.startCwd].filter(Boolean)) {
+    const d = path.resolve(dir); // not realpath: the board keys the folder as given
+    const hit = reg.filter((p) => d === p || d.startsWith(p + path.sep)).sort((a, b) => b.length - a.length)[0];
+    keys.add(projectKeyOf(hit ?? d));
+  }
+  return keys;
+}
 // Case-folded on purpose: a refusal must not be dodged by spelling the folder differently on a case-insensitive disk.
-const inDataDir = (p, ctx) => ctx.dataDirs.some((d) => { const a = p.toLowerCase(); const b = d.toLowerCase(); return a === b || within(a, b); });
+const inDataDir = (p, ctx) => ctx.dataDirs.some((d) => { const a = fold(p); const b = fold(d); return a === b || within(a, b); });
 // Returns null (not in the data folder, or not a crew role), HANDBACK_OWN, or a refusal.
 function handbackRule(raw, abs, r, ctx) {
   if (ctx.crew === null || !ctx.dataDirs || !(inDataDir(abs, ctx) || inDataDir(r, ctx))) return null;
   const id = ctx.crew;
-  const deny = `${id || 'this crew role'}: in the plugin data folder a crew role may write only .md files in its own handbacks/full/${id || '<id>'}/ and handbacks/summaries/${id || '<id>'}/ folders.`;
+  const deny = `${id || 'this crew role'}: in the plugin data folder a crew role may write only .md files in its own handbacks/full/${id || '<id>'}/ and handbacks/summaries/${id || '<id>'}/ folders of this session's project.`;
   if (!id || raw.split(/[\\/]/).includes('..')) return deny;
   const base = ctx.dataDirs.find((d) => within(abs, d)); // exact case: the allow side never folds
   if (!base) return deny; // reached through a link from outside the data folder
   const rel = path.relative(base, abs).split(path.sep).join('/');
   const m = HANDBACK_REL.exec(rel);
-  if (!m || m[1] !== id) return deny;
+  if (!m || m[2] !== id || !sessionKeys(ctx).has(m[1])) return deny;
   // No link anywhere below the data folder, checked per part with lstat: realpath misses a link that points
   // inside the folder, and a dangling one (it falls back to the parent). A hard-linked file would change another name.
   let p = base;
@@ -1211,16 +1656,17 @@ function handbackRule(raw, abs, r, ctx) {
 const PLAIN_READS = new Set(['cat', 'head', 'tail', 'ls', 'grep', 'wc']);
 const DATA_VAR = /CLAUDE_PLUGIN_DATA/;
 const PATH_PIECES = /[\s'"`,;()[\]{}=<>|&:]+/;
+const GLOB_PIECES = /[\s'"`,;(){}=<>|&:]+/; // as PATH_PIECES, but a [...] wildcard stays whole
 function dataForms(ctx) {
   const home = os.homedir(); const forms = new Set();
   for (const d of ctx.dataDirs ?? []) {
     forms.add(d);
     if (within(d, home)) { const rel = path.relative(home, d); for (const h of ['~', '$HOME', '${HOME}']) forms.add(`${h}/${rel}`); }
   }
-  return [...forms].map((f) => f.toLowerCase());
+  return [...forms].map(fold);
 }
 // The form followed by the end or a path separator: /data-2 is another folder, /data/x and /data are not.
-const namesForm = (text, forms) => { const t = text.toLowerCase(); return forms.some((f) => { for (let i = t.indexOf(f); i !== -1; i = t.indexOf(f, i + 1)) if (!/[\w.-]/.test(t[i + f.length] ?? '')) return true; return false; }); };
+const namesForm = (text, forms) => { const t = fold(text); return forms.some((f) => { for (let i = t.indexOf(f); i !== -1; i = t.indexOf(f, i + 1)) if (!/[\w.-]/.test(t[i + f.length] ?? '')) return true; return false; }); };
 function dataShellRule(src, ctx) {
   const forms = dataForms(ctx); const seen = new Map(); const all = []; let names = DATA_VAR.test(src);
   const resolves = (piece, cwd) => {
@@ -1230,8 +1676,27 @@ function dataShellRule(src, ctx) {
     if (!seen.has(abs)) seen.set(abs, inDataDir(real(abs), ctx)); // links from elsewhere into the folder
     return seen.get(abs);
   };
+  // A wildcard word names the folder when it can reach it or one of its matches is in it (see globTargetReason).
+  const globNames = (piece, cwd) => {
+    if (!SPECIAL(piece) || !ctx.dataDirs) return false;
+    const x = expandVars(piece, ctx);
+    const abs = path.isAbsolute(x) ? x : cwd ? `${cwd}/${x}` : null;
+    if (!abs || unresolved(x)) return false; // a variable hides the folder as much without a wildcard
+    if (EXOTIC.test(x)) { // pattern syntax: as for a write target, the folder in front of it and everything below
+      const pp = patternPrefix(abs);
+      if (!pp) return true;
+      const pre = fold(pp.prefix);
+      return ctx.dataDirs.some((d) => { const f = fold(d); return pre === f || within(pre, f) || within(f, pre); }) || inDataDir(real(pp.prefix), ctx) || walkBelow(pp.prefix, ctx) === null;
+    }
+    const parts = globParts(abs);
+    if (!parts) return true;
+    if (globVariants(parts).some((v) => ctx.dataDirs.some((d) => globReaches(v, splitAbs(d), ctx)))) return true;
+    const m = expandGlob(parts, ctx);
+    return m === null || m.some((p) => inDataDir(p, ctx) || inDataDir(real(p), ctx));
+  };
   const touches = (word, cwd) => DATA_VAR.test(word) || namesForm(word, forms)
-    || [word, ...word.split(PATH_PIECES)].some((p) => p && resolves(p, cwd));
+    || [word, ...word.split(PATH_PIECES)].some((p) => p && resolves(p, cwd))
+    || [word, ...word.split(GLOB_PIECES)].some((p) => p && globNames(p, cwd));
   const walk = (text, startCwd, depth) => {
     if (depth > 6 || Date.now() > ctx.deadline) return false;
     const { commands, nested, heredocs } = tokenize(text);
@@ -1303,6 +1768,7 @@ export function evaluate(input, env = process.env) {
   const caller = crewCaller(input);
   const ctx = { crew: caller && caller.id !== 'doraemon' ? caller.id : null, dataDirs: data ? [data, real(data)] : null, cwd, startCwd: cwd, gitEnv: false, project, pluginRoot, rmRoots: roots, cache: new Map(), pending: [], deadline: Date.now() + BUDGET_MS, km: /(^|:)miguel-rivera$/i.test(String(input.agent_type ?? '')), devops: DEVOPS.test(String(input.agent_type ?? '')), stdinShell: false, written: new Set(),
     role: (READ_ONLY_ROLES.exec(String(input.agent_type ?? '')) ?? [])[1]?.toLowerCase() ?? null,
+    projectDirEnv: typeof env.CLAUDE_PROJECT_DIR === 'string' && path.isAbsolute(env.CLAUDE_PROJECT_DIR) ? env.CLAUDE_PROJECT_DIR : null,
     // agent_id marks a subagent; agent_type alone is also set for `claude --agent`, the main thread when it is Doraemon.
     subagent: !!input.agent_id || (!!input.agent_type && crewId(String(input.agent_type)) !== 'doraemon'), isWrite: String(input.tool_name) === 'Write', isEdit: ['Edit', 'MultiEdit'].includes(String(input.tool_name)), writeRoots: [...new Set([...sys, ...(typeof input.scratchpad_dir === 'string' && input.scratchpad_dir ? [real(input.scratchpad_dir)] : [])])] };
   const tool = String(input.tool_name ?? '');
@@ -1314,7 +1780,7 @@ export function evaluate(input, env = process.env) {
     if (ti.command !== undefined && typeof ti.command !== 'string') return { deny: `${tool} command is not a string; blocked.` };
     const cmd = typeof ti.command === 'string' ? ti.command : '';
     if (cmd.length > MAX_COMMAND) return { deny: 'Command too long to verify; blocked.' };
-    if (CRED_TEXT.test(cmd)) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
+    if (CRED_TEXT.test(cmd) || CRED_TEXT.test(fold(cmd))) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
     if (ctx.crew !== null) { const d = dataShellRule(cmd, ctx); if (d) return { deny: d }; }
     let result = checkCommands(cmd, ctx);
     if (typeof result === 'string') return { deny: result };
@@ -1333,7 +1799,7 @@ export function evaluate(input, env = process.env) {
       const abs = path.resolve(cwd, p.replace(/^~(?=\/|$)/, home));
       // A content search rooted above the credential files would read them too.
       const above = tool === 'Grep' && [path.join(home, '.config/gh'), path.join(home, '.git-credentials')].some((c) => c === abs || within(c, abs));
-      if (CRED_PATH.test(abs) || CRED_PATH.test(real(abs)) || CRED_PATH.test(`${abs}/`) || above) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
+      if (CRED_PATH.test(abs) || CRED_PATH.test(fold(abs)) || CRED_PATH.test(fold(real(abs))) || CRED_PATH.test(`${fold(abs)}/`) || above) return { deny: 'Reading the gh hosts file or git credentials is blocked for every role.' };
     }
     return null;
   }

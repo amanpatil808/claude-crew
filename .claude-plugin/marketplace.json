@@ -1,7 +1,7 @@
 {
   "name": "crew",
   "owner": { "name": "Aman Patil" },
-  "description": "Private marketplace for the toon-crew plugin.",
+  "description": "Marketplace for the toon-crew plugin: a cartoon AI engineering crew for Claude Code.",
   "plugins": [
     {
       "name": "toon-crew",

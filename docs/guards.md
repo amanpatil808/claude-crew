@@ -1,6 +1,6 @@
 # Guards: what the toon-crew guard allows, asks and blocks
 
-For anyone who has installed the `toon-crew` plugin and wants to know exactly what the guard does. The README has the short version (the guard bullet in [Good to know](../README.md#good-to-know)). This page has the full rule list.
+For anyone who has installed the `toon-crew` plugin and wants to know exactly what the guard does. The README has the short version (the "Is it safe to let it run?" item in the [FAQ](../README.md#faq)). This page has the full rule list.
 
 > [!WARNING]
 > The guard is a seatbelt, not a sandbox. It reads the text of a tool call before it runs. It catches mistakes and lazy bypasses. A determined agent with a shell can still get around any text check, for example by writing a script file and running it. For roles that have Bash, Claude Code's own sandbox is the real boundary.
@@ -21,7 +21,7 @@ For each call it gives one of three answers:
 
 ## Who is who
 
-- **Doraemon** is the main session. He may run most things, but he may not push to `main`, merge or approve a pull request. He is the only one who starts crew agents, and the only one who may use SendMessage, CronCreate, Workflow and RemoteTrigger.
+- **The manager (Doraemon)** is the main session. It may run most things, but it may not push to `main`, merge or approve a pull request. It is the only one who starts crew agents, and the only one who may use SendMessage, CronCreate, Workflow and RemoteTrigger.
 - **The DevOps Team** is `toon-crew:mike-wazowski` and `toon-crew:sulley`. They are the only callers who get an "ask" (instead of a refusal) for pushes to `main`, merges and pull request approvals. The exact plugin names are required: a project agent with the same bare name (`sulley`) gets nothing.
 - **Miguel Rivera** (the knowledge manager) may only push `crew-lessons/<name>` branches and open a pull request on the crew repo.
 - **Read-only roles** are ninja-hattori, joe-gardner, twenty-two, nobita, dekisugi, olaf and stuart. See the table below. Nobita is the one exception for files: he may edit style and visual files (he builds styles; Shinchan builds behaviour), and nothing else.
@@ -31,10 +31,10 @@ For each call it gives one of three answers:
 
 | Rule | What happens |
 |---|---|
-| Push to `main` or `master` | Mike Wazowski and Sulley: you are asked. Everyone else, Doraemon and the main thread included: refused. Covers `git push origin main`, `HEAD:main`, `refs/heads/main`, a bare `git push` whose real destination (`@{push}`) is `main`, and pushes through an alias or xargs. `--delete main`, `:main`, `--all`, `--mirror` and `--prune` are refused for everyone. |
+| Push to `main` or `master` | Mike Wazowski and Sulley: you are asked. Everyone else, the manager and the main thread included: refused. Covers `git push origin main`, `HEAD:main`, `refs/heads/main`, a bare `git push` whose real destination (`@{push}`) is `main`, and pushes through an alias or xargs. `--delete main`, `:main`, `--all`, `--mirror` and `--prune` are refused for everyone. |
 | Force push | Refused for everyone, on any branch: `--force`, `-f` (also `-fu`), `--force-with-lease`, `--force-if-includes`, any unique abbreviation (`--force-w`, `--mir`) and `+refspec`. |
 | Git config tricks | Refused: `git -c alias.*`, `remote.*.push`, `push.*`, `core.sshCommand`, `url.*.insteadOf`; `git config` writes of the same keys (also through `--file` or `-f`); the `GIT_CONFIG_*` environment overrides; `--git-dir`, `--work-tree` or `GIT_DIR` on a push or an unknown subcommand. Repo aliases are resolved first. Before a bare push, `remote.<name>.push` rules are applied (`+` counts as a force push) and a push target the guard cannot verify asks you. `core.hooksPath` asks you. |
-| Merge | `gh pr merge`, `gh api .../pulls/N/merge`, `.../merges` and the GraphQL `mergePullRequest`. Mike Wazowski and Sulley: you are asked, once per merge. Everyone else, Doraemon and Miguel Rivera included: refused. `--admin` and `--auto` merges are refused for everyone. |
+| Merge | `gh pr merge`, `gh api .../pulls/N/merge`, `.../merges` and the GraphQL `mergePullRequest`. Mike Wazowski and Sulley: you are asked, once per merge. Everyone else, the manager and Miguel Rivera included: refused. `--admin` and `--auto` merges are refused for everyone. |
 | Pull request approvals, workflow runs, repo edits | `gh pr review --approve`, `gh workflow run`, `gh repo edit` and workflow dispatches: the DevOps Team is asked, everyone else is refused. |
 | Other MCP tools | A tool with merge, push, delete, destroy, drop, force, remove or wipe in its name asks you. An auto-merge tool is refused. Merge and approval tools follow the merge rule above. |
 | GitHub destruction | Refused: `gh repo delete`, `gh api -X DELETE repos/o/r` (also a full URL, or `curl` with `gh auth token`), moving or deleting `refs/heads/main`, branch protection changes, `gh alias`, `gh auth token`. |
@@ -46,8 +46,8 @@ For each call it gives one of three answers:
 | Memory files | Refused: shell writes into any `agent-memory*` folder, and file writes whose resulting text holds a token, key, private key, URL password, `password=` value, UPI id, email address, card number (Luhn-valid) or phone number (Indian 10-digit with `0`, `+91`, spaces, dots or dashes; or international). |
 | Read-only roles | Edit, MultiEdit and NotebookEdit refused, except Nobita's style files below. Tree-changing git refused (reset, checkout, restore, apply, am, stash, clean, commit, merge, rebase, cherry-pick, revert, pull, rm, mv, add), and so are `git push`, `patch` and inline-code file writes outside temp. Write is allowed only to the role's own `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, the system temp folder or session scratchpad, and its deliverable folders: `docs/research/` for dekisugi, olaf and nobita. Paths are resolved to their real location, so `..` and symlinks cannot escape. The memory secret scan applies to all of these. Shell writes are allowed only into temp. |
 | Nobita's style files | Nobita may Edit and Write style and visual files in his own checkout (his worktree, or the project): `.css`, `.scss`, `.sass`, `.less`, `.svg`, images (`.png`, `.jpg`, `.gif`, `.webp`, `.avif`, `.ico`), design-token data (`tokens.json`, `theme.json`, `.yaml`, `.yml`), and anything in `docs/design/`. Never JS, TS or HTML (so not `tokens.ts` or `theme.js`), tests, hooks, config or CI; nothing in a dot folder (`.claude/`, `.github/`), `node_modules/` or a test folder, and no `*.test.*`, `*.spec.*` or `*.stories.*` file, whatever its type. Documents in `docs/design/` get the secret scan. He stays read-only in every other way: shell writes only into temp, no commit, push or merge, no relay tools. |
-| Spawning | Only the main session (Doraemon) starts crew agents. Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, written with the prefix (a bare `olaf` could match a project agent with more tools). Every other crew role is refused. Agents that are not crew are not limited. |
-| Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except Doraemon. |
+| Spawning | Only the main session (the manager) starts crew agents. Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, written with the prefix (a bare `olaf` could match a project agent with more tools). Every other crew role is refused. Agents that are not crew are not limited. |
+| Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except the manager. |
 | Knowledge manager pushes | Miguel Rivera may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`, and only when `origin` is the crew repo. No merges, no other pushes. The guard accepts both `miguel-rivera` and `toon-crew:miguel-rivera` as his name. |
 
 ## Hand-back files
@@ -63,7 +63,7 @@ $CLAUDE_PLUGIN_DATA/projects/<project key>/handbacks/summaries/<its own id>/<nam
 
 ### The data folder from the shell
 
-A crew role (every role except Doraemon) may only **read** the data folder from Bash or Monitor. If a command line names the folder, it is refused unless every command on the line is `cat`, `head`, `tail`, `ls`, `grep` or `wc`, with no redirection except to `/dev/null`. So `cat <its hand-back file>` and `ls <folder> | wc -l` work. `cat <file> > /tmp/copy`, `cat <file> | sh` and `ls <folder> && git status` are refused, so split them into separate calls.
+A crew role (every role except the manager) may only **read** the data folder from Bash or Monitor. If a command line names the folder, it is refused unless every command on the line is `cat`, `head`, `tail`, `ls`, `grep` or `wc`, with no redirection except to `/dev/null`. So `cat <its hand-back file>` and `ls <folder> | wc -l` work. `cat <file> > /tmp/copy`, `cat <file> | sh` and `ls <folder> && git status` are refused, so split them into separate calls.
 
 A command line names the folder when it contains any of these:
 
@@ -71,7 +71,7 @@ A command line names the folder when it contains any of these:
 - **The path.** The folder's path or real path in any letter case, also written as `~/...`, `$HOME/...` or `${HOME}/...`, and also when it is glued to an option (`-C/path`).
 - **A path that leads there.** Any word, or path inside a word (inline `python`, `node`, `perl` or `ruby` code included), that resolves into the folder. Relative paths are resolved from the current folder after each `cd`, and symlinks that point into the folder are followed.
 
-So these are all refused, along with `>`, `cp`, `tee`, `rm`, `mv` and `sed -i`, which were refused before: `echo x > $CLAUDE_PLUGIN_DATA/events.jsonl`, `D=<folder>; echo x > $D/x`, `cd <folder>` followed by anything, `touch`, `mkdir -p`, `chmod`, `chown`, `sort -o`, `git -C <folder> init`, `tar -C <folder>`, `python3 -c "open('<folder>/x','w')"`, a here-doc that writes a script naming the folder, `ls <folder> | xargs rm`, and `board.sh` run with `CLAUDE_PLUGIN_DATA=...`. Doraemon, the main session and agents that are not crew keep their earlier rules.
+So these are all refused, along with `>`, `cp`, `tee`, `rm`, `mv` and `sed -i`, which were refused before: `echo x > $CLAUDE_PLUGIN_DATA/events.jsonl`, `D=<folder>; echo x > $D/x`, `cd <folder>` followed by anything, `touch`, `mkdir -p`, `chmod`, `chown`, `sort -o`, `git -C <folder> init`, `tar -C <folder>`, `python3 -c "open('<folder>/x','w')"`, a here-doc that writes a script naming the folder, `ls <folder> | xargs rm`, and `board.sh` run with `CLAUDE_PLUGIN_DATA=...`. The manager, the main session and agents that are not crew keep their earlier rules.
 
 **This is a seatbelt, not a sandbox, here too.** The guard reads the command's text. It does not catch:
 
@@ -85,6 +85,8 @@ The Write and Edit rules above do not depend on the text, because those tools na
 ## What the guard looks through
 
 It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` chains, subshells, `env`, `sudo`, `xargs` and `env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings, pipes into a shell, `find -exec`, and inline `python`, `node` or `perl` code given with `-c` or `-e`. It blocks shell functions and aliases that mention these programs, and programs named by a variable. A script that is written and run in the same command is blocked. `projects.mjs set` from a shell asks you.
+
+Wildcards, look-alike letters (also written as `$'\x..'` escapes) and pattern syntax in a write target are checked against every protected file, as if dot files always match. Near a protected folder, the guard refuses instead of guessing. Unpacking an archive or copying from a file list (`tar -x`, `unzip`, `ditto -x`, `pax -r`, `cpio -i`, `7z x`, `rsync --files-from`) is refused for every caller when the destination is at or above a protected root, such as the project root, `~/.claude` or your home folder. Unpack into a subfolder such as `./build` instead.
 
 ## What the guard cannot do
 

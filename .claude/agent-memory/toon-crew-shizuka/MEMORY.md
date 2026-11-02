@@ -1,1 +1,2 @@
 - [Docs and diagram lessons](docs-diagram-lessons.md) — branch vs plugin-cache drift, Mermaid validation, what "working" means on the board
+- [Prompt token lessons](prompt-token-lessons.md) — guard limits for read-only memory, task skill no-chain rule, byte vs runtime savings

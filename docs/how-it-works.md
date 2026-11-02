@@ -4,16 +4,16 @@ For the owner, and for anyone who has installed the `toon-crew` plugin. After re
 
 ## 1. The flow
 
-Doraemon is the main agent. You talk to him; he talks to everyone else. Follow the numbers from top to bottom. The right-hand lane shows what the board records at each step.
+In a project where you have turned the manager (Doraemon) on ([setup](setup.md#turn-the-manager-on-or-off)), it is the main agent. You talk to the manager; it talks to everyone else. Follow the numbers from top to bottom. The right-hand lane shows what the board records at each step.
 
 ```mermaid
 flowchart TD
     S1(["(1) 👤 You ask<br/>for something"])
-    S2(["(2) Doraemon (manager)<br/>reads project.md<br/>and his memory"])
-    S3["(3) He plans waves and<br/>gives every task<br/>P0, P1 or P2"]
-    S4["(4) He queues the whole plan<br/>on the board<br/>(toon-crew:task)"]
-    S5["(5) He writes the contract<br/>and commits it"]
-    S6["(6) He briefs the crew,<br/>2 to 4 at a time"]
+    S2(["(2) The manager<br/>reads project.md<br/>and its memory"])
+    S3["(3) It plans waves and<br/>gives every task<br/>P0, P1 or P2"]
+    S4["(4) It queues the whole plan<br/>on the board<br/>(toon-crew:task)"]
+    S5["(5) It writes the contract<br/>and commits it"]
+    S6["(6) It briefs the crew,<br/>2 to 4 at a time"]
 
     subgraph CREW["(7) The crew works"]
         BE(["Backend<br/>kevin: lead, own worktree<br/>bob: developer, own worktree"])
@@ -27,10 +27,10 @@ flowchart TD
     end
 
     S8["(8) The crew hand back<br/>(a short report each)"]
-    S9{"(9) Doraemon verifies:<br/>runs the tests,<br/>reads the diffs"}
-    S10["(10) He commits the work<br/>(only he commits)"]
-    S11["(11) He adds lessons to<br/>that agent's memory"]
-    S12["(12) He opens a draft PR<br/>and tells you the branch<br/>and PR number"]
+    S9{"(9) The manager verifies:<br/>runs the tests,<br/>reads the diffs"}
+    S10["(10) It commits the work<br/>(only the manager commits)"]
+    S11["(11) It adds lessons to<br/>that agent's memory"]
+    S12["(12) It opens a draft PR<br/>and tells you the branch<br/>and PR number"]
     S13{"(13) CI checks<br/>all green?"}
     S14{"(14) You say OK?"}
     S15(["(15) Mike Wazowski merges<br/>(Sulley for a production<br/>rollout) after your confirm"])
@@ -97,12 +97,12 @@ flowchart TD
     linkStyle 18,19,20,21,22,23 stroke:#2da44e,stroke-width:2px
 ```
 
-Colours are the same in every diagram in this repo. Dashed grey is you or something outside the plugin (such as GitHub), blue is Doraemon's own work, grey diamonds are checks, red with a dashed edge is the loop back, and green is the Crew Room board. The crew boxes use one colour per team: Backend gold, Frontend red, DevOps cyan, Security indigo, QA purple, Research orange, Documentation pink, Helpers khaki. The green dotted lines are what the board records: hooks write one line to the event log and the board reads it (section 3). Step 4 is not a hook: `board.sh task add` writes the queued task itself.
+Colours are the same in every diagram in this repo. Dashed grey is you or something outside the plugin (such as GitHub), blue is the manager's own work, grey diamonds are checks, red with a dashed edge is the loop back, and green is the Crew Room board. The crew boxes use one colour per team: Backend gold, Frontend red, DevOps cyan, Security indigo, QA purple, Research orange, Documentation pink, Helpers khaki. The green dotted lines are what the board records: hooks write one line to the event log and the board reads it (section 3). Step 4 is not a hook: `board.sh task add` writes the queued task itself.
 
 What to know:
-- **P0, P1, P2.** P0 blocks a release or the critical path. P1 is important next. P2 is nice to have. Doraemon gives every task one.
+- **P0, P1, P2.** P0 blocks a release or the critical path. P1 is important next. P2 is nice to have. The manager gives every task one.
 - **Assigned by skill, not by who is free.** If the right role is busy, the task waits, or a second copy of the same role takes it on different files.
-- **Only Doraemon commits.** Builders leave their changes uncommitted in the worktree and name it in the hand-back. Doraemon reviews the diff, brings it into the working branch and commits it. He checks the memory notes for secrets and commits them with the work.
+- **Only the manager commits.** Builders leave their changes uncommitted in the worktree and name it in the hand-back. The manager reviews the diff, brings it into the working branch and commits it. It checks the memory notes for secrets and commits them with the work.
 - **Nobody merges without you.** Only Mike Wazowski and Sulley may merge, and only a pull request you approved. You can always merge yourself on GitHub. The rules are in [guards.md](guards.md#the-rules).
 - **What step 16 means depends on the project.** The plugin does not deploy anything. If a project's `project.md` says a merge to `main` releases and deploys, that happens after step 15; Sulley handles production rollouts and rollbacks.
 
@@ -117,13 +117,13 @@ Sources: `plugin/agents/doraemon.md` ("When invoked", "Assigning work", "Worktre
 
 ### Parallel work: waves and copies
 
-Doraemon runs the crew in waves, and he can run two copies of one role. The rules are in `plugin/agents/doraemon.md`.
+The manager runs the crew in waves, and it can run two copies of one role. The rules are in `plugin/agents/doraemon.md`.
 
-- **Waves are 2-4 crew wide for light work, 6-8 for heavy work.** Several agents at once cost many times the tokens of one chat, so he keeps each wave small. No two tasks in a wave write the same file.
-- **A role can have a second copy.** If the right role is busy, Doraemon queues the task or starts a second copy of that role on different files, for example two Shinchans on two screens. He never gives the task to a different role just because it is idle. Because the files are different, the copies never overwrite each other.
+- **Waves are 2-4 crew wide for light work, 6-8 for heavy work.** Several agents at once cost many times the tokens of one chat, so it keeps each wave small. No two tasks in a wave write the same file.
+- **A role can have a second copy.** If the right role is busy, the manager queues the task or starts a second copy of that role on different files, for example two Shinchans on two screens. It never gives the task to a different role just because it is idle. Because the files are different, the copies never overwrite each other.
 - **The whole plan is queued up front.** Every piece of every wave, plus reviews, QA runs and the merge step, goes on the board with `toon-crew:task` before work starts. The Queued list shows what is coming.
-- **Each copy takes the oldest queued task for its role.** When an agent starts, the board moves that role's oldest queued task to Running. When the agent stops, the task is done. If the plan changes, Doraemon drops the task so nothing stale stays queued.
-- **On the Crew Room:** a "Crew 3 / 4" meter shows how many agents are running. When Doraemon starts a copy, he uses his copy-light gadget: a twin appears at the desk with a ×2 badge. See [the Crew Room guide](crew-room.md).
+- **Each copy takes the oldest queued task for its role.** When an agent starts, the board moves that role's oldest queued task to Running. When the agent stops, the task is done. If the plan changes, the manager drops the task so nothing stale stays queued.
+- **On the Crew Room:** a "Crew 3 / 4" meter shows how many agents are running. When the manager starts a copy, it uses its copy-light gadget: a twin appears at the desk with a ×2 badge. See [the Crew Room guide](crew-room.md).
 
 Sources: `plugin/agents/doraemon.md` (step 6 "queue the whole plan", "Assigning work", "Cost rules"), `plugin/board/lib/tasks.ts` (an assign takes the role's oldest queued task).
 
@@ -157,7 +157,7 @@ Fifteen agents in nine teams, one job each. Every agent reads the project's `CLA
   - stuart: Read, Grep, Glob. joe-gardner and twenty-two: Read, Grep, Glob, Bash, Write. ninja-hattori: the same plus Skill. olaf: Read, Grep, Glob, Write and the web tools. dekisugi: olaf's tools plus Agent.
   - `memory: project` adds Write back to a tool list, so these prompts tell the agent to read its memory file and write it back whole. The guard, not the list, keeps these roles read-only: [what it allows them to write](guards.md#the-rules).
 - **Who may merge, push, approve, spawn agents or use relay tools** is a guard rule, not a role setting: see [guards.md](guards.md#who-is-who).
-- **Models.** A per-call model beats the agent file, so Doraemon passes none, except `opus` for one run: sulley on production rollout or rollback design, shizuka on launch, trust or privacy copy, and any role after two failed reviews.
+- **Models.** A per-call model beats the agent file, so the manager passes none, except `opus` for one run: sulley on production rollout or rollback design, shizuka on launch, trust or privacy copy, and any role after two failed reviews.
 
 ### Skills the crew uses
 
@@ -168,7 +168,7 @@ Fifteen agents in nine teams, one job each. Every agent reads the project's `CLA
 | `integrations` | kevin and ninja-hattori (preloaded), bob (for third-party APIs) | Read-only by default, allow-lists and host pinning, scopes and keys, rate limits, paging caps, redaction, background jobs, commit-time re-checks |
 | `crew-lessons` | miguel-rivera (when the owner starts the pass) | The lessons harvest and promotion procedure |
 
-The commands you type (`/toon-crew:board`, `task`, `project`, `forget`) are in the [README](../README.md#commands).
+The commands you type most (`/toon-crew:board`, `handbacks`, `project`, `compact-setup`) are in the [README](../README.md#commands); the other skills, including `task` and `forget`, are in [Setup](setup.md#other-skills).
 
 ## 3. Where things live
 
@@ -220,15 +220,17 @@ flowchart LR
 ```
 
 
-| What | Where | Who uses it |
-|---|---|---|
-| Project facts: commands, docs per role, no-go areas, deploy rules | `.claude/crew/project.md` (written by the `project-profile` skill) | Every agent reads it first, with `CLAUDE.md` |
-| Memory: lessons for this project, one folder per agent | `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, checked into the project | The agent reads it at the start; Doraemon adds lessons from each hand-back |
-| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (`~/.toon-crew` if the board is started by hand) | Written by the plugin's hooks; read by the board |
-| The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass |
-| The board | a local page on `127.0.0.1`, started with the `board` skill | You |
+| What | Where | Who uses it | Who can see it |
+|---|---|---|---|
+| Project facts: commands, docs per role, no-go areas, deploy rules | `.claude/crew/project.md` (written by the `project-profile` skill) | Every agent reads it first, with `CLAUDE.md` | Your team, once you commit it |
+| Memory: lessons for this project, one folder per agent | `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, checked into the project | The agent reads it at the start; the manager adds lessons from each hand-back. The guard blocks any lesson that looks like a key, token or password | Your team, once you commit it |
+| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (`~/.toon-crew` if the board is started by hand) | Written by the plugin's hooks; read by the board | Only you, on this machine |
+| The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass | Only you, on this machine |
+| Hand-back reports and summaries | `projects/<project>/handbacks/` in the same folder (see below) | Written by each crew agent; the manager reads the summaries | Only you, on this machine |
+| Shared crew lessons | `docs/lessons/` in this repo | Written by the owner-only lessons pass | The repo owner, by pull request |
+| The board | a local page on `127.0.0.1`, started with the `board` skill | You | You |
 
-Hand-backs: when a crew member finishes, it writes two files in the project's folder under `projects/<project>/handbacks/` in the plugin data folder: the full report in `full/<agent>/` and a 12-line summary in `summaries/<agent>/`. Only the summary comes back into Doraemon's conversation. The reason is cost: Doraemon re-sends his whole conversation on every turn, so a long report in the chat is paid for again and again, while a file is not. The files survive `/clear` and new sessions, so Doraemon can read the summaries whenever he needs them. When something in a summary looks missing, he opens the full report and anything else he needs. The folders stay on your machine, and the board deletes files older than 60 days. The format is in `docs/specs/handbacks.md`.
+Hand-backs: when a crew member finishes, it writes two files in the project's folder under `projects/<project>/handbacks/` in the plugin data folder: the full report in `full/<agent>/` and a 12-line summary in `summaries/<agent>/`. Only the summary comes back into the manager's conversation. The reason is cost: the manager re-sends its whole conversation on every turn, so a long report in the chat is paid for again and again, while a file is not. The files survive `/clear` and new sessions, so the manager can read the summaries whenever it needs them. When something in a summary looks missing, it opens the full report and anything else it needs. The folders stay on your machine, and the board deletes files older than 60 days. The format is in `docs/specs/handbacks.md`.
 
 How the hooks work:
 - A session start, a subagent start or stop, a Bash, Agent or SendMessage call, and a turn end each send one small message to `board/hook.ts`. It appends at most one line to `events.jsonl`.
@@ -242,16 +244,16 @@ Sources: `plugin/hooks/hooks.json`, `plugin/board/hook.ts`, `plugin/board/lib/pa
 
 ## 4. Several projects
 
-Each project runs its own crew. Doraemon in project 1 and Doraemon in project 2 are separate sessions with separate memory. They never share work.
+Each project runs its own crew. The manager in project 1 and the manager in project 2 are separate sessions with separate memory. They never share work.
 
 ```mermaid
 flowchart TB
     subgraph P1["Project 1"]
-        S1(["Doraemon session and crew"])
+        S1(["Manager session and crew"])
         M1[(".claude/agent-memory/")]
     end
     subgraph P2["Project 2"]
-        S2(["Doraemon session and crew"])
+        S2(["Manager session and crew"])
         M2[(".claude/agent-memory/")]
     end
     S1 --- M1
@@ -291,7 +293,7 @@ Sources: `plugin/board/README.md`, `plugin/skills/crew-lessons/SKILL.md`.
 
 Measured once, in October 2026, on an early version (0.1.0) and not re-measured since the cast was renamed.
 
-- The manager is the cost: Doraemon runs on Opus and was 76 to 99 percent of each measured run, so he delegates reading and searching, keeps turns short and sends lookups to Stuart.
+- The manager is the cost: it runs on Opus and was 76 to 99 percent of each measured run, so it delegates reading and searching, keeps turns short and sends lookups to Stuart.
 - Cheapest model that fits: Opus where a wrong answer looks right (judgement, design review, security), Sonnet for building and writing, Haiku for checks and lookups.
 - Nobody passes a `model` on a call except the escalations in section 2.
 - To keep the manager's context useful when it compacts, `/toon-crew:compact-setup` adds an editable "Compact instructions" section to your CLAUDE.md (see `plugin/skills/compact-setup/SKILL.md`).
@@ -307,7 +309,7 @@ flowchart LR
   MP["marketplace.json<br/>(.claude-plugin/, marketplace crew)"] -->|"source: ./plugin"| SK
 
   subgraph PL["plugin/ : the toon-crew plugin (checked by .github/workflows/ci.yml)"]
-    AG(["agents/*.md<br/>15 crew agents; settings.json<br/>makes Doraemon the main agent"])
+    AG(["agents/*.md<br/>15 crew agents; the manager is the<br/>main agent where you opt in"])
     SK["skills/*<br/>board, task, project-profile, ..."]
     subgraph HK["hooks/hooks.json"]
       GD["hooks/guard.mjs<br/>+ inline-writes.mjs<br/>(PreToolUse)"]
@@ -369,7 +371,7 @@ flowchart LR
   linkStyle 14 stroke:#a371f7,stroke-width:2px
 ```
 
-Claude Code loads the plugin from the marketplace, makes Doraemon the main agent, and runs the hooks around every session. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: Doraemon uses it to queue the whole plan up front and to drop pieces when the plan changes.
+Claude Code loads the plugin from the marketplace and runs the hooks around every session. The manager becomes the main agent only in projects where you opt in. The guard hook checks each risky tool call before it runs. The other hooks only write: a project list and a one-line-per-event log in the plugin's data folder. The `task` skill writes to the same log: the manager uses it to queue the whole plan up front and to drop pieces when the plan changes.
 
 The Crew Room board is a separate local page. `board.sh start` runs `server.ts` on `127.0.0.1`; it reads the log and serves the page, which shows one room per project. Only if you opt a project in (`/toon-crew:project board on`) and the project's `project.md` has a `## Board` section does it also poll GitHub CI, pull requests, commits and a deploy host, read-only.
 
@@ -377,7 +379,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 
 ### What it does
 
-- Gives every session in a project a manager, **Doraemon**, who plans, briefs the crew, checks every hand-back and opens the pull request ([section 1](#1-the-flow)).
+- Gives a project a manager when you turn it on there. It plans, briefs the crew, checks every hand-back and opens the pull request ([section 1](#1-the-flow)).
 - Runs six builders in their **own git worktrees** and keeps six roles **read-only** ([section 2](#2-teams-and-roles)).
 - Checks risky Bash, file, agent and MCP calls with the **guard** before they run, and fails closed: if it cannot decide, it blocks. It asks you before a merge, a push to `main`, or an edit of a project's `.claude/hooks`, `agents`, `skills` or `commands` ([guards.md](guards.md)).
 - Shows the **Crew Room** on `127.0.0.1` ([the Crew Room guide](crew-room.md)).
@@ -391,11 +393,11 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 - **The board has no remote view, no login and no buttons,** and does not start by itself ([the Crew Room guide](crew-room.md#good-to-know)).
 - **Polling is off until you turn it on** for a project, and a project's own files cannot turn it on. It supports GitHub (through `gh`) and one SSH deploy host only: no GitLab, no cloud provider APIs. Commits are read from local refs; it does not fetch. Deploy status needs a result file in a fixed format, and app errors come from the `docker logs` of the containers you name.
 - **The event log is not rotated.** It grows, and the board reads all of it on each refresh. How large it gets in practice has not been measured.
-- **The board has no cost or token tracking** yet.
+- **The board shows plan usage, not a bill.** On a Pro or Max plan, the Plan usage panel shows your 5-hour and weekly limits and each agent's share of that usage (added in 0.3.13; the limits need Claude Code 2.1.287 or later). API users get a dollar ledger instead ([CHANGELOG.md](../CHANGELOG.md)).
 - **Projects never share memory.** Only `[crew]` rules move up, through a pull request the owner merges ([section 4](#4-several-projects)). The lessons pass is owner-only and manual, with no schedule, and needs `gitleaks`.
 - **The evals are not run in CI.** CI runs the structure check, strict validation, the hook and board tests and a secrets scan (`.github/workflows/ci.yml`). The eval cases are run by hand and have not been re-measured since the cast was renamed.
 - **No Windows or Linux desktop setup is documented.** `board.sh` is bash. CI runs on Ubuntu; the evals ran on macOS.
-- **It is private and unlicensed.** There is no public install and no licence to reuse the code.
+- **The code is MIT licensed; the characters are not ours.** See [LICENSE](../LICENSE). Character names and likenesses belong to their owners, and this is an unofficial fan project ([NOTICE](../NOTICE)).
 
 ### Privacy and your data
 

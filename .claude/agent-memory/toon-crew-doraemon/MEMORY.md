@@ -2,4 +2,6 @@
 - [Brief rules](brief-rules.md) — no repo edits for read-only roles; worktrees start from main; read the reference before prescribing a fix
 - [Short, tested docs](feedback-short-tested-docs.md) — README ~120 lines, detail in docs/, test every instruction with twenty-two
 - [Launch characters](launch-characters.md) — owner keeps the crew names and sprites for launch; may rename a bit later
+- [Release 1.0 plan](release-1-0-plan.md) — nothing released until owner tests; first public release is 1.0.0, 0.x.x until then
+- [No Claude attribution](no-claude-attribution.md) — no Co-Authored-By/Claude-Session/Generated-with lines in commits or PRs; history rewrite before public
 - [Cost baseline](cost-baseline.md) — Doraemon 64.6% of plan usage before 0.3.14; measure about a week later for the owner's 30% target

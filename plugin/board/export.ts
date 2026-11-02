@@ -21,13 +21,23 @@ export function toFeed(e: BoardEvent, roles: Map<string, Role>) {
   return { at: e.ts, who: role?.id ?? (e.kind === "ci" ? "CI" : e.agentType ?? "Crew"), kind, text: redact(e.text), ...(e.project ? { project: redact(e.project) } : {}), source: "auto-board" };
 }
 
+// Feed events after the cursor: after the last exported id, or, when the board's compaction removed that event,
+// from the time its id carries ("e-<ms>-<hex>"). Events of that same millisecond go again: "set" by id is harmless.
+export function pendingFeed(events: readonly BoardEvent[], lastId?: string): BoardEvent[] {
+  let start = 0;
+  if (lastId) {
+    const i = events.findIndex((e) => e.id === lastId);
+    const ms = Number(/^e-(\d{1,16})-/.exec(lastId)?.[1]);
+    if (i >= 0) start = i + 1;
+    else if (Number.isFinite(ms)) { const j = events.findIndex((e) => Date.parse(e.ts) >= ms); start = j < 0 ? events.length : j; }
+  }
+  return events.slice(start).filter((e) => FEED_KINDS.has(e.kind));
+}
+
 function main() {
   const dry = process.argv.includes("--dry");
   const cursor: { lastId?: string } = existsSync(CURSOR_FILE) ? JSON.parse(readFileSync(CURSOR_FILE, "utf8")) : {};
-  const events = readEvents();
-  // Resume after the last exported id; ids carry their timestamp, so a lost cursor line is still ordered.
-  const start = cursor.lastId ? events.findIndex((e) => e.id === cursor.lastId) + 1 : 0;
-  const pending = events.slice(start).filter((e) => FEED_KINDS.has(e.kind));
+  const pending = pendingFeed(readEvents(), typeof cursor.lastId === "string" ? cursor.lastId : undefined);
   const batch = pending.slice(0, MAX_WRITES);
   if (!batch.length) { console.log("Nothing new since the last export."); return; }
 

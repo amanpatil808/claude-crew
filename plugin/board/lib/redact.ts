@@ -56,8 +56,17 @@ const RULES: Rule[] = [
   // HTTP auth and cookie headers.
   [/\b(Set-Cookie|Cookie)(\s*:\s*)[^\r\n]+/gi, `$1$2${R}`],
   [/\b(Bearer|Basic|Token)\s+[A-Za-z0-9._~+/=-]{8,}/g, `$1 ${R}`],
-  // Well-known token shapes (GitHub, Anthropic, Slack, AWS, Docker Hub, GitLab) and JWTs.
-  [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-ant-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|dckr_pat_[A-Za-z0-9_-]{10,}|glpat-[A-Za-z0-9_-]{10,})/g, "[token]"],
+  // API key headers and fields with a dash: x-api-key: ..., "X-Goog-Api-Key": "...".
+  [/\b([\w-]*api[-_]?key)("?\s*[:=]\s*)("?)[^\s"',;&]+/gi, `$1$2$3${R}`],
+  // A password glued to its option (mysql -pS3cret, mysqldump -p...), and redis-cli -a <password>.
+  [/\b((?:mysql|mysqldump|mysqladmin|mysqlimport|mysqlcheck|mariadb|mariadb-dump|psql|pg_dump|pg_restore)\b[^\n|;&]*?\s-p)[^\s'"-][^\s'"]*/g, `$1${R}`],
+  [/\b(redis-cli\b[^\n|;&]*?\s-a\s+)[^\s'"]+/g, `$1${R}`],
+  // curl -u user:pass, --user=user:pass, -U proxy user: keep the user. A uid:gid pair (docker -u 1000:1000) stays.
+  [/((?:^|\s)(?:-u|-U|--user|--proxy-user)(?:\s+|=))([^\s:'"]+):(?!\d+(?:\s|$))[^\s'"]+/g, `$1$2:${R}`],
+  // Well-known token shapes (GitHub, Anthropic, Slack, AWS, Docker Hub, GitLab, npm, PyPI, Hugging Face) and JWTs.
+  [/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-ant-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|dckr_pat_[A-Za-z0-9_-]{10,}|glpat-[A-Za-z0-9_-]{10,}|npm_[A-Za-z0-9]{20,}|pypi-[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{20,})/g, "[token]"],
+  // A hex value after a key, token or secret label ("using key 9f2c...", "token: 3e4d..."). Unlabelled hex (git SHAs) stays.
+  [/\b(key|token|secret|signature)(s?\b["']?\s*(?:[:=]\s*|is\s+)?["']?)[0-9a-f]{24,}\b/gi, `$1$2${R}`],
   [/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, "[token]"],
   // OTPs written in prose: keep the label, drop the digits.
   [/\b(otp|one[- ]time (?:password|code)|verification code|login code)\b([^0-9\n]{0,20})\d{4,8}\b/gi, `$1$2${R}`],
@@ -75,6 +84,14 @@ const RULES: Rule[] = [
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, "[email]"],
   // UPI ids (name@okhdfc, 9876543210@ybl): an "@" and a bank or app handle, no dot, so ssh "user@host" is untouched.
   [/[A-Za-z0-9._-]+@(?:ok[a-z]+|[a-z]*(?:bank|upi|pay|ybl|ibl|axl|apl|icici|hdfc|sbi|axis|pnb|paytm|kotak|rbl|idfc|fbl)[a-z]*)\b(?!\.)/gi, "[upi]"],
+  // Aadhaar: 12 digits in groups of 4 (never starting 0 or 1), or 12 digits after the word. Not part of a longer run (a card).
+  [/(?<![\w+.-]|\d[\s-])[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}(?![\w.-]|[\s-]\d)/g, "[id]"],
+  [/\b(aadhaa?r|uidai)(\b[^0-9\n]{0,20})[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b/gi, `$1$2${R}`],
+  // Bank account numbers after a label: "account 123456789012", "a/c no: ...", "acct #...".
+  [/\b(a\/c|acct|account)(\.?\s*(?:no\.?|number|num|#)?\s*[:#-]?\s*)\d{9,18}\b/gi, `$1$2${R}`],
+  // US-style phones: (415) 555-0132, 415-555-0132, 415.555.0132.
+  [/(?<!\w)\(\d{3}\)\s?\d{3}[\s.-]\d{4}(?!\w)/g, "[phone]"],
+  [/(?<![\w.+-])\d{3}([.-])\d{3}\1\d{4}(?![\w.-])/g, "[phone]"],
   // Indian mobiles (+91 98765 43210, 9876543210) and other +CC numbers. The number must stand alone:
   // a letter or digit on either side means it is part of an id (agent id "aac46ee8410611592"), not a phone.
   [/(?<![\w+])(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\w)/g, "[phone]"],

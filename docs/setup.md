@@ -6,17 +6,16 @@ For anyone who is installing `toon-crew`, tuning it for a project, updating it, 
 
 - **Claude Code 2.1.295 or later.** The guard hook uses `"onFailure": "block"`, which older versions do not support.
 - **Node 24.2 or later, with `node` on your PATH** (the hooks and the board both run it). The board scripts are TypeScript run directly by Node, and the board's hook uses `import.meta.main`, which Node added in 24.2.
-- **git access to this private repo**, to install (`gh auth status` is green, or an SSH key is set up).
 - **`gh`**, only if you turn on CI and pull request polling.
 - **`gitleaks`**, only for the owner's lessons pass.
 - There is nothing to `npm install`: the plugin has no dependencies.
 
 ## What happens on first run
 
-1. **You talk to Doraemon.** The plugin makes him the main agent in every session (`"agent": "toon-crew:doraemon"`). If you have your own `agent` setting, yours wins.
+1. **You choose where the manager (Doraemon) runs.** Installing the plugin does not make it your main agent. You [turn the manager on per project](#turn-the-manager-on-or-off); until then the guard and the crew agents are available, but your session is a plain Claude Code chat.
 2. **Your project is registered.** At session start the plugin records the project's path and name in its own data folder, which Claude Code gives the plugin as `$CLAUDE_PLUGIN_DATA`. It is usually `~/.claude/plugins/data/toon-crew-crew/` (plugin name, a dash, marketplace name); run `ls ~/.claude/plugins/data/` to check. The event log lives there too. Polling and the lessons pass are both off.
-3. **He writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, Doraemon runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
-4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#quick-start)).
+3. **The manager writes a project profile.** When you first ask for real work and `.claude/crew/project.md` is missing or stale, the manager runs the `project-profile` skill. It writes that page from what is in your repo: test and build commands, docs per role, no-go areas, deploy rules. It is checked into your project, so read it before you commit it.
+4. **Nothing else starts by itself.** The board is not running yet. Open it with `/toon-crew:board` (see the [README](../README.md#crew-room-optional)).
 
 ## Per-project setup
 
@@ -59,6 +58,28 @@ Then add a `## Board` section to the project's `.claude/crew/project.md` (the `p
 
 `github` turns on CI, pull request and commit polling through `gh`. The `deploy-ssh`, `deploy-result`, `deploy-log` and `deploy-containers` keys turn on a read-only deploy check over ssh. All keys and their formats are in [plugin/board/README.md](../plugin/board/README.md). With no section, or with the flag off, nothing is polled.
 
+## Turn the manager on or off
+
+The manager is opt-in per project. It runs on Opus and delegates, so a crew session uses more of your plan than a plain chat; turning it on only where you want a crew keeps that cost to those projects.
+
+**On.** Either of these:
+
+- Add this to the project's `.claude/settings.json`. Edit the file yourself: the guard blocks the crew from it.
+
+  ```json
+  { "agent": "toon-crew:doraemon" }
+  ```
+
+- Or start one session with it: `claude --agent toon-crew:doraemon`.
+
+**Off.** Remove the `agent` line from the project's `.claude/settings.json`, or start Claude Code without `--agent`. The guard and the crew agents stay available.
+
+To switch off the whole plugin for one project (this also turns off the guard):
+
+```
+claude plugin disable toon-crew@crew --scope project
+```
+
 ## Update and uninstall
 
 `version` in `plugin/.claude-plugin/plugin.json` pins each project to a release, so nothing changes until you ask:
@@ -68,11 +89,11 @@ Then add a `## Board` section to the project's `.claude/crew/project.md` (the `p
 /plugin update toon-crew@crew
 ```
 
-Then `/reload-plugins`. Read [CHANGELOG.md](../CHANGELOG.md) first. To remove the plugin, use `/plugin` and uninstall `toon-crew`; Claude Code's default also deletes the plugin's data folder.
+Then `/reload-plugins`. Read [CHANGELOG.md](../CHANGELOG.md) first. To remove the plugin, use `/plugin` and uninstall `toon-crew`, or run `claude plugin uninstall toon-crew@crew`. Claude Code also deletes the plugin's data folder unless you pass `--keep-data`. Your project's `.claude/crew/` and agent memory stay.
 
 ## Upgrading from 0.x
 
-The memory folders are named `toon-crew-<id>`. Early versions used other names for the crew. Doraemon carries a map of the old names, and the board counts old events for the role that took over, so nothing breaks. Only a project that still holds old memory folders needs a one-time move.
+The memory folders are named `toon-crew-<id>`. Early versions used other names for the crew. The manager carries a map of the old names, and the board counts old events for the role that took over, so nothing breaks. Only a project that still holds old memory folders needs a one-time move.
 
 <details>
 <summary>Memory folder moves (old name to new)</summary>
@@ -104,12 +125,30 @@ The retired characters and who took over each job are listed in [the Crew Room g
 
 ## Troubleshooting
 
+- **The `/toon-crew:...` commands are missing.** Run `/reload-plugins`, then `/plugin` to check that `toon-crew` is installed and enabled.
+- **The manager is not the main agent.** It is opt-in: the project's `.claude/settings.json` needs `"agent": "toon-crew:doraemon"`, or start with `claude --agent toon-crew:doraemon`. The plugin may also be disabled in this project (`claude plugin list` shows it). See [Turn the manager on or off](#turn-the-manager-on-or-off).
+- **Install or update fails.** Claude Code clones the marketplace from GitHub, so you need `git` and a network. Check `claude --version` (2.1.295 or later) and run `/plugin marketplace update crew`.
 - **The board is empty.** The hooks and the board must use the same [data folder](#what-happens-on-first-run). Start the board with `/toon-crew:board`. Started by hand without `CLAUDE_PLUGIN_DATA`, it reads `~/.toon-crew` instead.
 - **The board shows a project but no CI or deploys.** Polling is off until you run `/toon-crew:project board on` and the project's `project.md` has a `## Board` section. See [Show CI, pull requests, commits and deploys on the board](#optional-show-ci-pull-requests-commits-and-deploys-on-the-board).
 - **Nothing is logged at all.** Check `node --version`. The board's hook needs 24.2 or later. (On older Node it likely loads but writes no events; that has not been tested.)
 - **A builder's worktree started from the wrong branch.** Add the `worktree` setting in [Recommended: make builders start from your branch](#recommended-make-builders-start-from-your-branch). Plugin settings cannot set it.
 - **A read-only agent wrote a file.** That is allowed for its own memory file, temp folders and its docs folder. See [Guards](guards.md#the-rules).
 - **The guard blocked something you want.** Run that command yourself with `!`, or on GitHub's website. The guard does not check your own commands.
+
+## Other skills
+
+The [README](../README.md#commands) lists the four skills you will use most. The rest:
+
+| Skill | Who runs it | What it does |
+|---|---|---|
+| `task` | The manager (you can type it too) | Queues and moves board tasks: `add`, `start`, `done`, `drop`, `list` |
+| `project-profile` | The manager, on first run or when `project.md` is stale | Writes `.claude/crew/project.md` |
+| `security-backend` | Kevin and Ninja Hattori (Bob when a task needs it) | Checklist for code that holds personal data, logins or secrets |
+| `integrations` | Kevin and Ninja Hattori (Bob when a task needs it) | Checklist for code that calls a third-party API |
+| `forget` | You | Removes a project from the board's list; with no argument it lists the projects |
+| `crew-lessons` | The repo owner, with Miguel Rivera | The shared-lessons pass; needs `gitleaks` |
+
+Who loads which skill is in [How it works](how-it-works.md#skills-the-crew-uses).
 
 ## Develop
 

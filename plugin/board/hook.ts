@@ -1,10 +1,10 @@
 // Claude Code hook entry: reads the hook's JSON from stdin and appends at most one event, plus one usage
 // event at Stop / SubagentStop / SessionEnd.
 // It always exits 0 and prints nothing, so a logging failure can never block or change a session.
-import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { writePrivate } from "./lib/private-fs.ts";
-import { join } from "node:path";
-import { agentIdOf, agentTypeOf, appendEvent, needOf, NEED_TEXT, readEvents, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
+import { isAbsolute, join } from "node:path";
+import { agentIdOf, agentTypeOf, appendEvent, needOf, NEED_TEXT, parseEvent, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
 import { AGENTS_DIR, EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
@@ -54,10 +54,26 @@ function prEvent(cmd: string, out: string): Draft | null {
 // Assignment text is only ever the tool's short description or summary, never the prompt or message body.
 const say = (s: unknown) => clip(redact(clip(s, 200)), 70);
 
-// Agent id -> agent type from the log, so a SendMessage "to" (an id) names a person on the board.
-function typeOfAgent(id: string): string | undefined {
-  const hit = readEvents().reverse().find((e) => e.agentId === id && e.agentType && e.agentType !== "agent");
-  return hit?.agentType;
+// How far back typeOfAgent looks: the last 512 KB, then the last 8 MB. Never the whole log.
+export const TYPE_TAIL_BYTES: readonly number[] = [512 * 1024, 8 * 1024 * 1024];
+
+// Agent id -> agent type from the newest event in the log's tail that names both, so a SendMessage "to" (an id)
+// names a person on the board. An agent last seen further back stays unnamed (the board shows its id).
+export function typeOfAgent(id: string, file = EVENTS_FILE, tails: readonly number[] = TYPE_TAIL_BYTES): string | undefined {
+  if (!agentIdOf(id)) return undefined;
+  for (const bytes of tails) {
+    let text: string;
+    try { text = tail(file, bytes); } catch { return undefined; }
+    const lines = text.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (!lines[i].includes(id)) continue;   // cheap filter before parsing
+      const e = parseEvent(lines[i]);
+      const type = e && e.agentId === id && e.agentType !== "agent" ? agentTypeOf(e.agentType) : undefined;
+      if (type) return type;
+    }
+    try { if (statSync(file).size <= bytes) return undefined; } catch { return undefined; }   // that was the whole file
+  }
+  return undefined;
 }
 
 // The model in the agent's own file; plugin-scoped ("toon-crew:bob"), helper-copy and retired names resolve like the board's roles.
@@ -226,6 +242,17 @@ export async function leaveRefreshMarker(input: HookInput, env: Record<string, s
   } catch { /* the timer still catches up */ }
 }
 
+// SessionStart: hand-back files older than 60 days go at most once a day, whether or not the board ever runs.
+// They live under CLAUDE_PLUGIN_DATA (the board's folder when that is unset, like the board's own prune).
+export async function dailyPrune(input: HookInput, env: Record<string, string | undefined> = process.env, now = Date.now()): Promise<void> {
+  if (input.hook_event_name !== "SessionStart") return;
+  const data = env.CLAUDE_PLUGIN_DATA && isAbsolute(env.CLAUDE_PLUGIN_DATA) ? env.CLAUDE_PLUGIN_DATA : LOG_DIR;
+  try {
+    const { pruneIfDue } = await import("./lib/handbacks.ts");   // only on SessionStart
+    pruneIfDue(data, now);
+  } catch { /* the next session tries again */ }
+}
+
 async function main() {
   try {
     let raw = "";
@@ -233,6 +260,7 @@ async function main() {
     const input: HookInput = JSON.parse(raw);
     const e = toEvent(input);
     if (e) appendEvent(e);
+    await dailyPrune(input);
     await leaveRefreshMarker(input);
     const read = input.hook_event_name === "Stop" || input.hook_event_name === "SubagentStop" || input.hook_event_name === "SessionEnd" ? await loadReadUsage() : null;
     const u = read ? await toUsage(input, read, (id) => (id === e?.agentId ? e.agentType : undefined) ?? typeOfAgent(id)) : null;
