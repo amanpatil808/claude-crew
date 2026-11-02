@@ -1,5 +1,10 @@
 # Kevin memory
 
+- APFS folds names with full Unicode case folding: U+017F -> s, U+212A -> k, U+00DF and U+1E9E -> ss, ligatures (U+FB01) -> fi, and NFD = NFC. toLowerCase misses all but Kelvin. Compare with NFKC then lower->upper->lower; a probe over every BMP letter (create x<c>, ask realpath.native) found no gap after that. (seen 1) [crew]
+- bash 3.2 (macOS /bin/bash) has no globstar and reads `**` as `*`, so `lnk/**/x` writes through a link; zsh `**/` does not follow links, `***/` does. A glob guard must expand `**` at least one level with links followed. (seen 1) [crew]
+- In a shell tokenizer, a `(` after a word or a command's first word is zsh/extglob pattern syntax (`*(D)`, `(a|b)`, `@(x)`), not a subshell: keep it in the word, and still scan its body as commands. Exclude `name()`, `a=(` and words after if/while/!/{/time. (seen 1) [crew]
+- Write guards that check only the destination miss whole-folder placement: cp -r x/.git dir/, cp -R x/. dir/, rsync x/ dir/, ditto, mv x/.git .git, ln -s into a missing .claude. Check dest itself and dest/<source name> against the roots, with lstat of source/<rel> and refusing links. (seen 1) [crew]
+
 - A plugin cannot ship the main statusLine (plugin settings apply only `agent` and `subagentStatusLine`, and the subagent status line has no rate_limits). For plan windows use a mod's `session.measure` / `$.session.usage().rateLimits` (CC >= 2.1.287). (seen 2) [crew]
 - A mod has no documented way to find CLAUDE_PLUGIN_DATA, and hook payloads carry no rate limits. To get mod data to disk, have the mod `$.env.set` one literal variable, which reaches every process started later, and have an async settings hook (which does get CLAUDE_PLUGIN_DATA) copy it through an allow-list. Why: plan-usage 2026-10-28; rateLimits is "empty off a subscription", so empty plus cost > 0 means per-token billing. (seen 1) [crew]
 - `claude plugin validate <dir>` prints a mod's hooks, calls, and env reads and writes. Use it as a free, offline proof of a mod's surface, next to a test that gives the mod a Proxy `$` which throws on any call outside the allow-list. (seen 1) [crew]
