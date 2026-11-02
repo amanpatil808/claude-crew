@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Nothing is released (no merge to main, no public repo, no history rewrite) until the owner has tested the build himself. The first public release is 1.0.0; work before it stays on 0.x.x (0.3.15 now).
+1.0.0 merged to main on 2026-11-02 (PR #23, merge 0e6e2a2) after the owner's "yes i am good le relase 1.0.0 now". Then, by his choice: rewrite history in place (no-reply email, Claude trailers out), make the repo public, protect main like a normal public repo, and look into listing it in Anthropic's plugin directory. The guard refuses force pushes for every role, so the owner runs the rewrite push himself.
 
 **Why:** owner, 2026-11-01 night: "dont release anything we will have it test first and release 1.0.0 there then; lets use 0.x.x".
 
