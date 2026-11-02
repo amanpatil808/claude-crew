@@ -6,5 +6,6 @@
   "author": { "name": "Aman Patil" },
   "repository": "https://github.com/amanpatil808/claude-crew",
   "license": "MIT",
+  "icon": ".claude-plugin/icon.png",
   "keywords": ["agents", "crew", "multi-agent", "guards", "board"]
 }
