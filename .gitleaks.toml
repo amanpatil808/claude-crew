@@ -4,6 +4,7 @@ title = "claude-crew gitleaks config"
 useDefault = true
 
 # The guard and redaction tests contain fake secrets on purpose (to prove the memory guard blocks them).
+# The tests moved from plugin/*/test to tests/ in 1.0.1; gitleaks scans every commit, so both paths stay listed.
 # They are made-up strings, not real credentials. Reviewed 2026-10-23.
 [allowlist]
 description = "Fake secrets used as test fixtures for the memory guard"
@@ -20,4 +21,16 @@ paths = [
   '''plugin/board/test/redact\.test\.ts''',
   '''plugin/board/test/redact-leaks\.test\.ts''',
   '''plugin/board/test/hardening\.test\.ts''',
+  '''tests/hooks/guard\.test\.mjs''',
+  '''tests/hooks/guard-handbacks\.test\.mjs''',
+  '''tests/hooks/guard-data-shell\.test\.mjs''',
+  '''tests/hooks/guard-hardening\.test\.mjs''',
+  '''tests/hooks/guard-roles\.test\.mjs''',
+  '''tests/hooks/proof-recheck\.test\.mjs''',
+  '''tests/hooks/proof-bypass\.test\.mjs''',
+  '''tests/hooks/proof-files\.test\.mjs''',
+  '''tests/hooks/proof-solid\.test\.mjs''',
+  '''tests/board/redact\.test\.ts''',
+  '''tests/board/redact-leaks\.test\.ts''',
+  '''tests/board/hardening\.test\.ts''',
 ]

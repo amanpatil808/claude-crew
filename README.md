@@ -1,7 +1,7 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.svg"><img src="docs/images/hero-light.svg" alt="toon-crew: Turn Claude Code into an AI engineering team." width="820"></picture></p>
 
 <p align="center">
-<a href="CHANGELOG.md"><img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square"></a>
+<a href="CHANGELOG.md"><img alt="version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-blue?style=flat-square"></a>
 <a href="https://code.claude.com/docs/en/overview"><img alt="Claude Code 2.1.295+" src="https://img.shields.io/badge/Claude_Code-2.1.295%2B-blue?style=flat-square"></a>
 <a href="docs/setup.md#requirements"><img alt="Node 24.2+" src="https://img.shields.io/badge/Node-24.2%2B-blue?style=flat-square"></a>
 </p>
@@ -145,6 +145,13 @@ Claude Code 2.1.295+, Node 24.2+ and bash. Tested on macOS; CI runs on Linux; Wi
 Update with `/plugin marketplace update crew`, then `/plugin update toon-crew@crew` and `/reload-plugins`. Uninstall with `claude plugin uninstall toon-crew@crew`. [Details](docs/setup.md#update-and-uninstall).
 
 </details>
+
+## What it changes on your machine
+
+- **One environment variable.** The plan-usage mod ([`plan-mod.mjs`](plugin/hooks/plan-mod.mjs)) sets `TOON_CREW_LIMITS` to your plan's usage percentages and reset times. Nothing else.
+- **One data folder.** Events, hand-backs and `limits.json` go to the plugin's data folder.
+- **Your own `gh` and `ssh`, opt-in.** Only after `/toon-crew:project board on` and a Board section in `project.md`, and only while the board is running. Results stay local.
+- **No network calls of its own.** [Privacy](docs/how-it-works.md#privacy-and-your-data).
 
 ## Docs
 

@@ -155,8 +155,8 @@ Who loads which skill is in [How it works](how-it-works.md#skills-the-crew-uses)
 The installable plugin lives in `plugin/` (agents, skills, hooks, board, evals, settings). The marketplace entry points at `./plugin`, so `docs/`, CI files and scripts are not copied into installs. The repo root holds the marketplace file, docs, scripts and CI.
 
 ```
-node --test plugin/hooks/test/*.test.mjs                 # guard, review proofs and registry tests
-node --no-warnings --test plugin/board/test/*.test.ts    # board tests
+node --test tests/hooks/*.test.mjs                 # guard, review proofs and registry tests
+node --no-warnings --test tests/board/*.test.ts    # board tests
 node scripts/check-structure.mjs                         # manifest, marketplace, hooks checks
 claude plugin validate . --strict                        # marketplace
 claude plugin validate ./plugin --strict                 # plugin

@@ -2,6 +2,14 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 1.0.1 - 2 Nov 2026
+
+### Changed
+
+- Tests moved out of the shipped plugin folder.
+- A listing icon added.
+- README section on what the plugin changes on your machine: the one environment variable the plan-usage mod sets, the data folder, and the opt-in `gh` and `ssh` polling.
+
 ## 1.0.0 - 2 Nov 2026
 
 First public release. Everything below is new since 0.3.14.

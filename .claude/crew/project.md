@@ -14,11 +14,11 @@ Lines marked `(owner)` were set by the owner; agents keep them as they are.
 | Install | none (no dependencies) | found, not run | repo has no `package.json` |
 | Structure check | `node scripts/check-structure.mjs` | found, not run | `.github/workflows/ci.yml:34` |
 | Validate plugin | `claude plugin validate . --strict` and `claude plugin validate ./plugin --strict` | found, not run | `.github/workflows/ci.yml:37-40` |
-| Test (guard hooks) | `node --test plugin/hooks/test/*.test.mjs` | found, not run | `.github/workflows/ci.yml:45` |
-| Test (board) | `node --no-warnings --test plugin/board/test/*.test.ts` | found, not run | `.github/workflows/ci.yml:53` |
+| Test (guard hooks) | `node --test tests/hooks/*.test.mjs` | found, not run | `.github/workflows/ci.yml:54` |
+| Test (board) | `node --no-warnings --test tests/board/*.test.ts` | found, not run | `.github/workflows/ci.yml:62` |
 | Secrets scan | `gitleaks detect --source . --config .gitleaks.toml --redact` | found, not run | `.github/workflows/ci.yml:70-74` |
 | Lint / Typecheck / Format | none defined | unverified | TODO(verify) |
-| Run locally (board) | `bash plugin/board/board.sh start` (also `stop`, `status`, `export`, `test`) | found, not run | `plugin/board/README.md` |
+| Run locally (board) | `bash plugin/board/board.sh start` (also `stop`, `status`, `export`, `task`, `handbacks`) | found, not run | `plugin/board/README.md` |
 
 - Env: `CLAUDE_PLUGIN_DATA`, `CLAUDE_PLUGIN_ROOT`, `BOARD_PORT`, `BOARD_LOG_DIR` (board); no services needed.
 - Green means: structure check, strict validate of marketplace and plugin, guard and board tests with 0 fail, 0 skipped, 0 todo, and gitleaks over all commits.
