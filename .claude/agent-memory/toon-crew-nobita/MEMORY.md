@@ -43,4 +43,8 @@
 - Encode a README GIF at 2x its `<img width>` from a deviceScaleFactor 2 capture, downscaling once with lanczos; a 1x GIF shown at its own width is blurry on retina (owner: "too zoomed and blurred"). Frame the whole board, not a close crop. (seen 1) [crew]
 - sharp `metadata()` with `animated: true` throws "exceeds pixel limit" on large GIFs; pass `limitInputPixels: false`, or load one `page` at a time. (seen 1) [crew]
 - Re-seed a fresh demo folder before re-filming a story: events appended to an old seed leave the end state in the first frame and spoil the reveal. (seen 1) [project]
+- To read a branch's files without a checkout: `git -C <repo> archive -o <literal scratch>.tar <sha> <paths>`, then `tar -x -C <dir> -f` in a separate call. (seen 1) [crew]
+- Measure README balance as numbers: render via `gh api /markdown`, set `prefers-color-scheme` with CDP `Emulation.setEmulatedMedia`, and take each h2 section's height and image pixels from `getBoundingClientRect`. (seen 1) [crew]
+- An 820 px diagram drops to ~5 px labels on a 390 px phone, so the text beside it must carry every box in the same order and words. (seen 1) [crew]
+- Feature-card tables: 2 columns at most (3 squeeze to 1-3 words per line on phone); cut cards that repeat the intro or a later section. (seen 1) [crew]
 - README card images show at 380 px, about 0.4x of a 960 px source: chip text needs 30 px or more in the source to land near 12 px. A two-column list of large chips reads better there than a four-column grid. (seen 1) [crew]
