@@ -153,23 +153,61 @@ export function watchRefresh({ dir = refreshDir(), registry = readRegistry, poll
   return () => { stopped = true; clearInterval(every); clearTimeout(timer); };
 }
 
+// ---- Viewers: the timer pollers run only while a page is looking ----
+// A page asks /api/state every 2 s while its tab is visible (room.js stops when hidden), so a request in the last
+// VIEWER_WINDOW_MS means someone is watching. The server exits after IDLE_EXIT_MS with none.
+export const VIEWER_WINDOW_MS = 5 * 60_000;
+export const IDLE_EXIT_MS = 2 * 3_600_000;
+export interface Viewers {
+  seen(): boolean;      // a page asked now; true when nobody had asked within the window before (a page came back)
+  watched(): boolean;   // a page asked within the window
+  idleMs(): number;     // since the last page request, or since the start when none came yet
+}
+export function viewerClock(now: () => number = Date.now, windowMs = VIEWER_WINDOW_MS): Viewers {
+  const started = now();
+  let last = Number.NEGATIVE_INFINITY;
+  return {
+    seen: () => { const t = now(), back = !(t - last <= windowMs); last = t; return back; },
+    watched: () => now() - last <= windowMs,
+    idleMs: () => now() - Math.max(started, last),
+  };
+}
+
+export interface Polling { stop(): void; wake(): void }
+export interface PollOptions {
+  githubMs?: number; boxMs?: number;
+  watched?: () => boolean;                       // false: the timer rounds poll nothing (gh, ssh)
+  github?: (p: Project) => Promise<void>; box?: (p: Project) => Promise<void>;
+  registry?: () => Project[];
+  refresh?: boolean;                             // watch the refresh markers (default true)
+}
+
 // Overlapping polls would race on the state files, so each loop waits for its previous round and the two
 // pollers are chained through one queue. The registry is re-read each round, so a new project is picked up
 // without a restart. GitHub is polled every 20 s as a fallback (about 180 calls an hour of gh's 5000) and at once
-// after a marker; the box every 2 min: each poll is an ssh login there.
-export function startPolling(githubMs = 20_000, boxMs = 120_000): () => void {
+// after a marker; the box every 2 min: each poll is an ssh login there. With no viewer a round polls nothing;
+// wake() runs both rounds at once (a page came back). Refresh markers still poll: a crew command asked for them.
+export function startPolling(o: PollOptions = {}): Polling {
+  const watched = o.watched ?? (() => true), registry = o.registry ?? readRegistry;
   const loop = (fn: (p: Project) => Promise<void>, ms: number) => {
-    let stopped = false, timer: NodeJS.Timeout | undefined;
+    let stopped = false, running = false, timer: NodeJS.Timeout | undefined;
     const tick = async () => {
-      try { for (const p of readRegistry()) await enqueue(() => fn(p)).catch(() => undefined); }
-      finally { if (!stopped) timer = setTimeout(tick, ms); }
+      timer = undefined;
+      running = true;
+      try { if (watched()) for (const p of registry()) await enqueue(() => fn(p)).catch(() => undefined); }
+      finally { running = false; if (!stopped) timer = setTimeout(tick, ms); }
     };
     void tick();
-    return () => { stopped = true; clearTimeout(timer); };
+    return {
+      stop: () => { stopped = true; clearTimeout(timer); },
+      wake: () => { if (stopped || running) return; clearTimeout(timer); void tick(); },
+    };
   };
   let queue = Promise.resolve();
   const enqueue = (fn: () => Promise<void>) => (queue = queue.then(fn, fn));
+  const github = o.github ?? pollGithub;
+  const loops = [loop(github, o.githubMs ?? 20_000), loop(o.box ?? pollBox, o.boxMs ?? 120_000)];
   // Refresh polls join the same queue as the timers, so they never overlap a timer round on the state files.
-  const stops = [loop(pollGithub, githubMs), loop(pollBox, boxMs), watchRefresh({ poll: (p) => enqueue(() => pollGithub(p)) })];
-  return () => stops.forEach((s) => s());
+  const stopRefresh = o.refresh === false ? () => undefined : watchRefresh({ registry, poll: (p) => enqueue(() => github(p)) });
+  return { stop: () => { loops.forEach((l) => l.stop()); stopRefresh(); }, wake: () => loops.forEach((l) => l.wake()) };
 }
