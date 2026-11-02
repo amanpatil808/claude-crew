@@ -2,7 +2,9 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
-## 0.3.15 - 2 Nov 2026
+## 1.0.0 - 2 Nov 2026
+
+First public release. Everything below is new since 0.3.14.
 
 ### Changed
 
