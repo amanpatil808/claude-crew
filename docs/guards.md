@@ -101,5 +101,5 @@ Wildcards, look-alike letters (also written as `$'\x..'` escapes) and pattern sy
 
 - Rules: `plugin/hooks/guard.mjs`, with inline-code parsing in `plugin/hooks/inline-writes.mjs`.
 - Which tools it runs on, the timeout and `onFailure`: `plugin/hooks/hooks.json`.
-- Tests: `plugin/hooks/test/*.test.mjs`. Run them with `node --test plugin/hooks/test/*.test.mjs`.
+- Tests: `tests/hooks/*.test.mjs`. Run them with `node --test tests/hooks/*.test.mjs`.
 - The roles and their settings: [how it works, section 2](how-it-works.md#2-teams-and-roles).

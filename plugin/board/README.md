@@ -12,7 +12,7 @@ CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/boa
 
 This is the exact command the `/toon-crew:board` skill runs (in the skill text, `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` are filled in). It prints `{"pid":..,"port":..}`; open `http://127.0.0.1:<port>`. The port is the first free one from 8811 (`BOARD_PORT=8830` starts the search there).
 
-Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `board.sh task ...` (below), `board.sh test`.
+Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `board.sh task ...` (below).
 
 ## Where things live
 
@@ -80,4 +80,4 @@ board.sh task list [--all] [--json]
 
 ## Test
 
-`board/board.sh test` (or `node --no-warnings --test board/test/*.test.ts`). Tests use a throwaway data folder.
+From a clone of the repo: `node --no-warnings --test tests/board/*.test.ts`. The tests do not ship with the plugin; they use a throwaway data folder.

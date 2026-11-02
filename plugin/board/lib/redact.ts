@@ -44,7 +44,7 @@ function maskNumbers(text: string): string {
 }
 
 const RULES: Rule[] = [
-  // postgres://user:pass@host, redis://:pass@host: keep scheme and user, drop the password.
+  // A URL with a password before the host (database or cache URLs): keep scheme and user, drop the password.
   [/\b([a-z][a-z0-9+.-]*:\/\/)([^\s:/@]*):([^\s@/]+)@/gi, `$1$2:${R}@`],
   // "password": "...", "addressLine1": "..." and friends in JSON logs.
   [new RegExp(`("${SECRET_KEY}"\\s*:\\s*)("(?:[^"\\\\]|\\\\.)*"|[^,}\\s]+)`, "gi"), `$1"${R}"`],

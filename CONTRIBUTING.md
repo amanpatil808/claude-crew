@@ -12,8 +12,8 @@ CI runs these (`.github/workflows/ci.yml`); run them before you open a pull requ
 node scripts/check-structure.mjs
 claude plugin validate . --strict
 claude plugin validate ./plugin --strict
-node --test plugin/hooks/test/*.test.mjs
-node --no-warnings --test plugin/board/test/*.test.ts
+node --test tests/hooks/*.test.mjs
+node --no-warnings --test tests/board/*.test.ts
 ```
 
 CI also scans every commit for secrets with gitleaks. There is no linter or type checker.

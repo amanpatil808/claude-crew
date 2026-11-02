@@ -51,7 +51,7 @@ jobs:
       # zero tests and still prints "# fail 0", so each step also needs "# pass N", N >= 1.
       - name: Guard and registry tests
         run: |
-          node --test --test-reporter=tap plugin/hooks/test/*.test.mjs | tee guard-tests.tap
+          node --test --test-reporter=tap tests/hooks/*.test.mjs | tee guard-tests.tap
           grep -qE '^# pass [1-9][0-9]*$' guard-tests.tap
           grep -qE '^# skipped 0$' guard-tests.tap
           grep -qE '^# todo 0$' guard-tests.tap
@@ -59,7 +59,7 @@ jobs:
 
       - name: Board tests
         run: |
-          node --no-warnings --test --test-reporter=tap plugin/board/test/*.test.ts | tee board-tests.tap
+          node --no-warnings --test --test-reporter=tap tests/board/*.test.ts | tee board-tests.tap
           grep -qE '^# pass [1-9][0-9]*$' board-tests.tap
           grep -qE '^# skipped 0$' board-tests.tap
           grep -qE '^# todo 0$' board-tests.tap

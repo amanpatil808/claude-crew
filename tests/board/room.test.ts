@@ -1,0 +1,147 @@
+import "./env.ts";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { listRoles, loadRoles, crewFrom, readAgentInfo } from "../../plugin/board/lib/crew.ts";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mainBusy, roomFeed, roomMembers, roomFacts, roomTalks, roleNotes, managerActive } from "../../plugin/board/lib/room.ts";
+import type { BoardEvent } from "../../plugin/board/lib/events.ts";
+
+const ev = (o: Partial<BoardEvent>): BoardEvent => ({ id: "e-" + Math.random(), ts: new Date().toISOString(), kind: "agent-start", text: "", ...o }) as BoardEvent;
+
+// A throwaway agents folder, so the tests do not depend on the plugin's real agent files.
+function agentsFolder(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), "crew-agents-"));
+  for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, `${name}.md`), body);
+  return dir;
+}
+const JOE = "---\nname: joe-gardner\ndescription: Tester who runs every check. (v0.2, training)\nmodel: haiku\neffort: low\ncolor: cyan\nmaxTurns: 40\n---\nbody";
+
+test("listRoles gives the 15 roster roles in desk order, even with no agent files", () => {
+  const roles = listRoles(agentsFolder({}));
+  assert.equal(roles.length, 15);
+  assert.deepEqual(roles.map((r) => r.order), [...roles.map((r) => r.order)].sort((a, b) => a - b));
+  assert.deepEqual(roles.map((r) => r.id).sort(), ["bob", "dekisugi", "doraemon", "joe-gardner", "kevin", "miguel-rivera", "mike-wazowski", "ninja-hattori", "nobita", "olaf", "shinchan", "shizuka", "stuart", "sulley", "twenty-two"]);
+  assert.ok(roles.every((r) => r.id && r.mascot && r.role && r.team && r.title));
+  assert.deepEqual([roles.find((r) => r.id === "bob")?.team, roles.find((r) => r.id === "bob")?.title], ["Backend Team", "Backend Developer"]);
+  const m = roomMembers([], roles.map((r) => r.id), false, new Map(), roles).find((x) => x.id === "joe-gardner");
+  assert.deepEqual([m?.team, m?.title], ["QA Team", "QA Engineer (runs every check, exact counts)"]);
+  assert.equal(roles.find((r) => r.id === "stuart")?.mascot, "Stuart");
+});
+
+test("feed keeps outcomes only: no generic helpers, no main session, no repeated starts, no passing CI", () => {
+  const roles = loadRoles();
+  const feed = roomFeed([
+    ev({ agentId: "a", agentType: "joe-gardner", text: "joe-gardner started" }),
+    ev({ agentId: "a", agentType: "joe-gardner", text: "joe-gardner started" }),
+    ev({ agentId: "g", agentType: "general-purpose", text: "general-purpose started" }),
+    ev({ agentId: "m", agentType: "agent", kind: "agent-stop", text: "main session finished: chatter" }),
+    ev({ agentId: "a", agentType: "joe-gardner", kind: "agent-stop", text: "joe-gardner finished: All 120 tests pass" }),
+    ev({ kind: "ci", ok: true, text: "CI x: success" }),
+    ev({ kind: "ci", ok: false, text: "CI x on main: failure" }),
+    ev({ kind: "commit", text: "Commit abc" }),
+    ev({ kind: "pr", text: "Opened PR #23" }),
+    ev({ kind: "deploy", ok: true, text: "Deploy ok v0.22.0: healthy" }),
+  ], roles);
+  assert.deepEqual(feed.map((f) => f.text).reverse(), ["Joe Gardner started", "Joe Gardner handed back: All 120 tests pass", "CI x on main: failure", "Opened PR #23", "Deployed v0.22.0 ok"]);
+  assert.equal(feed.length, 5);
+  assert.ok(!feed.some((f) => /general|main session|Commit/.test(f.text)));
+});
+
+test("members: working beats done, unknown roles are idle; facts are at most three", () => {
+  const roles = loadRoles();
+  const events = [ev({ agentId: "a", agentType: "joe-gardner", text: "joe-gardner started" })];
+  const members = roomMembers(crewFrom(events, roles), ["joe-gardner", "doraemon"]);
+  assert.equal(members.find((m) => m.id === "joe-gardner")?.status, "working");
+  assert.equal(members.find((m) => m.id === "doraemon")?.status, "working");   // managing Joe
+  assert.match(members.find((m) => m.id === "doraemon")?.line ?? "", /^Managing Joe Gardner/);
+  assert.equal(roomMembers([], ["doraemon"])[0].status, "idle");
+  assert.equal(roomMembers([], ["doraemon"], true)[0].line, "Working now");
+  assert.ok(roomFacts(members, { status: "ok", version: "v1" }).length <= 3);
+});
+
+test("the manager is busy from a heartbeat until his turn ends, 10 minutes at most", () => {
+  const at = (min: number) => new Date(Date.parse("2026-10-22T10:00:00Z") + min * 60_000).toISOString();
+  const now = Date.parse(at(5));
+  assert.equal(mainBusy([ev({ kind: "main-busy", ts: at(1) })], now), true);
+  assert.equal(mainBusy([ev({ kind: "main-busy", ts: at(1) }), ev({ kind: "turn-end", ts: at(2) })], now), false);
+  assert.equal(mainBusy([ev({ kind: "main-busy", ts: at(1) })], Date.parse(at(20))), false);
+  assert.equal(mainBusy([ev({ kind: "turn-end", ts: at(1) }), ev({ kind: "main-busy", ts: at(3) })], now), true);
+});
+
+test("talks, feed lines and hover notes for assignments and resumed agents", () => {
+  const roles = loadRoles(), now = Date.now();
+  const at = (s: number) => new Date(now - s * 1000).toISOString();
+  const events = [
+    ev({ ts: at(90), agentId: "s1", agentType: "shinchan", text: "shinchan started" }),
+    ev({ ts: at(80), agentId: "s1", kind: "agent-stop", text: "main session finished: Built the hallway" }),
+    ev({ ts: at(40), kind: "assign", from: "doraemon", to: "shinchan", toId: "s1", text: "keep old numbers while fetching" }),
+    ev({ ts: at(30), kind: "assign", from: "doraemon", to: "nobody-here", text: "x" }),
+    ev({ ts: new Date(now - 3_600_000).toISOString(), kind: "assign", from: "doraemon", to: "joe-gardner", text: "old" }),
+  ];
+  const talks = roomTalks(events, roles, now);
+  assert.deepEqual(talks.map((t) => [t.from, t.to, t.text]), [["doraemon", "shinchan", "keep old numbers while fetching"]]);
+  const feed = roomFeed(events, roles);
+  assert.ok(feed.some((f) => f.text === "Doraemon → Shinchan + Shiro: keep old numbers while fetching" && f.tone === "assign"));
+  assert.ok(feed.some((f) => f.tone === "done" && f.say === "Built the hallway"));   // untyped stop resolved by agent id
+  const members = roomMembers(crewFrom(events, roles), ["shinchan"], false, roleNotes(events, roles));
+  assert.equal(members[0].status, "working");   // the message resumed the agent
+  assert.equal(members[0].task, "keep old numbers while fetching");
+  assert.equal(members[0].lastHandback, "Built the hallway");
+});
+
+test("agent files give model, effort, colour, turns, version and stage", () => {
+  const roles = listRoles(agentsFolder({ "joe-gardner": JOE }));
+  const joe = roles.find((r) => r.id === "joe-gardner");
+  assert.deepEqual([joe?.model, joe?.effort, joe?.color, joe?.maxTurns, joe?.version, joe?.stage], ["haiku", "low", "purple", 40, "v0.2", "training"]);
+  assert.equal(roles.find((r) => r.id === "nobita")?.model, undefined);   // no file: no invented model
+  assert.deepEqual(readAgentInfo("/nonexistent/x.md"), {});
+});
+
+test("an agent file with no version tag gives no version or stage", () => {
+  const plain = "---\nname: joe-gardner\ndescription: Tester who runs every check.\nmodel: haiku\n---\nbody";
+  const joe = listRoles(agentsFolder({ "joe-gardner": plain })).find((r) => r.id === "joe-gardner");
+  assert.equal(joe?.model, "haiku");
+  assert.deepEqual([joe?.version, joe?.stage], [undefined, undefined]);
+});
+
+test("members carry role info, last contact and model override; manager activity follows the heartbeat", () => {
+  const roles = loadRoles(), now = Date.now(), at = (s: number) => new Date(now - s * 1000).toISOString();
+  const events = [
+    ev({ ts: at(300), agentId: "t1", agentType: "joe-gardner", text: "joe-gardner started" }),
+    ev({ ts: at(100), kind: "assign", from: "doraemon", to: "joe-gardner", toId: "t1", text: "re-run", model: "sonnet" }),
+  ];
+  const [m] = roomMembers(crewFrom(events, roles), ["joe-gardner"], false, roleNotes(events, roles), listRoles(agentsFolder({ "joe-gardner": JOE })));
+  assert.equal(m.lastContactAt, at(100));
+  assert.equal(m.modelOverride, "sonnet");
+  assert.deepEqual([m.model, m.version, m.stage, m.effort], ["haiku", "v0.2", "training", "low"]);
+  const [s] = roomMembers([], ["joe-gardner"], false, roleNotes([events[0]], roles));
+  assert.equal(s.lastContactAt, at(300));
+  assert.equal(managerActive([ev({ kind: "main-busy", ts: at(120) })], now), true);
+  assert.equal(managerActive([ev({ kind: "main-busy", ts: at(300) })], now), false);
+  assert.equal(managerActive([], now), false);
+});
+
+test("namespaced hand-backs show their summary, not the text after the plugin prefix", () => {
+  const roles = loadRoles();
+  const events = [
+    ev({ agentId: "k", agentType: "toon-crew:kevin", text: "toon-crew:kevin started" }),
+    ev({ agentId: "k", agentType: "toon-crew:kevin", kind: "agent-stop", text: "toon-crew:kevin finished: orders table and migration 0042" }),
+    ev({ agentId: "b", agentType: "toon-crew:bob", text: "toon-crew:bob started" }),
+    ev({ agentId: "b", agentType: "toon-crew:bob", kind: "agent-stop", text: "toon-crew:bob finished: " }),
+  ];
+  const feed = roomFeed(events, roles).reverse();
+  assert.deepEqual(feed.map((f) => f.text), ["Kevin started", "Kevin handed back: orders table and migration 0042", "Bob started", "Bob handed back"]);
+  assert.equal(feed[1].say, "orders table and migration 0042");
+  assert.equal(feed[3].say, "Done!");
+  const kevin = roomMembers(crewFrom(events, roles), ["kevin", "bob"]).find((m) => m.id === "kevin");
+  assert.equal(kevin?.line, "orders table and migration 0042");
+  assert.equal(roleNotes(events, roles).get("kevin")?.handback, "orders table and migration 0042");
+});
+
+test("a stop with a colon in the summary keeps all of it", () => {
+  const roles = loadRoles();
+  const feed = roomFeed([ev({ agentId: "k", agentType: "toon-crew:kevin", kind: "agent-stop", text: "toon-crew:kevin finished: Fixed it: two files, 3:1 ratio" })], roles);
+  assert.equal(feed[0].text, "Kevin handed back: Fixed it: two files, 3:1 ratio");
+});

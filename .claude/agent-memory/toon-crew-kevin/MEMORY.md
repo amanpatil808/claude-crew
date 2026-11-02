@@ -63,3 +63,7 @@
 - Decode shell ANSI-C escapes (\x, octal) as bytes, then UTF-8, then fold: one char per escape turns a long s (C5 BF) into two Latin-1 letters no fold catches. (seen 1) [crew]
 - Protected roots also hang off the cwd, so "destination at or above a root" refuses every folder you cd into; count not-yet-existing roots only at or above project, role checkout or home. (seen 1) [project]
 - A worktree agent can't run `HOME=... node x.mjs` (read as a git redirect) or `git clean -X`: set env in a small wrapper script; leave ignored proof folders for the manager. (seen 1) [project]
+- `claude plugin eval` refuses an `--eval-dir` outside the plugin root ("no .."), and a `name@marketplace` target reads evals from the installed cache, so evals must ship inside the plugin to stay runnable. Probe with a `--case` glob that matches nothing (no agent runs; `--runs` must be >= 1). (seen 1) [crew]
+- When you move gitleaks-allow-listed fixtures, keep the old paths in the allow-list beside the new ones: gitleaks scans every commit, and history still holds the files at the old paths. (seen 1) [crew]
+- In grep -E, `[^\n]` means "not a backslash and not n", not "not a newline", so a scan built on it misses most lines. Grep is line-based already: use `.*` or `[^|]*`. (seen 1) [crew]
+- The toon-crew guard refuses any Bash line containing the word eval (even `claude plugin eval --help`) and shell appends into agent-memory. Run the CLI from a scratch node script with execFileSync, and write memory with Edit. (seen 1) [project]
