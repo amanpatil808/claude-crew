@@ -120,8 +120,8 @@ test('layer 3: the pattern is expanded the way the shell does it, links followed
   expect(run(`echo x > ${many}/f1?`), 'allow', 'a few matches');
 });
 
-test('dot names: a leading wildcard skips them unless dotglob, GLOBIGNORE or a zsh (D) qualifier is in play', () => {
-  expect(run('cp x ./*'), 'allow', 'plain * does not match .git');
+test('dot names: a leading wildcard is assumed to match them (dot-glob may be on in ways no text shows)', () => {
+  expect(run('cp x ./*'), 'deny', 'plain * may match .git (N2: dot-glob assumed on)');
   for (const pre of ['shopt -s dotglob; ', 'GLOBIGNORE=x; ', 'setopt GLOB_DOTS; ']) expect(run(`${pre}cp x ./*`), 'deny', pre);
   expect(run('cp x ./*(D)'), 'deny', 'zsh (D)');
   expect(run('echo x > ./[.]git/config'), 'deny', 'a bracket may match the dot');
@@ -141,8 +141,8 @@ test('everyday commands with and without wildcards are unchanged', () => {
     for (const c of ['npm test', 'git status', 'git diff', 'git diff --stat', 'ls', 'ls -la *.md', `cat ${PROJ}/README.md`, 'cat src/*.ts', 'gh pr view 23',
       'node --test plugin/hooks/test/*.test.mjs', 'grep -rn TODO *.md', 'wc -l */*.md']) expect(run(c, { agent }), 'allow', `${agent || 'main'}: ${c}`);
   }
-  for (const c of ['rm -f *.log', 'rm -rf dist/*', 'cp src/*.js dist/', 'mv *.md docs/', 'echo x > out-*.txt', 'tee build/*.log < /dev/null', 'rm -f **/*.log',
-    'cp a.txt ./*', `cat ${DATA}/events.jsonl`]) expect(run(c), 'allow', `kevin: ${c}`);
+  for (const c of ['rm -f *.log', 'rm -rf dist/*', 'cp src/*.js dist/', 'mv *.md docs/', 'echo x > out-*.txt', 'tee build/*.log < /dev/null', 'rm -f src/**/*.log',
+    'cp a.txt src/*', `cat ${DATA}/events.jsonl`]) expect(run(c), 'allow', `kevin: ${c}`);
 });
 
 test('the data folder from a crew shell: a wildcard that reaches it (or a match in it) counts as naming it', () => {

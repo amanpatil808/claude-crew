@@ -127,7 +127,7 @@ test('H2: zsh qualifiers and every dot-glob switch make a wildcard match .git', 
     ]) rows.push([`${who}: ${command}`, run(command, { agent }), 'deny']);
   }
   // Common set flags leave dot names alone.
-  rows.push(['set -euo pipefail then a plain wildcard', run('set -euo pipefail; cp a.txt ./*'), 'allow']);
+  rows.push(['set -euo pipefail then a plain wildcard', run('set -euo pipefail; cp a.txt src/*'), 'allow']);
   rows.push(['set -e then rm -f *.log', run('set -e; rm -f *.log'), 'allow']);
   expectAll(rows);
 });

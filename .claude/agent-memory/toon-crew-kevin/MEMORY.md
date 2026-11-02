@@ -60,3 +60,6 @@
 - Subagents already get CLAUDE.md (as a system reminder) and their MEMORY.md in the prompt; a "read CLAUDE.md / your memory first" step loads them twice. Read project.md only. (seen 1) [crew]
 - events.jsonl is never rotated and every board poll re-parses it whole: a 50 MB log took 0.8 s per buildState and 621 MB RSS (Node 26, 2026-11-02). About 90% of its bytes are cumulative usage snapshots, so keep only the newest per (sid, agentId, scope). (seen 1) [project]
 - A .ts hook costs about 90 ms per spawn against 40 ms for a .mjs one (Node 26 type stripping): keep sync hooks in .mjs. (seen 1) [crew]
+- Decode shell ANSI-C escapes (\x, octal) as bytes, then UTF-8, then fold: one char per escape turns a long s (C5 BF) into two Latin-1 letters no fold catches. (seen 1) [crew]
+- Protected roots also hang off the cwd, so "destination at or above a root" refuses every folder you cd into; count not-yet-existing roots only at or above project, role checkout or home. (seen 1) [project]
+- A worktree agent can't run `HOME=... node x.mjs` (read as a git redirect) or `git clean -X`: set env in a small wrapper script; leave ignored proof folders for the manager. (seen 1) [project]
