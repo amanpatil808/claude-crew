@@ -94,10 +94,13 @@ test('B1c: tar -x, unzip and patch targets go through the plugin rule for every 
     `patch -d ${R} -p1 < /tmp/p.diff`, `patch --directory=${live} -p1 < /tmp/p.diff`, `patch -o ${live}/hooks/guard.mjs a.ts < /tmp/p.diff`, `cd ${R} && patch -p1 < /tmp/p.diff`,
     `tar -xPf /tmp/x.tar`, `git -C ${WT} apply --unsafe-paths /tmp/p.diff`])
     assert.ok(bob(c)?.deny, c);
-  for (const c of [`tar -xf /tmp/x.tar -C ${WT}`, `tar -xf /tmp/x.tar`, `unzip -o /tmp/p.zip -d ${WT}/out`, `patch -p1 < /tmp/p.diff`, `patch -d ${WT} -p1 < /tmp/p.diff`, `cp /tmp/x ${WT}/plugin/hooks/x.mjs`,
+  // N3 (2026-11-02): unpacking at a checkout's root may plant .git/hooks, so it is refused; a subfolder stays allowed.
+  for (const c of [`tar -xf /tmp/x.tar -C ${WT}`, `tar -xf /tmp/x.tar`]) assert.ok(bob(c)?.deny, c);
+  for (const c of [`tar -xf /tmp/x.tar -C ${WT}/out`, `unzip -o /tmp/p.zip -d ${WT}/out`, `patch -p1 < /tmp/p.diff`, `patch -d ${WT} -p1 < /tmp/p.diff`, `cp /tmp/x ${WT}/plugin/hooks/x.mjs`,
     `git -C ${WT} apply /tmp/p.diff`, 'git checkout -b t && git reset --hard HEAD && git stash && git stash pop', 'git rebase main', `cd ${WT} && bun test`])
     assert.equal(bob(c), null, c);
-  assert.equal(main(`tar -xf /tmp/x.tar -C ${R}`), null, 'the main thread is unchanged');
+  assert.ok(main(`tar -xf /tmp/x.tar -C ${R}`)?.deny, 'N3: the main thread may not unpack at the project root either');
+  assert.equal(main(`tar -xf /tmp/x.tar -C ${R}/build`), null, 'the main thread unpacks into a subfolder');
 });
 
 test.after(() => fs.rmSync(W, { recursive: true, force: true }));

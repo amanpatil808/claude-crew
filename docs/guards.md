@@ -86,6 +86,8 @@ The Write and Edit rules above do not depend on the text, because those tools na
 
 It reads past quoting, `$'..'`, `${IFS}`, `{a,b}` expansion, `&&`, `;` and `|` chains, subshells, `env`, `sudo`, `xargs` and `env -S` wrappers, `git -C`, `bash -c`, `eval`, `$(...)`, here-strings, pipes into a shell, `find -exec`, and inline `python`, `node` or `perl` code given with `-c` or `-e`. It blocks shell functions and aliases that mention these programs, and programs named by a variable. A script that is written and run in the same command is blocked. `projects.mjs set` from a shell asks you.
 
+Wildcards, look-alike letters (also written as `$'\x..'` escapes) and pattern syntax in a write target are checked against every protected file, as if dot files always match. Near a protected folder, the guard refuses instead of guessing. Unpacking an archive or copying from a file list (`tar -x`, `unzip`, `ditto -x`, `pax -r`, `cpio -i`, `7z x`, `rsync --files-from`) is refused for every caller when the destination is at or above a protected root, such as the project root, `~/.claude` or your home folder. Unpack into a subfolder such as `./build` instead.
+
 ## What the guard cannot do
 
 - **It cannot see inside a script file.** If a role writes `/tmp/w.sh` and then runs `bash /tmp/w.sh`, the guard sees only the second command.
