@@ -2,6 +2,7 @@
 // <CLAUDE_PLUGIN_DATA>/projects/<key>/handbacks/(full|summaries)/<id>/ folders, and nothing else under the data folder.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -18,7 +19,8 @@ fs.writeFileSync(path.join(project, 'README.md'), 'a\n');
 const DATA_A = path.join(W, 'home/.claude/plugins/data/toon-crew-crew');
 const DATA_B = path.join(W, 'data');
 const LAYOUTS = [['plugins/data layout', DATA_A], ['custom data folder', DATA_B]];
-const KEY = 'proj-1a2b3c4d';
+// The session's own key, as the board's projectKey computes it (no registry here, so the project folder itself).
+const KEY = `proj-${createHash('sha256').update(project).digest('hex').slice(0, 8)}`;
 const hb = (data, kind, id, name = '20261101-1200-guard-rule.md') => path.join(data, 'projects', KEY, 'handbacks', kind, id, name);
 for (const [, data] of LAYOUTS) {
   for (const f of ['events.jsonl', 'limits.json', 'projects.json', `projects/${KEY}/state.json`]) { fs.mkdirSync(path.dirname(path.join(data, f)), { recursive: true }); fs.writeFileSync(path.join(data, f), '{}\n'); }
@@ -47,9 +49,9 @@ test('a read-only role (joe-gardner) and a builder (kevin) CAN Write and Edit .m
     ok(call('Write', hb(data, kind, id, `${'a'.repeat(60)}.md`), { agent_type, data }), `${label} ${agent_type} 60-char name`);
   }
 });
-test('Write may create the folders: a project key and agent folder that do not exist yet are allowed', () => {
-  for (const [label, data] of LAYOUTS) for (const id of Object.keys(ROLES)) {
-    ok(call('Write', path.join(data, 'projects/new-proj-0000beef/handbacks/summaries', id, '20261101-0900-first.md'), { agent_type: `toon-crew:${id}`, data }), `${label} ${id} fresh project`);
+test('Write may create the folders: the own project key and an agent folder that do not exist yet are allowed', () => {
+  for (const [label, data] of LAYOUTS) {
+    ok(call('Write', path.join(data, 'projects', KEY, 'handbacks/summaries/shizuka/20261101-0900-first.md'), { agent_type: 'toon-crew:shizuka', data }), `${label} new agent folder`);
   }
   const fresh = path.join(W, 'fresh-data'); // not even the data folder exists
   ok(call('Write', hb(fresh, 'full', 'joe-gardner'), { agent_type: 'joe-gardner', data: fresh }), 'fresh data folder');
