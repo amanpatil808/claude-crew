@@ -4,7 +4,11 @@
   "version": "1.0.1",
   "description": "A cartoon agent crew (manager, builders, testers, researchers, writers) with safety guards, a live Crew Room board and shared lessons.",
   "author": { "name": "Aman Patil" },
+  "homepage": "https://github.com/amanpatil808/claude-crew",
   "repository": "https://github.com/amanpatil808/claude-crew",
+  "documentationUrl": "https://github.com/amanpatil808/claude-crew#readme",
+  "supportUrl": "https://github.com/amanpatil808/claude-crew/issues",
+  "privacyPolicyUrl": "https://github.com/amanpatil808/claude-crew/blob/main/docs/privacy.md",
   "license": "MIT",
   "icon": ".claude-plugin/icon.png",
   "keywords": ["agents", "crew", "multi-agent", "guards", "board"]

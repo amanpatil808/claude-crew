@@ -1,3 +1,6 @@
 - GitHub README pages via WebFetch show no last-commit date or releases; fetch api.github.com/repos/<owner>/<repo> for stars, forks, pushed_at, license. Why: summaries drop dates. (seen 1) [crew]
 - For repo comparisons read the source files (hooks, settings.json, CLAUDE.md, a plugin dir) not just the README; README counts often disagree with directories. (seen 1) [crew]
 - Scratchpad deliverables for comparisons are fine under the session scratchpad path the brief names; hand-back needs path + short summary. (seen 1) [crew]
+- For plugin-directory questions start at claude.com/docs/plugins/pre-submission-checklist: it tables every blocking and held rule (README 40 words in plugin folder, 512 files, hook scripts). Why: it is the one page that lists results per rule. (seen 1) [crew]
+- Glob with dot-folders can miss files (.github listing missed templates first time); re-glob specific paths before claiming a file is absent. (seen 1) [crew]
+- Research agents may have no Bash: no `date -u`; say so in the report and use a placeholder time in file names. (seen 1) [crew]
