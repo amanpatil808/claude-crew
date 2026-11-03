@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in toon-crew does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security problem, do not use this form: see [SECURITY.md](https://github.com/amanpatil808/claude-crew/blob/main/SECURITY.md).
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Run `claude plugin list` and copy the version shown for toon-crew.
+      placeholder: "1.0.1"
+    validations:
+      required: true
+  - type: input
+    id: claude-code-version
+    attributes:
+      label: Claude Code version
+      description: Run `claude --version`.
+      placeholder: "2.1.295"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: For example macOS 15, Ubuntu 24.04 or Windows 11. Add your Node version (`node --version`) if you can.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part is involved?
+      options:
+        - The guard (it asked, blocked or allowed something it should not)
+        - The board (Crew Room)
+        - The hooks or the event log
+        - Agents or skills
+        - Install or update
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order. The shortest steps that show the problem are best.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Paste any error text. Keep it short.
+    validations:
+      required: true
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Before you send
+      options:
+        - label: I removed secrets and personal paths from any logs or text I pasted.
+          required: true

@@ -2,6 +2,8 @@
 
 Thanks for helping. Bug reports and ideas: [open an issue](https://github.com/amanpatil808/claude-crew/issues). Security problems: see [SECURITY.md](SECURITY.md), not an issue.
 
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Set up
 There is nothing to install: no `package.json`, no dependencies. You need Node 24.2+ and Claude Code 2.1.295+. The plugin lives in `plugin/`; docs, scripts and CI are at the repo root. Try your change in a session with `claude --plugin-dir ./plugin`.
 

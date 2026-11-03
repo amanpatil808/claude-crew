@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/amanpatil808/claude-crew/security
+    about: Please do not open a public issue. Open the Security tab and choose "Report a vulnerability". See SECURITY.md for what is in scope.
