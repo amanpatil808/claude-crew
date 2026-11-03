@@ -93,6 +93,19 @@ test('docker compose down -v and volume removal are blocked', () => {
   for (const c of ['docker compose down', 'docker compose up -d', 'docker compose down --remove-orphans', 'docker ps', 'docker run -v data:/d img', 'docker volume ls', 'docker compose logs -f']) allowed(c);
 });
 
+// `run --rm` only removes the container that run creates; it is a docker flag, not a delete.
+test('docker/podman run --rm is allowed; deletes inside or around it are still blocked', () => {
+  for (const c of ['docker run --rm --network none -v "$PWD:/repo:ro" rhysd/actionlint -color', 'docker run --rm --network=none alpine true', 'podman run --rm --restart no alpine true',
+    'docker create --rm --name w alpine', 'docker run --rm=true --read-only alpine true', 'docker container run --rm --user root alpine id', 'docker compose run --rm --service-ports api',
+    'docker run alpine --rm --recursive', 'docker run --rm alpine rm -f /tmp/x', 'docker run --rm alpine rm --force /tmp/x', 'docker rm old', 'docker exec c sh -c "ls -R /d"',
+    'docker exec c sh -c "rm /d/a; ls -R /d"', 'docker run -v d:/d alpine rm /d/x']) allowed(c);
+  for (const c of ['docker run --rm -v d:/d alpine rm -rf /d', 'docker run --rm --network none -v d:/d alpine sh -c "rm -rf /d/*"', "docker run --rm alpine sh -c 'cd /d;rm -fr *'",
+    'docker run --rm alpine /bin/rm -r /d', 'docker run --rm alpine rm -f -r /d', 'docker run --rm alpine rm /d -R', 'docker run --rm --entrypoint rm alpine -rf /d',
+    'docker run --rm --entrypoint=rm alpine --recursive /d', 'docker create --rm alpine rm -rf /d', 'podman run --rm alpine "rm" -rf /d', 'docker exec c rm -rf /d',
+    'docker run --rm alpine true && docker volume rm d', 'docker run --rm alpine true; docker compose down -v', 'docker rm -v old', 'docker container rm -fv old',
+    'docker -H ssh://h container remove --volumes old', 'podman rm -v old']) blocked(c);
+});
+
 test('settings files cannot be edited, by tool or through the shell', () => {
   for (const f of [path.join(project, '.claude/settings.json'), path.join(project, '.claude/settings.local.json'), '.claude/settings.json',
     path.join(os.homedir(), '.claude/settings.json'), '~/.claude/settings.json', '.claude/../.claude/settings.json', path.join(project, '.CLAUDE/Settings.json')]) {

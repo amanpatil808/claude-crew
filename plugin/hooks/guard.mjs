@@ -1124,7 +1124,12 @@ function checkDocker(words, ctx) {
   const vi = rest.indexOf('volume');
   if (vi !== -1 && rest.slice(vi + 1).some((w) => ['rm', 'remove', 'prune'].includes(w))) return 'docker volume rm/prune is blocked: it deletes data.';
   if (rest.includes('system') && rest.includes('prune') && rest.some((w) => /^--vol/.test(w))) return 'docker system prune --volumes is blocked: it deletes data.';
-  if (rest.some((w) => ['run', 'exec'].includes(w)) && /\brm\s+(-\S*[rR]|--rec)|\brmdir\b|\bfind\b[^;|]*-delete|\bshred\b|\bmkfs\b|\bdd\s+if=/.test(rest.join(' '))) return 'Deleting files inside a container (docker run/exec rm -rf) can wipe mounted volumes: blocked.';
+  const runAt = rest.findIndex((w) => ['run', 'exec', 'create'].includes(w));
+  const rmAt = rest.findIndex((w) => w === 'rm' || w === 'remove');
+  if (rmAt !== -1 && (runAt === -1 || rmAt < runAt) && hasV) return 'docker rm -v is blocked: it deletes the container\'s volumes (data).';
+  // rm must start a word (not `--rm`, the flag that drops run's own container); any later arg of that rm
+  // that is a short cluster with r/R or --rec... counts, so `rm -f -r`, `rm /d -R` and `--entrypoint rm img -rf` are caught.
+  if (runAt !== -1 && /(?<![\w-])rm(?:\s+[^\s;|&]+)*?\s+(?:-[A-Za-z]*[rR]|--rec)|\brmdir\b|\bfind\b[^;|]*-delete|\bshred\b|\bmkfs\b|\bdd\s+if=/.test(rest.join(' '))) return 'Deleting files inside a container (docker run/exec rm -rf) can wipe mounted volumes: blocked.';
   void ctx;
   return null;
 }

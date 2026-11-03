@@ -1,5 +1,7 @@
 # Kevin memory
 
+- In guard regexes `\brm` matches after `-` (so `--rm` looks like rm) and `-\S*[rR]` matches any long option with an r (`--network`): use `(?<![\w-])rm` and short clusters `-[A-Za-z]*[rR]` plus explicit long names; give each rule a test case only it catches, or its mutant survives. (seen 1) [crew]
+
 - Fail closed without a data folder by pointing paths under /dev/null (every fs call fails with ENOTDIR, imports keep working); open config files read by sync hooks with O_NONBLOCK and check fstat isFile, or a FIFO hangs the hook. (seen 1) [crew]
 
 - APFS folds names with full Unicode case folding: U+017F -> s, U+212A -> k, U+00DF and U+1E9E -> ss, ligatures (U+FB01) -> fi, and NFD = NFC. toLowerCase misses all but Kelvin. Compare with NFKC then lower->upper->lower; a probe over every BMP letter (create x<c>, ask realpath.native) found no gap after that. (seen 1) [crew]
