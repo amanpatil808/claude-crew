@@ -11,7 +11,7 @@ body:
     attributes:
       label: Plugin version
       description: Run `claude plugin list` and copy the version shown for toon-crew.
-      placeholder: "1.0.1"
+      placeholder: "1.0.2"
     validations:
       required: true
   - type: input

@@ -1,6 +1,6 @@
 # Privacy: what toon-crew stores, sends and how to delete it
 
-For anyone who has installed, or is thinking of installing, the `toon-crew` plugin. This page describes version 1.0.1 and was checked against its code. If you find a gap, [open an issue](https://github.com/amanpatil808/claude-crew/issues); for a security problem, use [SECURITY.md](../SECURITY.md).
+For anyone who has installed, or is thinking of installing, the `toon-crew` plugin. This page describes version 1.0.2 and was checked against its code. If you find a gap, [open an issue](https://github.com/amanpatil808/claude-crew/issues); for a security problem, use [SECURITY.md](../SECURITY.md).
 
 ## The short version
 
