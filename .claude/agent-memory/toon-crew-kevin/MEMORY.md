@@ -1,5 +1,7 @@
 # Kevin memory
 
+- Fail closed without a data folder by pointing paths under /dev/null (every fs call fails with ENOTDIR, imports keep working); open config files read by sync hooks with O_NONBLOCK and check fstat isFile, or a FIFO hangs the hook. (seen 1) [crew]
+
 - APFS folds names with full Unicode case folding: U+017F -> s, U+212A -> k, U+00DF and U+1E9E -> ss, ligatures (U+FB01) -> fi, and NFD = NFC. toLowerCase misses all but Kelvin. Compare with NFKC then lower->upper->lower; a probe over every BMP letter (create x<c>, ask realpath.native) found no gap after that. (seen 1) [crew]
 - bash 3.2 (macOS /bin/bash) has no globstar and reads `**` as `*`, so `lnk/**/x` writes through a link; zsh `**/` does not follow links, `***/` does. A glob guard must expand `**` at least one level with links followed. (seen 1) [crew]
 - In a shell tokenizer, a `(` after a word or a command's first word is zsh/extglob pattern syntax (`*(D)`, `(a|b)`, `@(x)`), not a subshell: keep it in the word, and still scan its body as commands. Exclude `name()`, `a=(` and words after if/while/!/{/time. (seen 1) [crew]

@@ -2,15 +2,16 @@
 import "./env.ts";
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative } from "node:path";
 import { appendEvent, readEvents, QUIET_KINDS } from "../../plugin/board/lib/events.ts";
 import { loadRoles } from "../../plugin/board/lib/crew.ts";
 import { DROP_AFTER_MS, deriveNeeds } from "../../plugin/board/lib/needs.ts";
 import { EVENTS_FILE, LOG_DIR } from "../../plugin/board/lib/paths.ts";
 import { transcriptRoot } from "../../plugin/board/lib/usage.ts";
-import { contextTokens, run } from "../../plugin/board/remind.ts";
+import { autoCompactSet, contextTokens, run, SETTINGS_MAX } from "../../plugin/board/remind.ts";
 
 const SETTINGS = join(process.env.CLAUDE_CONFIG_DIR ?? "", "settings.json");   // the temp config folder from env.ts
 const ENV = { CLAUDE_PROJECT_DIR: "/work/acme", CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR };
@@ -179,6 +180,41 @@ test("the /autocompact line hides when autoCompactWindow is set at or below 2500
     rmSync(join(LOG_DIR, "remind"), { recursive: true, force: true });
     assert.equal(msg(go(stop(transcript(230_000)))), head(230, true));
   } finally { rmSync(SETTINGS, { force: true }); }
+});
+
+// settings.json can also hold keys (its `env` block), so the read is narrowed; each case below would hide the line
+// if the file were read.
+test("settings.json is read only as a small regular file from an absolute config folder", () => {
+  const HIDE = { autoCompactWindow: 200_000 };
+  const cfg = mkdtempSync(join(tmpdir(), "crew-remind-cfg-"));
+  const lineWith = (env: Record<string, string | undefined>) => { rmSync(join(LOG_DIR, "remind"), { recursive: true, force: true }); return msg(run(stop(transcript(230_000)) as Parameters<typeof run>[0], { CLAUDE_PROJECT_DIR: "/work/acme", ...env })); };
+  writeFileSync(join(cfg, "settings.json"), JSON.stringify(HIDE));
+  assert.equal(lineWith({ CLAUDE_CONFIG_DIR: cfg }), head(230, false), "control: the file itself hides the line");
+  assert.equal(autoCompactSet({ CLAUDE_CONFIG_DIR: cfg }), true);
+  // A relative CLAUDE_CONFIG_DIR is never resolved against the session's folder.
+  const rel = relative(process.cwd(), cfg);
+  assert.ok(!isAbsolute(rel));
+  assert.equal(lineWith({ CLAUDE_CONFIG_DIR: rel }), head(230, true), "relative config folder: not read");
+  // Over the size cap: not read, even with the key at the top.
+  writeFileSync(join(cfg, "settings.json"), JSON.stringify({ ...HIDE, pad: "x".repeat(SETTINGS_MAX) }));
+  assert.equal(lineWith({ CLAUDE_CONFIG_DIR: cfg }), head(230, true), "a file over the cap is not read");
+  writeFileSync(join(cfg, "settings.json"), JSON.stringify({ ...HIDE, pad: "x".repeat(SETTINGS_MAX - 100) }));
+  assert.equal(lineWith({ CLAUDE_CONFIG_DIR: cfg }), head(230, false), "just under the cap is still read");
+});
+
+test("a settings.json that is not a regular file (a FIFO) is skipped, so the sync Stop hook never hangs", () => {
+  const cfg = mkdtempSync(join(tmpdir(), "crew-remind-fifo-"));
+  const made = spawnSync("mkfifo", [join(cfg, "settings.json")]);
+  assert.equal(made.status, 0, "mkfifo is available");
+  // CLAUDE_CONFIG_DIR is also the transcript root, so the transcript moves with it.
+  const tdir = join(cfg, "projects", "-work-acme"), tpath = join(tdir, "fifo.jsonl");
+  mkdirSync(tdir, { recursive: true });
+  writeFileSync(tpath, readFileSync(transcript(240_000)));
+  const r = spawnSync(process.execPath, ["--no-warnings", join(import.meta.dirname, "..", "..", "plugin", "board", "remind.ts")],
+    { input: JSON.stringify(stop(tpath, { session_id: "ffffffff-fifo" })), encoding: "utf8", timeout: 5_000, env: { ...process.env, CLAUDE_PROJECT_DIR: "/work/acme", CLAUDE_CONFIG_DIR: cfg } });
+  assert.equal(r.signal, null, "finished on its own, not killed at the timeout");
+  assert.equal(r.status, 0);
+  assert.equal(JSON.parse(r.stdout).systemMessage, head(240, true));
 });
 
 test("hooks.json: remind.ts is one sync entry, in Stop only", () => {

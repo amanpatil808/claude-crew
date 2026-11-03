@@ -1,14 +1,22 @@
 // Every file location in one place, each overridable by env so tests can point at a temp folder
 // and the real log is never touched by them.
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 // This file lives in <plugin>/board/lib, so the plugin root is two levels up (also the fallback outside a plugin).
 const BOARD_DIR = resolve(import.meta.dirname, "..");
 
 export const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || resolve(BOARD_DIR, "..");
-// Log and state live in the plugin's data folder, never in the repo; ~/.toon-crew is for a hand-started board.
-export const DATA_DIR = process.env.BOARD_LOG_DIR || process.env.CLAUDE_PLUGIN_DATA || join(homedir(), ".toon-crew");
+
+// Log and state live only in the plugin's data folder (BOARD_LOG_DIR when a developer names one), never in the repo
+// and never in a folder the plugin picks itself. Claude Code sets CLAUDE_PLUGIN_DATA for every plugin hook, and
+// board.sh refuses to run without it. With no absolute folder, every path below sits under /dev/null, a device file:
+// each read and write fails (ENOTDIR, for root too) and the callers' own error handling turns that into "nothing".
+export const NO_DATA_DIR = "/dev/null/toon-crew-no-data-folder";
+export function dataDirOf(env: Record<string, string | undefined>): string | undefined {
+  const d = env.BOARD_LOG_DIR || env.CLAUDE_PLUGIN_DATA || "";
+  return isAbsolute(d) ? d : undefined;
+}
+export const DATA_DIR = dataDirOf(process.env) ?? NO_DATA_DIR;
 export const LOG_DIR = DATA_DIR;
 export const EVENTS_FILE = join(LOG_DIR, "events.jsonl");
 export const CURSOR_FILE = join(LOG_DIR, "export-cursor.json");

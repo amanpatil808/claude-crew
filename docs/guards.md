@@ -50,6 +50,18 @@ For each call it gives one of three answers:
 | Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except the manager. |
 | Knowledge manager pushes | Miguel Rivera may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`, and only when `origin` is the crew repo. No merges, no other pushes. The guard accepts both `miguel-rivera` and `toon-crew:miguel-rivera` as his name. |
 
+## What the plugin's own code reads
+
+The credential rule above limits the crew. The plugin's own code (hooks, board, mod) holds itself to the same line:
+
+- **No credentials.** It never opens `~/.config/gh`, `~/.git-credentials`, `~/.ssh`, the keychain, `.env` files or `~/.claude.json` on its own. (The one exception is an agent's own edit: before an Edit runs, the guard reads that file's current text to scan the result for secrets, and keeps nothing.) When you opt a project in to board polling, the board runs your own `gh` and `ssh`, which use their own logins. Every `ssh` call has `BatchMode=yes` and `StrictHostKeyChecking=yes`, so it never prompts.
+- **One setting from `~/.claude/settings.json`.** The compact reminder (`plugin/board/remind.ts`) reads `autoCompactWindow`, to leave out the `/autocompact` tip once you have set it. That file can also hold keys in its `env` block, so the read is narrowed: Claude Code's own config folder only (an absolute `CLAUDE_CONFIG_DIR`, else `~/.claude`), a regular file up to 256 KB (a pipe or a bigger file is skipped), and one number kept. Nothing from it is logged, written or shown.
+- **Transcripts, numbers only.** The board reads Claude Code's transcripts under `~/.claude/projects/` for token counts, model names and times, never message text or tool output (`plugin/board/lib/usage.ts`).
+- **Only its own folders.** `board.sh` builds paths only under the plugin root and the data folder (`$CLAUDE_PLUGIN_DATA`, absolute). It has no home-folder fallback, and its `stop` signals a pid from `server.json` only when that process is running a `board/server.ts`.
+- **Agent instructions follow the same line.** The project-profile skill reads `.env*.example` names only, and from `.claude/settings.json` only `agent`, `worktree` and the subagent-model setting.
+
+Tests: `tests/board/board-sh.test.ts`, `tests/board/data-dir.test.ts`, `tests/board/remind.test.ts` and `tests/hooks/plugin-text.test.mjs`. The last one fails if any file the plugin ships says to pipe a download into a shell, run a remote package (`npx`), install a tool, or skip a trust prompt.
+
 ## Hand-back files
 
 Each crew agent writes a full report and a short summary per task into the plugin's data folder (`$CLAUDE_PLUGIN_DATA`), so the main session can reread them after `/clear`. The guard lets every crew role, the read-only ones included, Write or Edit exactly these files, and nothing else in the data folder:

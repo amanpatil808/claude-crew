@@ -58,7 +58,11 @@ For each promoted lesson:
 
 1. Write a failing eval case from the original incident. Run it against the current prompt or skill and confirm it fails.
 2. Edit the prompt or skill file that owns the behaviour. Keep the edit small.
-3. Run `claude plugin eval` and confirm the case now passes against the new version, with no regression in the other cases.
+3. Run the case again and confirm it now passes against the new version, with no regression in the other cases.
+
+Run eval cases only from the crew repo checkout, exactly as `plugin/evals/README.md` says: read the case's `setup.sh`
+before running it (it only copies the local fixture), keep the report local, and leave the plugin trust question to
+the owner. The cases need nothing from the network.
 4. Remove the bullet from the ledger once it is in the prompt.
 
 ## 6. Release
@@ -73,7 +77,8 @@ Before any push, in `~/Developer/claude-crew`, run both checks on the files chan
 1. The PII scan: `findSecret` from `hooks/guard.mjs` over every line of each changed file, plus the hostname and IP patterns. Zero hits required.
 2. `gitleaks detect --source . --log-opts "origin/main.."`.
 
-If `gitleaks` is missing, stop. Do not push and tell the owner to install it. Remove any hit, then rescan.
+If `gitleaks` is not on your PATH, stop: push nothing and tell the owner it is missing. Never download, install or
+run a tool from the network yourself. Remove any hit, then rescan.
 Also confirm no `[project]` bullet is in the diff.
 
 Push a branch named `crew-lessons/<yyyy-mm-dd>` and open ONE pull request on

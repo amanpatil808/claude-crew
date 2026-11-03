@@ -148,9 +148,10 @@ Update with `/plugin marketplace update crew`, then `/plugin update toon-crew@cr
 
 ## What it changes on your machine
 
-- **One environment variable.** The plan-usage mod ([`plan-mod.mjs`](plugin/hooks/plan-mod.mjs)) sets `TOON_CREW_LIMITS` to your plan's usage percentages and reset times. Nothing else.
-- **One data folder.** Events, hand-backs and `limits.json` go to the plugin's data folder.
-- **Your own `gh` and `ssh`, opt-in.** Only after `/toon-crew:project board on` and a Board section in `project.md`, and only while the board is running. Results stay local.
+- **One environment variable.** The plan-usage mod ([`plan-mod.mjs`](plugin/hooks/plan-mod.mjs)) sets `TOON_CREW_LIMITS` to your plan's usage percentages, reset times and whether you're on a subscription: under 200 bytes, no other text. Claude Code has no narrower scope for a mod's variable, so every command, hook and MCP server the session starts afterwards can see it.
+- **One data folder.** Events, hand-backs and `limits.json` go to the plugin's data folder (`$CLAUDE_PLUGIN_DATA`), and nowhere else: without it, the board refuses to start and the hooks write nothing.
+- **Two reads outside your project.** Claude Code's transcripts under `~/.claude/projects/` (your sessions' and crew agents'), for token counts, model names and times only. And one setting, `autoCompactWindow`, from `~/.claude/settings.json` (a regular file up to 256 KB). That file can also hold keys, so nothing else from it is kept, logged or shown.
+- **Your own `gh` and `ssh`, opt-in.** Only after `/toon-crew:project board on` and a Board section in `project.md`, and only while the board is running. The board runs the commands; it never reads your gh token, SSH keys or keychain. Results stay local.
 - **No network calls of its own.** [Privacy](docs/how-it-works.md#privacy-and-your-data).
 
 ## Docs

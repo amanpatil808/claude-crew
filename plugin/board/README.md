@@ -18,12 +18,14 @@ Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `
 
 | What | Where |
 |---|---|
-| Events, snapshots, `server.json`, `server.log` | `$CLAUDE_PLUGIN_DATA`, or `~/.toon-crew` when started by hand (override: `BOARD_LOG_DIR`) |
+| Events, snapshots, `server.json`, `server.log` | `$CLAUDE_PLUGIN_DATA`, which must be an absolute path (developer override: `BOARD_LOG_DIR`, also absolute). With neither, `board.sh` refuses to run and the hooks write nothing. |
 | Project registry (written by the hooks) | `$CLAUDE_PLUGIN_DATA/projects.json`: `[{ path, name, firstSeen, lastSeen, board, lessons }]` |
 | Agent definitions (model, effort, colour, turns, version) | `$CLAUDE_PLUGIN_ROOT/agents/*.md` |
 | Per-project poller state | `<data>/projects/<project-key>/` |
 
 If the hooks and `board.sh` see different data folders, the board shows nothing. Always start it with the command above.
+
+`board.sh` builds paths only under the plugin root (its own parent folder; an inherited `CLAUDE_PLUGIN_ROOT` is ignored) and the data folder. `stop` signals the pid in `server.json` only when that process is running a `board/server.ts`.
 
 ## Projects and optional pollers
 

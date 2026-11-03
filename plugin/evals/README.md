@@ -6,22 +6,29 @@ and runs against `fixtures/tiny-shop/`: a tiny Node repo with no dependencies, n
 
 ## Run
 
+Run these from the `plugin/` folder of your own clone of the crew repo (`.` is the plugin). Everything the suite uses
+is already in this folder: nothing is downloaded or installed.
+
 ```bash
 # Smoke: 5 cases, 1 run each, one arm (about $2 at list price, about 4 min)
-claude plugin eval . --tag smoke --runs 1 --ablation none --scaffold --trust-plugin \
+claude plugin eval . --tag smoke --runs 1 --ablation none --scaffold \
   --allow-tools Bash Write Edit --threshold 0.8 --no-publish --max-cost-usd 4
 
 # One case while you iterate
 claude plugin eval . --case joe-not-run-vs-passed --runs 1 --ablation none --scaffold \
-  --trust-plugin --allow-tools Bash Write --no-publish
+  --allow-tools Bash Write --no-publish
 
 # Full suite before a release (3 runs, one arm; estimated $25-30)
-claude plugin eval . --scaffold --trust-plugin --allow-tools Bash Write Edit --ablation none \
+claude plugin eval . --scaffold --allow-tools Bash Write Edit --ablation none \
   --threshold 0.8 --no-publish --max-cost-usd 35
 ```
 
-- `--scaffold` is required: every case's `setup.sh` copies the fixture into the empty workspace and makes it a
-  one-commit git repo. Only use it on this suite (the script runs as you).
+- **Read the scaffold scripts first.** `--scaffold` runs each case's `setup.sh` as you, outside the eval sandbox.
+  Every `setup.sh` here only calls `fixtures/tiny-shop.sh`, which copies the local `fixtures/tiny-shop/` folder into
+  the empty workspace and makes it a one-commit git repo: no network, no install. Use the flag on this suite only.
+- **Answer the trust question yourself.** The first run in this folder asks whether you trust the plugin. Don't add
+  a flag that skips it.
+- `--no-publish` keeps the report on your machine.
 - `--allow-tools Bash Write Edit`: crew members run tests and write proofs. Bash runs under the OS sandbox (writes stay
   in the workspace, no network).
 - `--ablation none` for gating. With the default two-arm run, graders marked `arm: with-only` (for example "dispatched

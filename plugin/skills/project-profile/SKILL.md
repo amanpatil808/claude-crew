@@ -17,9 +17,9 @@ Look at whichever of these exist:
 - `CLAUDE.md`, `README*`, `CONTRIBUTING*`, `docs/` (list the tree, read the index pages).
 - Command sources: `package.json` scripts, `Makefile`, `justfile`, `Taskfile*`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `composer.json`, `scripts/`. The lockfile tells you the package manager.
 - CI: `.github/workflows/*`, `.gitlab-ci.yml` and similar. CI's steps are the most reliable list of what "green" means.
-- Services: `docker-compose*.yml`, `compose*.yml`, dev scripts. Env: `.env*.example` files (variable names only, never values).
+- Services: `docker-compose*.yml`, `compose*.yml`, dev scripts. Env: `.env*.example` files (variable names only, never values). Never open `.env`, `.env.local` or any other real env, key or credential file.
 - Git: `git remote -v` (the GitHub `owner/repo`), the default branch (`git symbolic-ref refs/remotes/origin/HEAD`), `.gitignore`.
-- Crew setup: `.claude/settings.json` (`agent`, `env`, `worktree`), `.worktreeinclude`, `.claude/agent-memory/`.
+- Crew setup: `.claude/settings.json` (only `agent`, `worktree`, and `env.CLAUDE_CODE_SUBAGENT_MODEL` / `_FORCE`; other `env` values can be keys, so never copy or repeat them), `.worktreeinclude`, `.claude/agent-memory/`.
 
 For each command, record where you found it (`file:line`) and its status:
 - `ran ok` only if you ran it in this session and it passed;
@@ -65,7 +65,7 @@ The Crew Room board reads `## Board` from this file and puts the values into com
 ## 5. Crew setup checks (report, don't change)
 Check these and list each as ok or a recommendation for the owner. Don't edit settings files yourself.
 - Builders run in git worktrees. `.claude/settings.json` should set `"worktree": {"baseRef": "head"}`, or their worktrees start from the default branch instead of the working branch.
-- `.worktreeinclude` lists the gitignored files builders need (for example `.env`); `.claude/worktrees/` is in `.gitignore`.
+- `.worktreeinclude` lists the gitignored files builders need (for example `.env`; check the names in the list only, never open those files); `.claude/worktrees/` is in `.gitignore`.
 - `env.CLAUDE_CODE_SUBAGENT_MODEL` is `sonnet` (optional). It only covers agents without a `model` of their own, such as general-purpose, so they don't run on the main model; it doesn't change crew agents, which all set one. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` should not be set.
 - Doraemon is opt-in per project: the project's `.claude/settings.json` sets `"agent": "toon-crew:doraemon"` (the owner edits it; the guard blocks the crew), or a session starts with `claude --agent toon-crew:doraemon`. Report whether it is set.
 - `.claude/agent-memory/` is checked in (project memory is meant to be shared). Plugin agents use `toon-crew-<name>/` folders there; old `<name>/` folders from project-level agents need copying across (see `docs/how-it-works.md` in the claude-crew repo).
