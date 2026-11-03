@@ -3,8 +3,12 @@
 // file is tightened too.
 import { appendFileSync, chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { insideNoDataDir } from "./paths.ts";
 
+export class NoDataDirError extends Error {}
+// The "no data folder" stand-in is never created, even where /dev/null is not a device file (Windows).
 export function ensureDir(dir: string): void {
+  if (insideNoDataDir(dir)) throw new NoDataDirError("no data folder");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
 }
 

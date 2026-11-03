@@ -19,17 +19,23 @@ data_dir() {
 }
 
 # Prints the pid when server.json names a live board server, and nothing else: a pid read from the file never
-# reaches `kill` unless that process runs a board/server.ts. Any version's, so a board started before an update
-# (from the old cache folder) can still be stopped.
+# reaches `kill` unless that process's whole argv is the form `start` launches, `node --no-warnings /<abs>/board/server.ts`
+# (node may be a shim's absolute path). Any folder's server.ts, so a board started before an update (from the old
+# cache folder) can still be stopped. ps joins argv with spaces, so a space before / or - in the path means more
+# arguments (`node --no-warnings x.js /y/board/server.ts`) and is refused. -ww: no truncation at the terminal width.
 running_pid() {
   [ -f "$SERVER_JSON" ] || return 1
-  local pid cmd; pid=$("${NODE[@]}" -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).pid;if(!Number.isSafeInteger(p)||p<=1)process.exit(1);process.stdout.write(String(p))' "$SERVER_JSON" 2>/dev/null) || return 1
+  local pid cmd script re='^(node|/[^ ]*/node) --no-warnings (/.*/board/server\.ts)$'
+  pid=$("${NODE[@]}" -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).pid;if(!Number.isSafeInteger(p)||p<=1)process.exit(1);process.stdout.write(String(p))' "$SERVER_JSON" 2>/dev/null) || return 1
   kill -0 "$pid" 2>/dev/null || return 1
-  cmd=$(ps -p "$pid" -o command= 2>/dev/null) || return 1
-  case "$cmd" in
-    *node*/board/server.ts*) echo "$pid" ;;
-    *) return 1 ;;
+  cmd=$(ps -ww -p "$pid" -o args= 2>/dev/null) || return 1
+  cmd=${cmd%"${cmd##*[![:space:]]}"}
+  [[ $cmd =~ $re ]] || return 1
+  script=${BASH_REMATCH[2]}
+  case "$script" in
+    *" /"*|*" -"*) return 1 ;;
   esac
+  echo "$pid"
 }
 
 case "${1:-status}" in
@@ -43,7 +49,10 @@ if ! LOG_DIR=$(data_dir); then
   echo 'CLAUDE_PLUGIN_DATA is not set to an absolute folder. Run this as CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/board.sh" ...'
   exit 2
 fi
-export BOARD_LOG_DIR="$LOG_DIR"
+# The server, export and task read only CLAUDE_PLUGIN_DATA (lib/paths.ts), like the hooks: a developer's
+# BOARD_LOG_DIR reaches them only through here.
+export CLAUDE_PLUGIN_DATA="$LOG_DIR"
+unset BOARD_LOG_DIR
 SERVER_JSON="$LOG_DIR/server.json"
 
 case "${1:-status}" in

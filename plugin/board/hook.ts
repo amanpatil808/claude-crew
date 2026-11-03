@@ -3,10 +3,10 @@
 // It always exits 0 and prints nothing, so a logging failure can never block or change a session.
 import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { writePrivate } from "./lib/private-fs.ts";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import { agentIdOf, agentTypeOf, appendEvent, needOf, NEED_TEXT, parseEvent, USAGE_TEXT, usageFields, type BoardEvent, type UsageOptions } from "./lib/events.ts";
 import { redact } from "./lib/redact.ts";
-import { AGENTS_DIR, EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
+import { AGENTS_DIR, dataDirOf, EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
 import { projectName } from "./lib/projects.ts";
 import { readAgentInfo, slug } from "./lib/crew.ts";
 import { ALIASES } from "./lib/roster.ts";
@@ -243,10 +243,11 @@ export async function leaveRefreshMarker(input: HookInput, env: Record<string, s
 }
 
 // SessionStart: hand-back files older than 60 days go at most once a day, whether or not the board ever runs.
-// They live under CLAUDE_PLUGIN_DATA (the board's folder when that is unset, like the board's own prune).
+// They live under CLAUDE_PLUGIN_DATA; without an absolute one there is nothing to prune.
 export async function dailyPrune(input: HookInput, env: Record<string, string | undefined> = process.env, now = Date.now()): Promise<void> {
   if (input.hook_event_name !== "SessionStart") return;
-  const data = env.CLAUDE_PLUGIN_DATA && isAbsolute(env.CLAUDE_PLUGIN_DATA) ? env.CLAUDE_PLUGIN_DATA : LOG_DIR;
+  const data = dataDirOf(env);
+  if (!data) return;
   try {
     const { pruneIfDue } = await import("./lib/handbacks.ts");   // only on SessionStart
     pruneIfDue(data, now);

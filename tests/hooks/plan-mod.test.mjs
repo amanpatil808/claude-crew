@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 // The board's modules resolve their data folder on import: point it at a throwaway one first.
-process.env.BOARD_LOG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-plan-mod-'));
+process.env.CLAUDE_PLUGIN_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-plan-mod-'));
 const { readingOf, register } = await import('../../plugin/hooks/plan-mod.mjs');
 const { limitsReading, LIMITS_ENV } = await import('../../plugin/board/lib/events.ts');
 

@@ -18,7 +18,7 @@ Other commands: `board.sh stop`, `board.sh status`, `board.sh export [--dry]`, `
 
 | What | Where |
 |---|---|
-| Events, snapshots, `server.json`, `server.log` | `$CLAUDE_PLUGIN_DATA`, which must be an absolute path (developer override: `BOARD_LOG_DIR`, also absolute). With neither, `board.sh` refuses to run and the hooks write nothing. |
+| Events, snapshots, `server.json`, `server.log` | `$CLAUDE_PLUGIN_DATA`, which must be an absolute path. `board.sh` alone also takes a developer override, `BOARD_LOG_DIR` (absolute too), and hands it to the server, `export` and `task` as their data folder; the hooks never read it. With neither, `board.sh` refuses to run and the hooks write nothing. |
 | Project registry (written by the hooks) | `$CLAUDE_PLUGIN_DATA/projects.json`: `[{ path, name, firstSeen, lastSeen, board, lessons }]` |
 | Agent definitions (model, effort, colour, turns, version) | `$CLAUDE_PLUGIN_ROOT/agents/*.md` |
 | Per-project poller state | `<data>/projects/<project-key>/` |

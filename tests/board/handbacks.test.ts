@@ -261,10 +261,10 @@ test("startPrune on the real clock: a 61-day-old file goes, today's stays; failu
   assert.deepEqual(lines, ["crew board: hand-back clean-up failed; it will try again tomorrow"]);
 });
 
-test("the board server prunes at start (BOARD_LOG_DIR is its data folder)", async () => {
+test("the board server prunes at start (CLAUDE_PLUGIN_DATA is its data folder; board.sh hands BOARD_LOG_DIR over as it)", async () => {
   const data = fresh(), t = tree(data, undefined, Date.now());
   const child = spawn(process.execPath, ["--no-warnings", join(import.meta.dirname, "..", "..", "plugin", "board", "server.ts")], {
-    env: { ...process.env, BOARD_LOG_DIR: data, BOARD_PORT: String(20000 + Math.floor(Math.random() * 20000)), BOARD_REGISTRY_FILE: join(data, "projects.json") }, stdio: "ignore" });
+    env: { ...process.env, CLAUDE_PLUGIN_DATA: data, BOARD_PORT: String(20000 + Math.floor(Math.random() * 20000)), BOARD_REGISTRY_FILE: join(data, "projects.json") }, stdio: "ignore" });
   try {
     // server.json is written just before the prune starts: wait for the prune itself.
     for (let i = 0; i < 100 && existsSync(t.oldSum); i++) await new Promise((r) => setTimeout(r, 50));

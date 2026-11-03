@@ -3,13 +3,12 @@
 // nothing and exits 0. The transcript is read for numbers only (see lib/usage.ts for its limits and path checks).
 import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 import { appendEvent, COMPACT_TEXT, type BoardEvent } from "./lib/events.ts";
 import { EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
 import { writePrivate } from "./lib/private-fs.ts";
 import { projectName } from "./lib/projects.ts";
-import { safeTranscript } from "./lib/usage.ts";
+import { configDirOf, safeTranscript } from "./lib/usage.ts";
 
 export const SIZE_LIMIT = 200_000;   // context tokens at which the first reminder shows
 export const SIZE_STEP = 100_000;    // further growth needed before the next one
@@ -99,8 +98,8 @@ export function sizeMessage(ctx: number, showAuto: boolean): string {
 export const AUTO_WINDOW_MAX = 250_000;
 export const SETTINGS_MAX = 256 * 1024;
 export function autoCompactSet(env: Record<string, string | undefined>): boolean {
-  const dir = env.CLAUDE_CONFIG_DIR === undefined || env.CLAUDE_CONFIG_DIR === "" ? join(homedir(), ".claude") : env.CLAUDE_CONFIG_DIR;
-  if (!isAbsolute(dir)) return false;   // never resolved against the session's folder
+  const dir = configDirOf(env);
+  if (!dir) return false;   // never resolved against the session's folder
   let fd: number | undefined;
   try {
     fd = openSync(join(dir, "settings.json"), constants.O_RDONLY | constants.O_NONBLOCK);

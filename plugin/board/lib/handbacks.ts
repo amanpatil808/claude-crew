@@ -4,6 +4,7 @@
 // Nothing here follows a symlink: the folder is written by agents, so a link could point anywhere.
 import { chmodSync, closeSync, constants, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, rmdirSync, unlinkSync, writeSync, type Dirent, type Stats } from "node:fs";
 import { join, resolve, sep } from "node:path";
+import { ensureDir } from "./private-fs.ts";
 import { projectKey, type Project } from "./projects.ts";
 
 export const KINDS = ["full", "summaries"] as const;
@@ -35,7 +36,7 @@ export class LinkError extends Error {}
 // <agent id>/ folder inside; it inherits the protection of these. A link at any level below the data folder is refused.
 export function ensureHandbacks(dataDir: string, key: string): string {
   const root = handbacksDir(dataDir, key);
-  mkdirSync(resolve(dataDir), { recursive: true, mode: 0o700 });
+  ensureDir(resolve(dataDir));
   let p = resolve(dataDir);
   for (const part of ["projects", key, "handbacks"]) {
     p = join(p, part);

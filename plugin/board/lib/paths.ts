@@ -1,20 +1,27 @@
 // Every file location in one place, each overridable by env so tests can point at a temp folder
 // and the real log is never touched by them.
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 // This file lives in <plugin>/board/lib, so the plugin root is two levels up (also the fallback outside a plugin).
 const BOARD_DIR = resolve(import.meta.dirname, "..");
 
 export const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || resolve(BOARD_DIR, "..");
 
-// Log and state live only in the plugin's data folder (BOARD_LOG_DIR when a developer names one), never in the repo
-// and never in a folder the plugin picks itself. Claude Code sets CLAUDE_PLUGIN_DATA for every plugin hook, and
-// board.sh refuses to run without it. With no absolute folder, every path below sits under /dev/null, a device file:
-// each read and write fails (ENOTDIR, for root too) and the callers' own error handling turns that into "nothing".
+// Log and state live only in the plugin's data folder, never in the repo and never in a folder the plugin picks
+// itself. Claude Code sets CLAUDE_PLUGIN_DATA for every plugin hook, and board.sh refuses to run without it.
+// BOARD_LOG_DIR is read by board.sh alone, which hands it to the server, export and task as CLAUDE_PLUGIN_DATA:
+// a BOARD_LOG_DIR in a session's environment never moves the hooks' files out of the data folder.
+// With no absolute folder, every path below sits under /dev/null, a device file: each read and write fails (ENOTDIR,
+// for root too) and the callers' own error handling turns that into "nothing". On Windows /dev/null is no device,
+// so the folder-making helpers refuse it themselves (insideNoDataDir).
 export const NO_DATA_DIR = "/dev/null/toon-crew-no-data-folder";
 export function dataDirOf(env: Record<string, string | undefined>): string | undefined {
-  const d = env.BOARD_LOG_DIR || env.CLAUDE_PLUGIN_DATA || "";
+  const d = env.CLAUDE_PLUGIN_DATA || "";
   return isAbsolute(d) ? d : undefined;
+}
+export function insideNoDataDir(p: string): boolean {
+  const rel = relative(resolve(NO_DATA_DIR), resolve(p));
+  return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
 }
 export const DATA_DIR = dataDirOf(process.env) ?? NO_DATA_DIR;
 export const LOG_DIR = DATA_DIR;

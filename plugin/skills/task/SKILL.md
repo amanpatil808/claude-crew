@@ -23,5 +23,5 @@ Rules:
 
 Notes for the reply:
 - `add` prints the new task id. Keep it for `start`, `done` and `drop`.
-- The command passes the hooks' data folder and the project folder explicitly because the main session's Bash does not have them set. Without them the task would land in `~/.toon-crew` or under the wrong project, and the board would not show it.
+- The command passes the hooks' data folder and the project folder explicitly because the main session's Bash does not have them set. Without them `board.sh` refuses to run (no data folder) or files the task under the wrong project, and the board would not show it.
 - If `${CLAUDE_PROJECT_DIR}` comes through empty, the board uses the current folder as the project.
