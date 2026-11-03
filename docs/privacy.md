@@ -12,7 +12,7 @@ For anyone who has installed, or is thinking of installing, the `toon-crew` plug
 
 ## What it stores on your machine
 
-**In the plugin's data folder.** Claude Code gives the plugin this folder; it is usually `~/.claude/plugins/data/toon-crew-crew/`. When you start the board by hand, it uses `~/.toon-crew` instead.
+**In the plugin's data folder.** Claude Code gives the plugin this folder; it is usually `~/.claude/plugins/data/toon-crew-crew/`. When you start the board by hand, `CLAUDE_PLUGIN_DATA` must be set to that folder as an absolute path; without it the board stops and writes nothing (there is no home-folder fallback since 1.0.2).
 
 | File or folder | What is in it |
 |---|---|

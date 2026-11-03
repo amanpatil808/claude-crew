@@ -224,7 +224,7 @@ flowchart LR
 |---|---|---|---|
 | Project facts: commands, docs per role, no-go areas, deploy rules | `.claude/crew/project.md` (written by the `project-profile` skill) | Every agent reads it first, with `CLAUDE.md` | Your team, once you commit it |
 | Memory: lessons for this project, one folder per agent | `.claude/agent-memory/toon-crew-<id>/MEMORY.md`, checked into the project | The agent reads it at the start; the manager adds lessons from each hand-back. The guard blocks any lesson that looks like a key, token or password | Your team, once you commit it |
-| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (`~/.toon-crew` if the board is started by hand) | Written by the plugin's hooks; read by the board | Only you, on this machine |
+| The event log: starts, finishes, assignments, commits, PRs | `events.jsonl` in `$CLAUDE_PLUGIN_DATA` (an absolute folder; the board does nothing without it) | Written by the plugin's hooks; read by the board | Only you, on this machine |
 | The project list | `projects.json` in the same folder: path, name, first and last seen | Written when a session starts; read by the board and the lessons pass | Only you, on this machine |
 | Hand-back reports and summaries | `projects/<project>/handbacks/` in the same folder (see below) | Written by each crew agent; the manager reads the summaries | Only you, on this machine |
 | Shared crew lessons | `docs/lessons/` in this repo | Written by the owner-only lessons pass | The repo owner, by pull request |
@@ -392,7 +392,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 - **It deploys nothing** unless your project's own rules make a merge deploy (step 16).
 - **The board has no remote view, no login and no buttons,** and does not start by itself ([the Crew Room guide](crew-room.md#good-to-know)).
 - **Polling is off until you turn it on** for a project, and a project's own files cannot turn it on. It supports GitHub (through `gh`) and one SSH deploy host only: no GitLab, no cloud provider APIs. Commits are read from local refs; it does not fetch. Deploy status needs a result file in a fixed format, and app errors come from the `docker logs` of the containers you name.
-- **The event log is not rotated.** It grows, and the board reads all of it on each refresh. How large it gets in practice has not been measured.
+- **The event log is trimmed only while the board runs.** When the board starts, and then once a day, it drops events older than 30 days (turn ends and manager heartbeats after one day), keeps only the newest usage line for each session and agent, and keeps the events of any task still queued or active. If you never start the board, the log only grows. How large it gets in practice has not been measured.
 - **The board shows plan usage, not a bill.** On a Pro or Max plan, the Plan usage panel shows your 5-hour and weekly limits and each agent's share of that usage (added in 0.3.13; the limits need Claude Code 2.1.287 or later). API users get a dollar ledger instead ([CHANGELOG.md](../CHANGELOG.md)).
 - **Projects never share memory.** Only `[crew]` rules move up, through a pull request the owner merges ([section 4](#4-several-projects)). The lessons pass is owner-only and manual, with no schedule, and needs `gitleaks`.
 - **The evals are not run in CI.** CI runs the structure check, strict validation, the hook and board tests and a secrets scan (`.github/workflows/ci.yml`). The eval cases are run by hand and have not been re-measured since the cast was renamed.
@@ -402,7 +402,7 @@ The Crew Room board is a separate local page. `board.sh start` runs `server.ts` 
 ### Privacy and your data
 
 - **The plugin has no server and sends nothing by itself.** Claude Code talks to Anthropic as it always does. The board runs on your machine.
-- **The event log and project list** live in the plugin's data folder (`$CLAUDE_PLUGIN_DATA`, or `~/.toon-crew` when you start the board by hand). Files are mode 0600 and folders 0700.
+- **The event log and project list** live in the plugin's data folder (`$CLAUDE_PLUGIN_DATA`, an absolute folder; the board does nothing without it). Files are mode 0600 and folders 0700.
 - **Log lines are short and redacted.** The board redacts secrets, one-time codes, addresses and emails before a line reaches disk or the page. An assignment keeps only the task's short description, never the full prompt, and a hand-back is cut to 160 characters.
 - **The project list** holds each project's path, name, first and last seen, and two opt-in flags. It never holds secrets. `/toon-crew:forget` removes a project. Uninstalling removes the data folder by Claude Code's default.
 - **Memory and `project.md` live in your project** and are meant to be checked in. The guard blocks obvious secrets (keys, tokens, passwords, emails, phone and card numbers) from being written into memory files. It does not scan `project.md`, so read it before you commit it.
