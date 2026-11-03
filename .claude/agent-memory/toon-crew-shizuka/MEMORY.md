@@ -1,3 +1,4 @@
 - [Docs and diagram lessons](docs-diagram-lessons.md) — branch vs plugin-cache drift, Mermaid validation, what "working" means on the board
 - [Prompt token lessons](prompt-token-lessons.md) — guard limits for read-only memory, task skill no-chain rule, byte vs runtime savings
+- [Community files lessons](community-files-lessons.md) — diff Covenant against official text, absolute links in PR templates, no email contact
 - [Directory review lessons](directory-review-lessons.md) — policy-hold README section, network-call grep, version bump places

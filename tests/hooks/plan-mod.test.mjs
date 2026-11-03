@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 // The board's modules resolve their data folder on import: point it at a throwaway one first.
-process.env.BOARD_LOG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-plan-mod-'));
+process.env.CLAUDE_PLUGIN_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-plan-mod-'));
 const { readingOf, register } = await import('../../plugin/hooks/plan-mod.mjs');
 const { limitsReading, LIMITS_ENV } = await import('../../plugin/board/lib/events.ts');
 
@@ -49,6 +49,21 @@ test('odd windows are dropped or clamped; a bad reset time is null; each window 
   assert.deepEqual(r, { v: 1, at: AT, sub: true, w: [{ id: '5h', pct: 100, end: null }, { id: '7d', pct: 0, end: null }] });
   assert.ok(!JSON.stringify(r).includes('planted'));
   assert.deepEqual(limitsReading(r), r);
+});
+
+// $.env.set reaches every process Claude Code starts after it (Bash commands, hooks, MCP servers), and the mod API has
+// no narrower scope. So the value is pinned: a fixed shape, at most two windows, no text from the event, small.
+test('the variable every later process sees: fixed keys, numbers and times only, under 200 bytes for any event', () => {
+  const huge = 'x'.repeat(100_000);
+  const e = { context: { window: 1e300, path: huge }, cost: { usd: 1e300, note: huge }, sessionId: huge, cwd: huge,
+    rateLimits: Array.from({ length: 10_000 }, (_, i) => ({ kind: i % 2 ? 'five_hour' : 'seven_day', percentUsed: 99.99999, resetsAt: '2026-10-28T04:00:00.123456789Z', extra: huge })) };
+  const r = readingOf(e, NOW);
+  const text = JSON.stringify(r);
+  assert.ok(text.length < 200, `${text.length} bytes`);
+  assert.deepEqual(Object.keys(r), ['v', 'at', 'sub', 'w']);
+  assert.equal(r.w.length, 2);
+  for (const w of r.w) assert.deepEqual(Object.keys(w), ['id', 'pct', 'end']);
+  assert.doesNotMatch(text, /xxx/);
 });
 
 // A `$` that records every call and fails the test on anything but $.clock.now and $.env.set.

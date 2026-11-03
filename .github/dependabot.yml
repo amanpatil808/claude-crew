@@ -1,0 +1,20 @@
+# Keeps the SHA-pinned actions in .github/workflows/ up to date.
+# Dependabot rewrites the pinned SHA and the trailing "# vX.Y.Z" comment together.
+# No npm ecosystem: the repo has no dependencies (the only package.json is a
+# test fixture under plugin/evals/fixtures with none).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies

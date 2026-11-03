@@ -2,6 +2,40 @@
 
 All notable changes to toon-crew. Versions follow `version` in `plugin/.claude-plugin/plugin.json`; projects pin to a version and update on purpose.
 
+## 1.0.2 - 3 Nov 2026
+
+Hook users need nothing new: Claude Code already sets the data folder the hooks use.
+
+### Security and safety
+
+- Guard: `docker run --rm` is allowed again. The in-container delete rule had read the `--rm` flag as the `rm` command, so `docker run --rm --network none ...` was refused. `rm` now has to start a word, and every later argument of that `rm` is checked, so `rm -f -r`, `rm /d -R` and an `rm` entrypoint are still refused. `create` is covered like `run` and `exec`, and `docker rm -v`, which deletes a container's volumes, is refused.
+- Board: `board.sh stop` signals the pid in `server.json` only when that process's whole command line is `node --no-warnings <path>/board/server.ts`, so a process that merely mentions `board/server.ts` is never stopped or mistaken for the board.
+- The plugin writes only inside its data folder (`$CLAUDE_PLUGIN_DATA`). `board.sh` builds paths only under the plugin root and an absolute data folder. The hooks read only `CLAUDE_PLUGIN_DATA`; `BOARD_LOG_DIR` is a developer override that `board.sh` alone reads. The project registry commands refuse a relative data folder, and a relative `CLAUDE_CONFIG_DIR` is never resolved against your project.
+- The compact reminder reads one number, `autoCompactWindow`, from `~/.claude/settings.json` and keeps nothing else: Claude Code's own config folder only, a regular file of at most 256 KB. A pipe or a bigger file is skipped (this also fixes a hang when that path was a pipe).
+- No file the plugin ships tells you to pipe a download into a shell, run a remote package, install a tool or skip a trust prompt. The evals README, the crew-lessons skill and Miguel Rivera now say to read the scaffold scripts, answer the trust question yourself, and never fetch a tool from the network. A new test fails if such text comes back.
+- [Guards](docs/guards.md) has a new section, "What the plugin's own code reads".
+
+### Directory listing
+
+- The plugin folder has its own README.
+- New [privacy page](docs/privacy.md): what stays on your machine, what the plugin reads, and how to delete it.
+- `plugin.json` gains `homepage`, `documentationUrl`, `supportUrl` and `privacyPolicyUrl` links.
+
+### Repo
+
+- Code of conduct (Contributor Covenant 2.1, with the Security tab as the private contact), bug and feature issue forms with a no-secrets checkbox, a pull request template and `CODEOWNERS`. Blank issues are off.
+- Dependabot opens weekly grouped pull requests to keep the SHA-pinned GitHub Actions current.
+- CI runs Claude Code 2.1.317 (was 2.1.308). The stated minimum, 2.1.295, is unchanged.
+
+### Fixed
+
+- Two board tests no longer fail on their own. `refresh.test.ts` drove a 60 ms debounce with real sleeps and failed under load; it now runs on mocked timers. `handbacks.test.ts` built its 59-day-old fixtures against a fixed 2026-11-01 clock while the server used the real one, so it failed from 2 Nov 2026 on; it now builds them from the real clock. These were test faults, not board faults.
+
+### Removed
+
+- The empty `plugin/settings.json` (it was `{}` and changed nothing). The structure check still validates one if it is added back.
+- The `~/.toon-crew` fallback. A board started by hand now needs `CLAUDE_PLUGIN_DATA` set to the hooks' data folder as an absolute path (or an absolute `BOARD_LOG_DIR`, for developers). Without one, `board.sh` prints a message and does nothing; before, it read `~/.toon-crew` and showed an empty board. Use `/toon-crew:board`, or see [the Crew Room guide](docs/crew-room.md#start-it). A folder already at `~/.toon-crew` is left alone; the plugin no longer reads it.
+
 ## 1.0.1 - 2 Nov 2026
 
 ### Changed

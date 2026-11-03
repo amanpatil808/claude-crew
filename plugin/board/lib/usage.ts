@@ -34,7 +34,15 @@ const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 const NEEDLE = '"type":"assistant"';             // cheap filter before JSON.parse; the parsed type is checked again
 
-export const transcriptRoot = () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+// Claude Code's config folder: an absolute CLAUDE_CONFIG_DIR, else ~/.claude when it is unset or empty. A relative
+// one is never resolved against the session's folder: undefined, and nothing is read.
+export function configDirOf(env: Record<string, string | undefined>): string | undefined {
+  const d = env.CLAUDE_CONFIG_DIR === undefined || env.CLAUDE_CONFIG_DIR === "" ? join(homedir(), ".claude") : env.CLAUDE_CONFIG_DIR;
+  return isAbsolute(d) ? d : undefined;
+}
+// With no usable config folder the root sits under /dev/null, so every realpath and readdir of it fails.
+export const NO_TRANSCRIPT_ROOT = "/dev/null/toon-crew-no-config-folder";
+export const transcriptRoot = () => { const d = configDirOf(process.env); return d ? join(d, "projects") : NO_TRANSCRIPT_ROOT; };
 
 export interface SafeFile { real: string; dev: number; ino: number }
 

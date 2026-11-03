@@ -95,3 +95,36 @@ test('board and lessons flags default off, can be set by CLI, survive register, 
   assert.equal(setFlag(dir, '/work/fresh', 'board', true).board, true, 'an unregistered absolute path is added');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// A relative data folder would resolve against the session's (or caller's) folder and drop projects.json and its
+// lock into a project. register, forget and set use an absolute folder only.
+test('register, forget and set refuse a relative data folder and write nothing into the current folder', () => {
+  const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'reg-rel-cwd-')));
+  const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'reg-rel-home-')));
+  const base = { PATH: process.env.PATH, HOME: home };
+  for (const rel of ['rel/data', '.', 'data', '~/.toon-crew']) {
+    const reg = spawnSync(process.execPath, ['--no-warnings', SCRIPT, 'register'], { cwd, encoding: 'utf8', input: JSON.stringify({ cwd }), env: { ...base, CLAUDE_PLUGIN_DATA: rel, CLAUDE_PROJECT_DIR: cwd } });
+    assert.equal(reg.status, 0, `register ${rel}: ${reg.stderr}`);
+    for (const args of [['forget', rel, 'proj'], ['forget', rel], ['set', rel, '/work/proj', 'board', 'on'], ['set', rel, '/work/proj']]) {
+      const r = spawnSync(process.execPath, ['--no-warnings', SCRIPT, ...args], { cwd, encoding: 'utf8', env: base });
+      assert.equal(r.status, 2, `${args.join(' ')}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, /must be an absolute path/);
+    }
+    assert.deepEqual(fs.readdirSync(cwd, { recursive: true }), [], `${rel}: nothing in the current folder`);
+    assert.deepEqual(fs.readdirSync(home), [], `${rel}: nothing in the home folder`);
+  }
+  const prev = process.cwd();
+  process.chdir(cwd);
+  try {
+    for (const call of [() => register('rel/data', '/work/x'), () => forget('rel/data', 'x'), () => setFlag('rel/data', '/work/x', 'board', true)]) {
+      assert.throws(call, /must be an absolute path/);
+    }
+    assert.deepEqual(fs.readdirSync(cwd, { recursive: true }), [], 'nothing from the exported functions either');
+    // Nor is a registry planted in the current folder ever read.
+    fs.mkdirSync(path.join(cwd, 'rel', 'data'), { recursive: true });
+    fs.writeFileSync(path.join(cwd, 'rel', 'data', 'projects.json'), JSON.stringify([{ path: '/planted', name: 'planted' }]));
+    assert.deepEqual(readProjects('rel/data'), []);
+  } finally { process.chdir(prev); }
+  fs.rmSync(cwd, { recursive: true, force: true });
+  fs.rmSync(home, { recursive: true, force: true });
+});

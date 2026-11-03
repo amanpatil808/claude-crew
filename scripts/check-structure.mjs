@@ -42,7 +42,8 @@ if (market) {
   }
 }
 
-const settings = readJson('settings.json');
+// The plugin ships no settings.json now; if one is added back it is still checked.
+const settings = fs.existsSync(path.join(root, 'settings.json')) ? readJson('settings.json') : null;
 if (settings) for (const k of Object.keys(settings)) if (!['agent', 'subagentStatusLine'].includes(k)) fail(`settings.json: "${k}" is dropped by Claude Code (only agent and subagentStatusLine apply)`);
 if (settings?.agent?.startsWith('toon-crew:')) {
   const name = settings.agent.slice('toon-crew:'.length).split(':');

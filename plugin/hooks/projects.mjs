@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 const FILE = 'projects.json';
 
 export function readProjects(dataDir) {
+  if (!usableDataDir(dataDir)) return [];
   let text;
   try { text = fs.readFileSync(path.join(dataDir, FILE), 'utf8'); } catch { return []; }
   try {
@@ -32,8 +33,14 @@ const FLAGS = ['board', 'lessons'];
 
 function sleepMs(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
 
+// The data folder is used only when absolute: a relative one would resolve against the session's (or caller's)
+// folder and put the registry inside a project.
+export const usableDataDir = (dataDir) => typeof dataDir === 'string' && path.isAbsolute(dataDir);
+const NOT_ABSOLUTE = 'the data folder must be an absolute path';
+
 // Run `fn` while holding <dataDir>/.projects.lock (a directory: mkdir is atomic). A lock older than 10s is stale.
 export function withLock(dataDir, fn) {
+  if (!usableDataDir(dataDir)) throw new Error(NOT_ABSOLUTE);
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const lock = path.join(dataDir, '.projects.lock');
   for (let tries = 0; ; tries++) {
@@ -102,7 +109,7 @@ async function main() {
   const [cmd, ...args] = process.argv.slice(2);
   if (cmd === 'register') {
     const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-    if (!dataDir) return; // not running as an installed plugin: nothing to do
+    if (!usableDataDir(dataDir)) return; // not an installed plugin's absolute data folder: nothing to do
     let raw = '';
     for await (const chunk of process.stdin) raw += chunk;
     let cwd = '';
@@ -115,6 +122,7 @@ async function main() {
     const [dataDir, ...rest] = args;
     const target = rest.join(' ').trim();
     if (!dataDir) { console.error('usage: projects.mjs forget <dataDir> [path-or-name]'); process.exit(2); }
+    if (!usableDataDir(dataDir)) { console.error(`toon-crew: ${NOT_ABSOLUTE}.`); process.exit(2); }
     const list = readProjects(dataDir);
     if (!target) {
       console.log(list.length ? 'Registered projects:' : 'No projects registered yet.');
@@ -129,6 +137,7 @@ async function main() {
   if (cmd === 'set') {
     const [dataDir, target, flag, value] = args;
     if (!dataDir || !target) { console.error('usage: projects.mjs set <dataDir> <path-or-name> [board|lessons on|off]'); process.exit(2); }
+    if (!usableDataDir(dataDir)) { console.error(`toon-crew: ${NOT_ABSOLUTE}.`); process.exit(2); }
     if (!flag) { // show
       const p = readProjects(dataDir).find((x) => x.path === path.resolve(target) || x.name === target);
       if (!p) { console.error(`No registered project matches "${clean(target)}".`); process.exit(1); }

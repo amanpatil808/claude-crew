@@ -4,7 +4,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-process.env.BOARD_LOG_DIR = mkdtempSync(join(tmpdir(), "crew-board-test-"));
+// CLAUDE_PLUGIN_DATA, the only variable the board's modules read; BOARD_LOG_DIR is board.sh's alone.
+process.env.CLAUDE_PLUGIN_DATA = mkdtempSync(join(tmpdir(), "crew-board-test-"));
+delete process.env.BOARD_LOG_DIR;
 // The transcript root too (liveness stats, usage reads): no test ever looks at the real ~/.claude/projects.
 process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), "crew-board-config-"));
 

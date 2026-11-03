@@ -1,21 +1,59 @@
 #!/bin/bash
 # Crew Room board control: start | stop | status | export | task | handbacks.
 # The server (with its pollers) runs detached so it outlives the session that started it.
-# Log and state go to $CLAUDE_PLUGIN_DATA, or ~/.toon-crew when started by hand; override with BOARD_LOG_DIR.
+# Every path it builds is under the plugin root (this file's parent) or the data folder: $CLAUDE_PLUGIN_DATA,
+# or BOARD_LOG_DIR when a developer names one (tests, the demo). Both must be absolute; there is no home-folder fallback.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$HERE/.." && pwd)}"
-LOG_DIR="${BOARD_LOG_DIR:-${CLAUDE_PLUGIN_DATA:-$HOME/.toon-crew}}"
-export BOARD_LOG_DIR="$LOG_DIR"
-SERVER_JSON="$LOG_DIR/server.json"
+# The plugin root is always this file's own parent, never an inherited CLAUDE_PLUGIN_ROOT.
+CLAUDE_PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
+export CLAUDE_PLUGIN_ROOT
 NODE=(node --no-warnings)
 
-# Prints the pid when server.json names a live process.
+data_dir() {
+  local d="${BOARD_LOG_DIR:-${CLAUDE_PLUGIN_DATA:-}}"
+  case "$d" in
+    /*) printf '%s\n' "$d" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Prints the pid when server.json names a live board server, and nothing else: a pid read from the file never
+# reaches `kill` unless that process's whole argv is the form `start` launches, `node --no-warnings /<abs>/board/server.ts`
+# (node may be a shim's absolute path). Any folder's server.ts, so a board started before an update (from the old
+# cache folder) can still be stopped. ps joins argv with spaces, so a space before / or - in the path means more
+# arguments (`node --no-warnings x.js /y/board/server.ts`) and is refused. -ww: no truncation at the terminal width.
 running_pid() {
   [ -f "$SERVER_JSON" ] || return 1
-  local pid; pid=$("${NODE[@]}" -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).pid))' "$SERVER_JSON" 2>/dev/null) || return 1
-  kill -0 "$pid" 2>/dev/null && echo "$pid"
+  local pid cmd script re='^(node|/[^ ]*/node) --no-warnings (/.*/board/server\.ts)$'
+  pid=$("${NODE[@]}" -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).pid;if(!Number.isSafeInteger(p)||p<=1)process.exit(1);process.stdout.write(String(p))' "$SERVER_JSON" 2>/dev/null) || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  cmd=$(ps -ww -p "$pid" -o args= 2>/dev/null) || return 1
+  cmd=${cmd%"${cmd##*[![:space:]]}"}
+  [[ $cmd =~ $re ]] || return 1
+  script=${BASH_REMATCH[2]}
+  case "$script" in
+    *" /"*|*" -"*) return 1 ;;
+  esac
+  echo "$pid"
 }
+
+case "${1:-status}" in
+  # Always under CLAUDE_PLUGIN_DATA (never BOARD_LOG_DIR): the guard allows hand-back files only there. handbacks.ts checks it.
+  handbacks) shift; exec "${NODE[@]}" "$HERE/handbacks.ts" "$@" ;;
+  start|stop|status|export|task) ;;
+  *) echo "usage: $0 start|stop|status|export [--dry]|task add|start|done|drop|list|handbacks dir|list"; exit 2 ;;
+esac
+
+if ! LOG_DIR=$(data_dir); then
+  echo 'CLAUDE_PLUGIN_DATA is not set to an absolute folder. Run this as CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/board.sh" ...'
+  exit 2
+fi
+# The server, export and task read only CLAUDE_PLUGIN_DATA (lib/paths.ts), like the hooks: a developer's
+# BOARD_LOG_DIR reaches them only through here.
+export CLAUDE_PLUGIN_DATA="$LOG_DIR"
+unset BOARD_LOG_DIR
+SERVER_JSON="$LOG_DIR/server.json"
 
 case "${1:-status}" in
   start)
@@ -30,7 +68,4 @@ case "${1:-status}" in
     if pid=$(running_pid); then echo "running: $(cat "$SERVER_JSON")"; else echo "not running"; fi ;;
   export) shift; "${NODE[@]}" "$HERE/export.ts" "$@" ;;
   task) shift; "${NODE[@]}" "$HERE/task.ts" "$@" ;;
-  # Always under CLAUDE_PLUGIN_DATA (never BOARD_LOG_DIR or ~/.toon-crew): the guard allows hand-back files only there.
-  handbacks) shift; "${NODE[@]}" "$HERE/handbacks.ts" "$@" ;;
-  *) echo "usage: $0 start|stop|status|export [--dry]|task add|start|done|drop|list|handbacks dir|list"; exit 2 ;;
 esac

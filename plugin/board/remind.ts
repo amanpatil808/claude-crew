@@ -3,13 +3,12 @@
 // nothing and exits 0. The transcript is read for numbers only (see lib/usage.ts for its limits and path checks).
 import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { appendEvent, COMPACT_TEXT, type BoardEvent } from "./lib/events.ts";
 import { EVENTS_FILE, LOG_DIR } from "./lib/paths.ts";
 import { writePrivate } from "./lib/private-fs.ts";
 import { projectName } from "./lib/projects.ts";
-import { safeTranscript } from "./lib/usage.ts";
+import { configDirOf, safeTranscript } from "./lib/usage.ts";
 
 export const SIZE_LIMIT = 200_000;   // context tokens at which the first reminder shows
 export const SIZE_STEP = 100_000;    // further growth needed before the next one
@@ -92,14 +91,24 @@ export function sizeMessage(ctx: number, showAuto: boolean): string {
   ].join("\n");
 }
 
-// The one setting read from the owner's settings.json: autoCompactWindow, nothing else is kept. Unreadable,
-// missing or not a number means "not set", so the line stays.
+// The one setting read from the owner's user settings.json: autoCompactWindow. That file can also hold an `env`
+// block with keys, so the read is narrowed: Claude Code's own config folder only (an absolute CLAUDE_CONFIG_DIR, else
+// ~/.claude), a regular file of at most SETTINGS_MAX bytes, one number kept, nothing logged, written or returned.
+// Anything else (unreadable, missing, too big, not a number) means "not set", so the line stays.
 export const AUTO_WINDOW_MAX = 250_000;
+export const SETTINGS_MAX = 256 * 1024;
 export function autoCompactSet(env: Record<string, string | undefined>): boolean {
+  const dir = configDirOf(env);
+  if (!dir) return false;   // never resolved against the session's folder
+  let fd: number | undefined;
   try {
-    const w = obj(JSON.parse(readFileSync(join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json"), "utf8"))).autoCompactWindow;
+    fd = openSync(join(dir, "settings.json"), constants.O_RDONLY | constants.O_NONBLOCK);
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.size > SETTINGS_MAX) return false;
+    const buf = Buffer.alloc(st.size);
+    const w = obj(JSON.parse(buf.subarray(0, readSync(fd, buf, 0, buf.length, 0)).toString("utf8"))).autoCompactWindow;
     return typeof w === "number" && Number.isFinite(w) && w > 0 && w <= AUTO_WINDOW_MAX;
-  } catch { return false; }
+  } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
 
 export function decide(ctx: number, merge: string, prev: State, showAuto = true): { message: string; why: "size" | "merge"; next: State } | null {

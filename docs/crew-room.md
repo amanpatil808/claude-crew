@@ -18,7 +18,7 @@ Both board screenshots (this one and the Crew Room one in the README) show demo 
 ## Start it
 
 - Type `/toon-crew:board` (it takes `start`, `stop` or `status`; the default is `start`). It prints `{"pid":..,"port":..,"startedAt":..}`. Open `http://127.0.0.1:<port>`. Only you can run this skill (`disable-model-invocation: true`).
-- Without the skill, the skill's command is `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/board.sh" start`. Run by hand, `board.sh` needs `CLAUDE_PLUGIN_DATA` set to the hooks' [data folder](setup.md#what-happens-on-first-run), or it reads `~/.toon-crew` and shows an empty board.
+- Without the skill, the skill's command is `CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "${CLAUDE_PLUGIN_ROOT}/board/board.sh" start`. Run by hand, `board.sh` needs `CLAUDE_PLUGIN_DATA` set to the hooks' [data folder](setup.md#what-happens-on-first-run), or it stops with a message and does nothing (since 1.0.2 there is no home-folder fallback). Developers can name an absolute folder with `BOARD_LOG_DIR` instead; it wins if both are set.
 - It does not start by itself. It keeps running after your session ends, pauses its GitHub and ssh checks while no page is open, and stops itself after 2 hours with no viewer.
 
 ## Good to know

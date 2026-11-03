@@ -1,5 +1,11 @@
 # Kevin memory
 
+- To verify a pid is ours, anchor the whole `ps -ww -o args=` line and refuse " /" or " -" inside the script part (ps joins argv with spaces); BSD ps never truncates piped output, so a -ww test only bites on Linux CI. When an env override must reach only some entry points, let the one launcher translate it rather than the lib guessing its caller. (seen 1) [crew]
+
+- In guard regexes `\brm` matches after `-` (so `--rm` looks like rm) and `-\S*[rR]` matches any long option with an r (`--network`): use `(?<![\w-])rm` and short clusters `-[A-Za-z]*[rR]` plus explicit long names; give each rule a test case only it catches, or its mutant survives. (seen 1) [crew]
+
+- Fail closed without a data folder by pointing paths under /dev/null (every fs call fails with ENOTDIR, imports keep working); open config files read by sync hooks with O_NONBLOCK and check fstat isFile, or a FIFO hangs the hook. (seen 1) [crew]
+
 - APFS folds names with full Unicode case folding: U+017F -> s, U+212A -> k, U+00DF and U+1E9E -> ss, ligatures (U+FB01) -> fi, and NFD = NFC. toLowerCase misses all but Kelvin. Compare with NFKC then lower->upper->lower; a probe over every BMP letter (create x<c>, ask realpath.native) found no gap after that. (seen 1) [crew]
 - bash 3.2 (macOS /bin/bash) has no globstar and reads `**` as `*`, so `lnk/**/x` writes through a link; zsh `**/` does not follow links, `***/` does. A glob guard must expand `**` at least one level with links followed. (seen 1) [crew]
 - In a shell tokenizer, a `(` after a word or a command's first word is zsh/extglob pattern syntax (`*(D)`, `(a|b)`, `@(x)`), not a subshell: keep it in the word, and still scan its body as commands. Exclude `name()`, `a=(` and words after if/while/!/{/time. (seen 1) [crew]

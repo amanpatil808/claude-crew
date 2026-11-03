@@ -40,7 +40,7 @@ For each call it gives one of three answers:
 | GitHub destruction | Refused: `gh repo delete`, `gh api -X DELETE repos/o/r` (also a full URL, or `curl` with `gh auth token`), moving or deleting `refs/heads/main`, branch protection changes, `gh alias`, `gh auth token`. |
 | Credential reads | Refused for every role: reading `~/.config/gh` or `~/.git-credentials`, by Bash, Read or Grep. A search rooted above those folders is refused too. |
 | Recursive delete | Refused: `rm -r`, `rm -rf`, `find -delete`, `rsync --delete`, `git clean -x`, `docker run ... rm -rf`, unless every target is inside the system temp folder, the session scratchpad, or a real (not symlinked) `tmp/`, `.tmp/`, `scratch/` or `.scratch/` folder in the project. A project that itself sits in a temp folder gets no temp-folder exemption. `cd` into an unknown variable, `cd` inside `( )`, `mv` into scratch and `ln` inside scratch are blocked, because they make a later delete look legal. |
-| Docker data | Refused (docker, docker-compose, podman): `down -v` or `--volumes`, `compose rm -v`, `volume rm`, `volume prune`, `system prune --volumes`. |
+| Docker data | Refused (docker, docker-compose, podman): `down -v` or `--volumes`, `compose rm -v`, `rm -v` (`container rm/remove -v`), `volume rm`, `volume prune`, `system prune --volumes`, and `rm -r`, `rmdir`, `find -delete`, `shred`, `mkfs` or `dd if=` inside `run`, `create` or `exec`. Allowed: the `--rm` flag of `run` and `create`, which only removes the container that command makes when it exits. |
 | Protected files | Refused, for Edit and Write and for shell writes (`>`, `tee`, `cp`, `mv`, `ln`, `sed -i`, `dd of=`, and `python`, `node` or `perl` with `-c` or `-e`): `.claude/settings*.json`, the installed plugin under `~/.claude/plugins` (a checkout you load with `--plugin-dir` stays editable), `.git/config`, `.git/hooks`, a `config` or `hooks/` file inside a git-dir-looking folder, `~/.claude.json` and `.mcp.json`. |
 | Project crew config | Edit, Write and shell writes to a project's `.claude/hooks`, `.claude/agents`, `.claude/skills` or `.claude/commands` ask you. |
 | Memory files | Refused: shell writes into any `agent-memory*` folder, and file writes whose resulting text holds a token, key, private key, URL password, `password=` value, UPI id, email address, card number (Luhn-valid) or phone number (Indian 10-digit with `0`, `+91`, spaces, dots or dashes; or international). |
@@ -49,6 +49,18 @@ For each call it gives one of three answers:
 | Spawning | Only the main session (the manager) starts crew agents. Dekisugi may start only `toon-crew:olaf` or `toon-crew:stuart`, written with the prefix (a bare `olaf` could match a project agent with more tools). Every other crew role is refused. Agents that are not crew are not limited. |
 | Relay tools | SendMessage, CronCreate, Workflow and RemoteTrigger are refused for every crew role except the manager. |
 | Knowledge manager pushes | Miguel Rivera may only run `git push origin crew-lessons/<name>` and `gh pr create -R amanpatil808/claude-crew`, and only when `origin` is the crew repo. No merges, no other pushes. The guard accepts both `miguel-rivera` and `toon-crew:miguel-rivera` as his name. |
+
+## What the plugin's own code reads
+
+The credential rule above limits the crew. The plugin's own code (hooks, board, mod) holds itself to the same line:
+
+- **No credentials.** It never opens `~/.config/gh`, `~/.git-credentials`, `~/.ssh`, the keychain, `.env` files or `~/.claude.json` on its own. (The one exception is an agent's own edit: before an Edit runs, the guard reads that file's current text to scan the result for secrets, and keeps nothing.) When you opt a project in to board polling, the board runs your own `gh` and `ssh`, which use their own logins. Every `ssh` call has `BatchMode=yes` and `StrictHostKeyChecking=yes`, so it never prompts.
+- **One setting from `~/.claude/settings.json`.** The compact reminder (`plugin/board/remind.ts`) reads `autoCompactWindow`, to leave out the `/autocompact` tip once you have set it. That file can also hold keys in its `env` block, so the read is narrowed: Claude Code's own config folder only (an absolute `CLAUDE_CONFIG_DIR`, else `~/.claude`), a regular file up to 256 KB (a pipe or a bigger file is skipped), and one number kept. Nothing from it is logged, written or shown.
+- **Transcripts, numbers only.** The board reads Claude Code's transcripts under `~/.claude/projects/` for token counts, model names and times, never message text or tool output (`plugin/board/lib/usage.ts`).
+- **Only its own folders.** `board.sh` builds paths only under the plugin root and the data folder (`$CLAUDE_PLUGIN_DATA`, absolute). It has no home-folder fallback, and its `stop` signals a pid from `server.json` only when that process's whole command line is the one `start` launches (`node --no-warnings /…/board/server.ts`, from any plugin version's folder). The hooks write only under `$CLAUDE_PLUGIN_DATA`; the developer override `BOARD_LOG_DIR` is read by `board.sh` alone.
+- **Agent instructions follow the same line.** The project-profile skill reads `.env*.example` names only, and from `.claude/settings.json` only `agent`, `worktree` and the subagent-model setting.
+
+Tests: `tests/board/board-sh.test.ts`, `tests/board/data-dir.test.ts`, `tests/board/remind.test.ts` and `tests/hooks/plugin-text.test.mjs`. The last one fails if any file the plugin ships says to pipe a download into a shell, run a remote package (`npx`), install a tool, or skip a trust prompt.
 
 ## Hand-back files
 
