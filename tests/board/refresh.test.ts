@@ -1,11 +1,11 @@
 // Fast board refresh: (a) a command that changes GitHub makes the server poll that project at once, (b) /api/state
 // answers 304 to a matching ETag, (c) the page skips parse and repaint on 304. No test calls GitHub: the poll is a stub.
 import "./env.ts";
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, request } from "node:http";
 import type { AddressInfo } from "node:net";
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { leaveRefreshMarker } from "../../plugin/board/hook.ts";
@@ -13,14 +13,26 @@ import { markRefresh, refreshDir, refreshWanted, watchRefresh } from "../../plug
 import type { Project } from "../../plugin/board/lib/projects.ts";
 import { handle } from "../../plugin/board/server.ts";
 
+// The watcher runs on a mocked clock (setTimeout/setInterval only): no wall-clock sleeps, so load cannot shift the windows.
+// advance() moves it in 5 ms steps and lets pending promises settle after each step.
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const settle = () => new Promise((r) => setImmediate(r));
+async function advance(ms: number) { for (let t = 0; t < ms; t += 5) { mock.timers.tick(5); await settle(); } }
+// Every mark gets a fresh mtime, so a write in the same real millisecond as the last is still seen as a change.
+let stamp = 1_700_000_000;
+function mark(project: string, dir: string) {
+  markRefresh(project, dir);
+  stamp++;
+  for (const f of readdirSync(dir)) utimesSync(join(dir, f), stamp, stamp);
+}
 const shop: Project = { path: "/work/shop", name: "shop", board: true };
 const quiet: Project = { path: "/work/quiet", name: "quiet" };   // board not approved
 
 function watcher(poll: (p: Project) => Promise<void>) {
   const dir = mkdtempSync(join(tmpdir(), "crew-refresh-"));
-  const stop = watchRefresh({ dir, registry: () => [shop, quiet], poll, debounceMs: 60, everyMs: 15 });
-  return { dir, stop };
+  mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const stopWatch = watchRefresh({ dir, registry: () => [shop, quiet], poll, debounceMs: 60, everyMs: 15 });
+  return { dir, stop: () => { stopWatch(); mock.timers.reset(); } };
 }
 
 test("which commands ask for a refresh", () => {
@@ -32,10 +44,10 @@ test("a marker starts one GitHub poll for its project within the debounce; two q
   const polled: string[] = [];
   const { dir, stop } = watcher(async (p) => { polled.push(p.name); });
   try {
-    markRefresh("shop", dir);
-    await sleep(40);
-    markRefresh("shop", dir);   // still inside the 60 ms window
-    await sleep(250);
+    mark("shop", dir);
+    await advance(40);
+    mark("shop", dir);   // still inside the 60 ms window
+    await advance(250);
     assert.deepEqual(polled, ["shop"]);
   } finally { stop(); }
 });
@@ -44,9 +56,9 @@ test("a project without board: true, or an unknown one, is never polled", async 
   const polled: string[] = [];
   const { dir, stop } = watcher(async (p) => { polled.push(p.name); });
   try {
-    markRefresh("quiet", dir);
-    markRefresh("nobody", dir);
-    await sleep(250);
+    mark("quiet", dir);
+    mark("nobody", dir);
+    await advance(250);
     assert.deepEqual(polled, []);
   } finally { stop(); }
 });
@@ -55,20 +67,22 @@ test("a marker that was already there when the server started does not fire", as
   const polled: string[] = [];
   const dir = mkdtempSync(join(tmpdir(), "crew-refresh-"));
   markRefresh("shop", dir);
-  const stop = watchRefresh({ dir, registry: () => [shop], poll: async (p) => { polled.push(p.name); }, debounceMs: 30, everyMs: 15 });
-  try { await sleep(200); assert.deepEqual(polled, []); } finally { stop(); }
+  mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const stopWatch = watchRefresh({ dir, registry: () => [shop], poll: async (p) => { polled.push(p.name); }, debounceMs: 30, everyMs: 15 });
+  const stop = () => { stopWatch(); mock.timers.reset(); };
+  try { await advance(200); assert.deepEqual(polled, []); } finally { stop(); }
 });
 
 test("at most one poll runs at a time; a marker during a poll queues exactly one more", async () => {
   let running = 0, peak = 0, runs = 0;
   const { dir, stop } = watcher(async () => { runs++; peak = Math.max(peak, ++running); await sleep(150); running--; });
   try {
-    markRefresh("shop", dir);
-    await sleep(120);          // the first poll has started
-    markRefresh("shop", dir);
-    await sleep(40);
-    markRefresh("shop", dir);  // second window, still while the first poll runs
-    await sleep(700);
+    mark("shop", dir);
+    await advance(120);          // the first poll has started
+    mark("shop", dir);
+    await advance(40);
+    mark("shop", dir);  // second window, still while the first poll runs
+    await advance(700);
     assert.equal(peak, 1);
     assert.equal(runs, 2);
   } finally { stop(); }

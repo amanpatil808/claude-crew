@@ -160,17 +160,17 @@ test("board.sh handbacks dir and list, end to end", () => {
 });
 
 // ---------- prune ----------
-const tree = (data: string, key = "shop-00000001") => {
+const tree = (data: string, key = "shop-00000001", now = NOW) => {
   const hb = handbacksDir(data, key);
   return {
     hb,
-    oldFull: put(join(hb, "full", "kevin", "20260801-0900-old.md"), "old", 61),
-    oldSum: put(join(hb, "summaries", "kevin", "20260801-0900-old.md"), "old", 61),
-    oldLone: put(join(hb, "summaries", "olaf", "20260801-0900-old.md"), "old", 61),
-    young: put(join(hb, "summaries", "kevin", "20260903-0900-young.md"), "young", 59),
-    oldOtherType: put(join(hb, "full", "kevin", "notes.txt"), "old", 90),
-    events: put(join(data, "events.jsonl"), "old", 400),
-    state: put(join(data, "projects", key, "state.json"), "old", 400),
+    oldFull: put(join(hb, "full", "kevin", "20260801-0900-old.md"), "old", 61, now),
+    oldSum: put(join(hb, "summaries", "kevin", "20260801-0900-old.md"), "old", 61, now),
+    oldLone: put(join(hb, "summaries", "olaf", "20260801-0900-old.md"), "old", 61, now),
+    young: put(join(hb, "summaries", "kevin", "20260903-0900-young.md"), "young", 59, now),
+    oldOtherType: put(join(hb, "full", "kevin", "notes.txt"), "old", 90, now),
+    events: put(join(data, "events.jsonl"), "old", 400, now),
+    state: put(join(data, "projects", key, "state.json"), "old", 400, now),
   };
 };
 
@@ -262,7 +262,7 @@ test("startPrune on the real clock: a 61-day-old file goes, today's stays; failu
 });
 
 test("the board server prunes at start (BOARD_LOG_DIR is its data folder)", async () => {
-  const data = fresh(), t = tree(data);
+  const data = fresh(), t = tree(data, undefined, Date.now());
   const child = spawn(process.execPath, ["--no-warnings", join(import.meta.dirname, "..", "..", "plugin", "board", "server.ts")], {
     env: { ...process.env, BOARD_LOG_DIR: data, BOARD_PORT: String(20000 + Math.floor(Math.random() * 20000)), BOARD_REGISTRY_FILE: join(data, "projects.json") }, stdio: "ignore" });
   try {
